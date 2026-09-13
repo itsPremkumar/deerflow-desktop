@@ -94,6 +94,13 @@ from .astra_security_tool import astra_security_manage
 from .mission_hierarchy_tool import manage_mission_hierarchy, schedule_work_queue
 from .artifact_lineage_tool import trace_artifact_lineage
 
+# Wave 7: Enterprise Harness Expansion
+from .performance_registry_tool import manage_model_performance_registry
+from .knowledge_graph_tool import query_knowledge_graph
+from .evaluation_benchmark_tool import run_task_evaluation_benchmark
+from .computer_worker_tool import execute_sandboxed_computer_action
+from .durable_replay_tool import manage_durable_orchestration
+
 __all__ = [
     "setup_agent",
     "update_agent",
@@ -175,4 +182,9 @@ __all__ = [
     "manage_mission_hierarchy",
     "schedule_work_queue",
     "trace_artifact_lineage",
+    "manage_model_performance_registry",
+    "query_knowledge_graph",
+    "run_task_evaluation_benchmark",
+    "execute_sandboxed_computer_action",
+    "manage_durable_orchestration",
 ]
