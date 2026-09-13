@@ -331,6 +331,20 @@ def _resolve_sandbox(request: ToolCallRequest) -> Sandbox | None:
         return None
 
 
+def _resolve_externalize_threshold(tool_name: str, config: ToolOutputConfig) -> int:
+    """Externalization threshold for *tool_name* (precedence: tool_overrides > prune_tiers > global).
+
+    Mirrors the trigger conditions in :func:`_budget_content` so the pre-scan
+    never produces a false negative. ``0`` disables externalization (fallback
+    truncation may still apply).
+    """
+    if tool_name in config.tool_overrides:
+        return config.tool_overrides[tool_name]
+    if tool_name in config.prune_tiers:
+        return config.prune_tiers[tool_name]
+    return config.externalize_min_chars
+
+
 def _budget_content(
     content: str,
     *,
@@ -345,7 +359,7 @@ def _budget_content(
     Returns ``(replacement, transform_kind)`` — ``"externalized"`` or
     ``"truncated"`` — or ``None`` if no change was needed.
     """
-    threshold = config.tool_overrides.get(tool_name, config.externalize_min_chars)
+    threshold = _resolve_externalize_threshold(tool_name, config)
     if threshold <= 0 and config.fallback_max_chars <= 0:
         return None
     if len(content) <= threshold and len(content) <= config.fallback_max_chars:
@@ -483,7 +497,7 @@ def _effective_trigger(tool_name: str, config: ToolOutputConfig) -> int:
     a false negative. Returns ``-1`` when nothing could ever trigger.
     """
     candidates: list[int] = []
-    externalize = config.tool_overrides.get(tool_name, config.externalize_min_chars)
+    externalize = _resolve_externalize_threshold(tool_name, config)
     if externalize > 0:
         candidates.append(externalize)
     if config.fallback_max_chars > 0:

@@ -852,7 +852,14 @@ def _complete_assembly(
     entirely when no observer is registered to receive it, mirroring
     ``notify_agent_assembled``'s own zero-observer fast path.
     """
+    from deerflow.diagnostics.invariants import verify_agent_assembly
     from deerflow.extensions import get_agent_build_extensions
+
+    # Fail-loud assembly gate (DeepSeek-Harness-style invariant registry):
+    # duplicate tool names make model tool_calls ambiguous and a non-terminal
+    # clarification gate lets sibling calls run before the user answers, so a
+    # breached assembly never reaches the graph. Runs even with no observers.
+    verify_agent_assembly(tools=tools, middlewares=middlewares)
 
     resolved_extensions = get_agent_build_extensions()
     if not resolved_extensions.has_agent_assembly_observers:
@@ -920,13 +927,22 @@ def _assemble_lead_agent(config: RunnableConfig, *, app_config: AppConfig) -> Le
     non_interactive = bool(cfg.get("non_interactive", False))
     agent_name = validate_agent_name(cfg.get("agent_name"))
 
+    # Per-session agent preset (DeepSeek-Harness-style preset modes): a named
+    # toolset bundle resolved per request without a restart. ``standard`` is
+    # the identity preset (today's behavior). The bootstrap path below keeps
+    # its own fixed minimal graph and ignores presets.
+    from deerflow.config.agent_preset_config import preset_summary, resolve_agent_preset
+
+    preset_name, preset = resolve_agent_preset(cfg.get("agent_preset"), presets=resolved_app_config.agent_presets)
+
     agent_config = load_agent_config(agent_name, user_id=resolved_user_id) if not is_bootstrap else None
     # Keep compatibility with lightweight AgentConfig-shaped objects used by
     # integrations that predate caller-level subagent restrictions.
     allowed_subagents = getattr(agent_config, "allowed_subagents", None) if agent_config is not None else None
     # The request switch may disable delegation, but it can never widen the
     # server-side custom-agent policy. An explicit empty list is a hard deny.
-    subagent_enabled = bool(requested_subagent_enabled and allowed_subagents != [])
+    # A preset may only narrow further (``subagent_enabled=False``).
+    subagent_enabled = bool(requested_subagent_enabled and allowed_subagents != [] and preset.subagent_enabled is not False)
     config.setdefault("configurable", {})["subagent_enabled"] = subagent_enabled
     if isinstance(config.get("context"), dict):
         config["context"]["subagent_enabled"] = subagent_enabled
@@ -963,7 +979,7 @@ def _assemble_lead_agent(config: RunnableConfig, *, app_config: AppConfig) -> Le
         thinking_enabled = False
 
     logger.info(
-        "Create Agent(%s) -> thinking_enabled: %s, reasoning_effort: %s, model_name: %s, is_plan_mode: %s, subagent_enabled: %s, max_concurrent_subagents: %s, max_total_subagents: %s",
+        "Create Agent(%s) -> thinking_enabled: %s, reasoning_effort: %s, model_name: %s, is_plan_mode: %s, subagent_enabled: %s, max_concurrent_subagents: %s, max_total_subagents: %s, agent_preset: %s",
         agent_name or "default",
         thinking_enabled,
         reasoning_effort,
@@ -972,6 +988,7 @@ def _assemble_lead_agent(config: RunnableConfig, *, app_config: AppConfig) -> Le
         subagent_enabled,
         max_concurrent_subagents,
         max_total_subagents,
+        preset_name,
     )
 
     # Inject run metadata for LangSmith trace tagging
@@ -986,6 +1003,7 @@ def _assemble_lead_agent(config: RunnableConfig, *, app_config: AppConfig) -> Le
             "reasoning_effort": reasoning_effort,
             "is_plan_mode": is_plan_mode,
             "subagent_enabled": subagent_enabled,
+            "agent_preset": preset_name,
             "tool_groups": agent_config.tool_groups if agent_config else None,
             "available_skills": sorted(available_skills) if available_skills is not None else None,
             "allowed_subagents": list(allowed_subagents) if allowed_subagents is not None else None,
@@ -1100,6 +1118,7 @@ def _assemble_lead_agent(config: RunnableConfig, *, app_config: AppConfig) -> Le
                 "bootstrap": True,
                 "non_interactive": non_interactive,
                 "plan_mode": is_plan_mode,
+                "agent_preset": preset_summary(preset_name, preset),
                 "subagents": _subagent_release_policy(
                     resolved_app_config,
                     enabled=subagent_enabled,
@@ -1140,12 +1159,16 @@ def _assemble_lead_agent(config: RunnableConfig, *, app_config: AppConfig) -> Le
     # leave it unset, so ``update_agent`` remains available there.
     channel_name = cfg.get("channel_name")
     is_webhook_channel = channel_name in _WEBHOOK_CHANNELS
-    extra_tools = [update_agent] if agent_name and not is_webhook_channel else []
+    extra_tools = [update_agent] if agent_name and not is_webhook_channel and preset.allow_update_agent else []
     # Default lead agent (unchanged behavior)
-    raw_tools = get_available_tools(model_name=model_name, groups=agent_config.tool_groups if agent_config else None, subagent_enabled=subagent_enabled, app_config=resolved_app_config)
+    preset_groups = preset.tool_groups if preset.tool_groups is not None else (agent_config.tool_groups if agent_config else None)
+    raw_tools = get_available_tools(model_name=model_name, groups=preset_groups, include_mcp=preset.include_mcp, subagent_enabled=subagent_enabled, app_config=resolved_app_config)
     configured_tools = raw_tools + extra_tools
+    preset_disabled = set(preset.disabled_tools)
     if non_interactive:
-        configured_tools = [tool for tool in configured_tools if tool.name not in _NON_INTERACTIVE_DISABLED_TOOL_NAMES]
+        preset_disabled |= _NON_INTERACTIVE_DISABLED_TOOL_NAMES
+    if preset_disabled:
+        configured_tools = [tool for tool in configured_tools if tool.name not in preset_disabled]
     authorization_candidates = [*configured_tools]
     if skill_setup.describe_skill_tool:
         authorization_candidates.append(skill_setup.describe_skill_tool)
@@ -1221,6 +1244,7 @@ def _assemble_lead_agent(config: RunnableConfig, *, app_config: AppConfig) -> Le
             "bootstrap": False,
             "non_interactive": non_interactive,
             "plan_mode": is_plan_mode,
+            "agent_preset": preset_summary(preset_name, preset),
             "subagents": _subagent_release_policy(
                 resolved_app_config,
                 enabled=subagent_enabled,

@@ -139,3 +139,43 @@ continue, and consume/log its outcome in a completion callback. Prepare-stage
 cancellation retains its handoff/reclaim path. Regressions in
 `tests/blocking_io/test_workspace_changes_cancellation.py` must cover prompt
 metadata cancellation and text-cache drain/cleanup.
+
+### Agent Presets (`config/agent_preset_config.py`)
+
+Named per-session toolset bundles (DeepSeek-Harness-style preset modes),
+requested per run via the `agent_preset` configurable/context key without a
+restart. `standard` is the identity preset (today's behavior); `minimal` is
+the cheap preset (no MCP catalog, no subagents, no `ask_clarification`).
+Operators add presets via `AppConfig.agent_presets` (see `config.example.yaml`);
+unknown names warn and fall back to `standard` so a typo can never break run
+admission. A preset may only narrow: `tool_groups` override the custom agent's
+groups, `include_mcp=False` drops the MCP catalog, `subagent_enabled=False`
+forces delegation off, `disabled_tools` extends the non-interactive filter, and
+`allow_update_agent=False` withholds `update_agent`. The resolved preset is
+recorded in run metadata (`agent_preset`) and the assembly descriptor
+(`effective_policies["agent_preset"]`). The bootstrap agent keeps its own fixed
+minimal graph and ignores presets. Tests: `tests/test_agent_presets.py`.
+
+### Invariant Registry (`diagnostics/invariants.py`)
+
+Fail-loud runtime self-checks (DeepSeek-Harness-style `ctx.invariants`):
+`InvariantRegistry` runs named `InvariantCheck`s and raises `InvariantError`
+(naming the breaching check) instead of limping on, with allow/blocklist
+substring filters. The module is stdlib-only so factories can import it without
+cycles. `_complete_assembly` in `agents/lead_agent/agent.py` gates every lead
+assembly via `verify_agent_assembly`: duplicate model-visible tool names and a
+non-terminal `ClarificationMiddleware` (IsolatedMiddleware-aware) fail the run
+at build time. Only check owned assembly relations, never remote state.
+Tests: `tests/test_invariants.py`.
+
+### Pruner Tiers (`config/tool_output_config.py::prune_tiers`)
+
+Named per-tool-class externalization tiers (DeepSeek-Harness-style pruner
+tiers, e.g. `{'bash': 65536, 'web_fetch': 16384}`). Per-tool resolution
+precedence: `tool_overrides` > `prune_tiers` > `externalize_min_chars`; `0`
+disables externalization at the matching layer (fallback truncation may still
+apply) and negative values are rejected loudly. Both `_budget_content` and the
+`_effective_trigger` pre-scan resolve through `_resolve_externalize_threshold`
+so the fast path never false-negatives; tiers ride `release_policy_parameters`
+into the assembly identity automatically. Tests:
+`tests/test_tool_output_prune_tiers.py`.

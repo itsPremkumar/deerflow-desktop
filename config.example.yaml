@@ -20,7 +20,7 @@
 # ============================================================================
 # Bump this number when the config schema changes.
 # Run `make config-upgrade` to merge new fields into your local config.yaml.
-config_version: 43
+config_version: 44
 
 # ============================================================================
 # Logging
@@ -754,6 +754,23 @@ tool_groups:
   - name: knowledge
 
 # ============================================================================
+# Agent Presets Configuration
+# ============================================================================
+# Named per-session toolset bundles (DeepSeek-Harness-style preset modes),
+# requested per run via configurable/context key `agent_preset` without a
+# restart. `standard` (identity: today's behavior) and `minimal` (no MCP, no
+# subagents, no clarification round-trips) are built in; define more here.
+# Operator presets override the built-ins by name.
+
+# agent_presets:
+#   research:
+#     tool_groups: [web]
+#     include_mcp: true
+#     subagent_enabled: false
+#     disabled_tools: [bash]
+#     allow_update_agent: true
+
+# ============================================================================
 # Tools Configuration
 # ============================================================================
 # Configure available tools for the agent to use
@@ -1236,6 +1253,12 @@ tool_output:
   # tool_overrides:
   #   web_search: 8000
   #   bash: 20000
+  # Per-tool-class externalization tiers (DeepSeek-Harness-style pruner
+  # tiers). Precedence per tool: tool_overrides > prune_tiers >
+  # externalize_min_chars. 0 disables externalization for matching tools.
+  # prune_tiers:
+  #   bash: 65536
+  #   web_fetch: 16384
 
 # ============================================================================
 # Suggestions Configuration

@@ -10,6 +10,7 @@ from dotenv import load_dotenv
 from pydantic import BaseModel, ConfigDict, Field, PrivateAttr, model_validator
 
 from deerflow.config.acp_config import ACPAgentConfig, load_acp_config_from_dict
+from deerflow.config.agent_preset_config import AgentPresetConfig
 from deerflow.config.agent_storage_config import AgentStorageConfig
 from deerflow.config.agents_api_config import AgentsApiConfig, load_agents_api_config_from_dict
 from deerflow.config.auth_config import AuthAppConfig
@@ -234,6 +235,7 @@ class AppConfig(BaseModel):
     )
     tools: list[ToolConfig] = Field(default_factory=list, description="Available tools")
     tool_groups: list[ToolGroupConfig] = Field(default_factory=list, description="Available tool groups")
+    agent_presets: dict[str, AgentPresetConfig] = Field(default_factory=dict, description="Named per-session agent presets (standard/minimal/...). Empty selects built-in defaults; requested via configurable/context key 'agent_preset'.")
     skills: SkillsConfig = Field(default_factory=SkillsConfig, description="Skills configuration")
     skill_scan: SkillScanConfig = Field(default_factory=SkillScanConfig, description="Native deterministic skill safety scanning configuration")
     skill_evolution: SkillEvolutionConfig = Field(default_factory=SkillEvolutionConfig, description="Agent-managed skill evolution configuration")
