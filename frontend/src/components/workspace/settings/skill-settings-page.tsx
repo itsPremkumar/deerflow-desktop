@@ -45,6 +45,7 @@ import type { Skill } from "@/core/skills/type";
 import { env } from "@/env";
 
 import { SettingsSection } from "./settings-section";
+import { SkillProposalsSection } from "./skill-proposals-section";
 
 const SkillExportDialog = dynamic(() => import("./skill-export-dialog"), {
   ssr: false,
@@ -71,7 +72,12 @@ export function SkillSettingsPage({ onClose }: { onClose?: () => void } = {}) {
           {t.common.error} {error.message}
         </div>
       ) : (
-        <SkillSettingsList skills={skills} onClose={onClose} />
+        <>
+          <SkillSettingsList skills={skills} onClose={onClose} />
+          <div className="mt-6">
+            <SkillProposalsSection />
+          </div>
+        </>
       )}
     </SettingsSection>
   );

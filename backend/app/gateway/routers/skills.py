@@ -1,6 +1,8 @@
 import asyncio
 import logging
+import shutil
 import tempfile
+import zipfile
 from collections.abc import AsyncGenerator
 from pathlib import Path
 from typing import BinaryIO, Literal
@@ -28,6 +30,20 @@ from deerflow.config.extensions_config import (
 )
 from deerflow.runtime.user_context import get_effective_user_id
 from deerflow.skills import Skill
+from deerflow.skills.export import SkillExportError, build_skill_export, export_manifest
+from deerflow.skills.installer import SkillAlreadyExistsError, SkillSecurityScanError
+from deerflow.skills.proposals import (
+    APPROVED,
+    INSTALLED,
+    PENDING,
+    REJECTED,
+    SkillProposal,
+    SkillProposalStore,
+    finding_summary,
+    proposals_root,
+    validate_proposal_content,
+    validate_proposal_name,
+)
 from deerflow.skills.export import SkillExportError, build_skill_export, export_manifest
 from deerflow.skills.installer import SkillAlreadyExistsError, SkillSecurityScanError
 from deerflow.skills.security_scanner import scan_skill_content
@@ -239,10 +255,20 @@ async def _parse_skill_archive_form(request: Request) -> FormData:
     return await parser.parse()
 
 
-async def _install_skill_archive(archive_path: Path, config: AppConfig) -> SkillInstallResponse:
+async def _install_skill_archive(archive_path: Path, config: AppConfig, *, user_id: str | None = None) -> SkillInstallResponse:
+    """Install an archive, refreshing caches for the target user.
+
+    Args:
+        archive_path: Staged ``.skill`` archive.
+        config: Active app config.
+        user_id: Install into this user's custom skills. Defaults to the
+            request's effective user (proposal approval passes the proposer).
+    """
+    effective_user_id = user_id or get_effective_user_id()
     try:
-        result = await _get_user_skill_storage(config).ainstall_skill_from_archive(archive_path)
-        await refresh_user_skills_system_prompt_cache_async(get_effective_user_id())
+        storage = get_or_new_user_skill_storage(effective_user_id, app_config=config)
+        result = await storage.ainstall_skill_from_archive(archive_path)
+        await refresh_user_skills_system_prompt_cache_async(effective_user_id)
         return SkillInstallResponse(**result)
     except FileNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e)) from e
@@ -373,6 +399,227 @@ async def reload_skills(request: Request) -> SkillReloadResponse:
         scope="process",
         message="Skill caches invalidated; subsequent runs in this Gateway process will rescan the latest skills.",
     )
+
+
+class SkillProposalFinding(BaseModel):
+    """One scan finding, shaped for the existing findings UI."""
+
+    rule_id: str
+    severity: str
+    file: str | None = None
+    line: int | None = None
+    message: str = ""
+    remediation: str | None = None
+
+
+class SkillProposalResponse(BaseModel):
+    """An agent-proposed skill awaiting (or past) human review."""
+
+    id: str
+    name: str
+    description: str
+    status: str
+    created_by: str
+    created_at: str
+    findings: list[SkillProposalFinding] = Field(default_factory=list)
+    findings_summary: dict[str, int] = Field(default_factory=dict)
+    reviewed_by: str | None = None
+    reviewed_at: str | None = None
+    reject_reason: str | None = None
+    installed_skill: str | None = None
+
+
+class SkillProposalCreateRequest(BaseModel):
+    """Propose a skill (any authenticated user; nothing takes effect)."""
+
+    name: str = Field(min_length=1, max_length=64, description="Skill name: lowercase letters, digits, hyphens")
+    description: str = Field(default="", max_length=500, description="Short description of the skill")
+    skill_md: str = Field(min_length=1, description="Complete SKILL.md markdown")
+
+
+class SkillProposalReviewRequest(BaseModel):
+    """Reject reason (optional); approve carries no body fields."""
+
+    reason: str = Field(default="", max_length=2000, description="Why the proposal is rejected")
+
+
+class SkillProposalListResponse(BaseModel):
+    """Newest-first proposals."""
+
+    proposals: list[SkillProposalResponse]
+
+
+def _proposal_finding_to_response(finding: dict) -> SkillProposalFinding:
+    # Native SkillScan findings (rule_id/severity/file/line/message/remediation).
+    line = finding.get("line")
+    return SkillProposalFinding(
+        rule_id=str(finding.get("rule_id", "")),
+        severity=str(finding.get("severity", "info")),
+        file=str(finding.get("file")) if finding.get("file") is not None else None,
+        line=line if isinstance(line, int) else None,
+        message=str(finding.get("message", "")),
+        remediation=str(finding.get("remediation")) if finding.get("remediation") is not None else None,
+    )
+
+
+def _proposal_to_response(proposal: SkillProposal) -> SkillProposalResponse:
+    findings = [_proposal_finding_to_response(finding) for finding in proposal.findings]
+    return SkillProposalResponse(
+        id=proposal.id,
+        name=proposal.name,
+        description=proposal.description,
+        status=proposal.status,
+        created_by=proposal.created_by,
+        created_at=proposal.created_at,
+        findings=findings,
+        findings_summary=finding_summary(proposal.findings),
+        reviewed_by=proposal.reviewed_by,
+        reviewed_at=proposal.reviewed_at,
+        reject_reason=proposal.reject_reason,
+        installed_skill=proposal.installed_skill,
+    )
+
+
+def _proposal_store() -> SkillProposalStore:
+    return SkillProposalStore(proposals_root())
+
+
+@router.get(
+    "/skills/proposals",
+    response_model=SkillProposalListResponse,
+    summary="List Skill Proposals",
+    description="List skill proposals. By default only the caller's own; `scope=all` (admin-only) lists everyone's.",
+)
+async def list_skill_proposals(
+    request: Request,
+    scope: str = Query(default="mine", description="`mine` or `all` (admin-only)"),
+    status: str | None = Query(default=None, description="Filter by status: pending, approved, rejected, installed"),
+) -> SkillProposalListResponse:
+    user_id = get_effective_user_id()
+    if scope == "all":
+        await require_admin_user(request, detail=_ADMIN_REQUIRED_DETAIL)
+    elif scope != "mine":
+        raise HTTPException(status_code=400, detail="scope must be 'mine' or 'all'")
+    if status is not None and status not in (PENDING, APPROVED, REJECTED, INSTALLED):
+        raise HTTPException(status_code=400, detail="status must be one of: pending, approved, rejected, installed")
+    store = _proposal_store()
+    proposals = store.list_all(status) if scope == "all" else store.list(user_id, status)
+    return SkillProposalListResponse(proposals=[_proposal_to_response(proposal) for proposal in proposals])
+
+
+@router.post(
+    "/skills/proposals",
+    response_model=SkillProposalResponse,
+    status_code=201,
+    summary="Propose A Skill",
+    description="Propose a skill as SKILL.md markdown. Scanned immediately (blockers fail without storing); an admin reviews before anything takes effect.",
+)
+async def create_skill_proposal(
+    request: Request, body: SkillProposalCreateRequest, config: AppConfig = Depends(get_config)
+) -> SkillProposalResponse:
+    user_id = get_effective_user_id()
+    try:
+        validate_proposal_name(body.name)
+        skill_md, description = validate_proposal_content(body.skill_md, body.description)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    findings = await _scan_static_skill_markdown_or_raise(body.name, skill_md, app_config=config)
+    store = _proposal_store()
+    proposal = store.create(
+        user_id,
+        body.name,
+        description,
+        skill_md,
+        [dict(finding) for finding in findings],
+    )
+    logger.info("Skill proposal '%s' created by %s", body.name, user_id)
+    return _proposal_to_response(proposal)
+
+
+def _stage_proposal_archive(proposal: SkillProposal) -> Path:
+    """Materialize a proposal as a `.skill` archive directory layout for install."""
+    staging = Path(tempfile.mkdtemp(prefix="deerflow-proposal-install-"))
+    skill_dir = staging / proposal.name
+    skill_dir.mkdir(parents=True)
+    (skill_dir / SKILL_MD_FILE).write_text(proposal.skill_md, encoding="utf-8")
+    archive_path = staging / f"{proposal.name}.skill"
+    with zipfile.ZipFile(archive_path, "w", zipfile.ZIP_DEFLATED) as archive:
+        archive.write(skill_dir / SKILL_MD_FILE, f"{proposal.name}/{SKILL_MD_FILE}")
+    return archive_path
+
+
+@router.post(
+    "/skills/proposals/{proposal_id}/approve",
+    response_model=SkillProposalResponse,
+    summary="Approve And Install A Proposed Skill",
+    description="Admin-only: re-scan, install into the proposer's custom skills, and mark installed. Blocked re-scans fail without state changes.",
+)
+async def approve_skill_proposal(
+    proposal_id: str, request: Request, config: AppConfig = Depends(get_config)
+) -> SkillProposalResponse:
+    await require_admin_user(request, detail=_ADMIN_REQUIRED_DETAIL)
+    admin_id = get_effective_user_id()
+    store = _proposal_store()
+    proposal = store.get_any(proposal_id)
+    if proposal is None:
+        raise HTTPException(status_code=404, detail=f"Unknown skill proposal '{proposal_id}'.")
+    if proposal.status not in (PENDING, APPROVED):
+        raise HTTPException(status_code=409, detail=f"Skill proposal '{proposal_id}' is {proposal.status}; only pending (or previously approved) proposals can be approved.")
+    # Re-scan at approve time (scanner rules may have changed since proposal).
+    await _scan_static_skill_markdown_or_raise(proposal.name, proposal.skill_md, app_config=config)
+    if proposal.status == PENDING:
+        # Record approval first so a failed install stays visibly approved
+        # (and retryable) instead of silently pending.
+        try:
+            proposal = store.set_status_any(proposal_id, APPROVED, reviewed_by=admin_id)
+        except ValueError as exc:
+            # Lost a concurrent-approval race after the read above.
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+        if proposal is None:  # pragma: no cover - deleted between read and write
+            raise HTTPException(status_code=404, detail=f"Unknown skill proposal '{proposal_id}'.")
+    staging: Path | None = None
+    try:
+        staging = await asyncio.to_thread(_stage_proposal_archive, proposal)
+        archive_path = staging / f"{proposal.name}.skill"
+        try:
+            install = await _install_skill_archive(archive_path, config, user_id=proposal.created_by)
+        except SkillAlreadyExistsError as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+        except SkillSecurityScanError as exc:
+            raise HTTPException(status_code=400, detail={"message": str(exc), "skill_name": exc.skill_name, "findings": exc.findings}) from exc
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        updated = store.set_status_any(
+            proposal_id, INSTALLED, reviewed_by=admin_id, installed_skill=install.skill_name
+        )
+    finally:
+        if staging is not None:
+            await asyncio.to_thread(shutil.rmtree, staging, True)
+    if updated is None:  # pragma: no cover - deleted between read and write
+        raise HTTPException(status_code=404, detail=f"Unknown skill proposal '{proposal_id}'.")
+    logger.info("Skill proposal '%s' approved by %s", proposal_id, admin_id)
+    return _proposal_to_response(updated)
+
+
+@router.post(
+    "/skills/proposals/{proposal_id}/reject",
+    response_model=SkillProposalResponse,
+    summary="Reject A Proposed Skill",
+    description="Admin-only: reject with an optional reason. Rejected proposals stay readable but inert.",
+)
+async def reject_skill_proposal(
+    proposal_id: str, request: Request, body: SkillProposalReviewRequest
+) -> SkillProposalResponse:
+    await require_admin_user(request, detail=_ADMIN_REQUIRED_DETAIL)
+    admin_id = get_effective_user_id()
+    store = _proposal_store()
+    try:
+        updated = store.set_status_any(proposal_id, REJECTED, reviewed_by=admin_id, reject_reason=body.reason)
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    if updated is None:
+        raise HTTPException(status_code=404, detail=f"Unknown skill proposal '{proposal_id}'.")
+    return _proposal_to_response(updated)
 
 
 @router.get("/skills/custom", response_model=SkillsListResponse, summary="List Custom Skills")

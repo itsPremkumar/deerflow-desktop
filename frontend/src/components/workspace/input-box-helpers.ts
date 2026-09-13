@@ -58,6 +58,25 @@ export type SlashSuggestion = {
   kind: "builtin" | "skill";
 };
 
+/**
+ * Intent keywords that surface a builtin command in the slash catalog
+ * without being its name (deterministic, zero-LLM-cost keyword routing).
+ * Exact match only — prefix behavior stays with the name/description
+ * matcher below so suggestions remain predictable. Aliases never create new
+ * slash commands, so the cross-language slash contract is untouched; adding
+ * a reserved command name would be a contract change instead.
+ */
+export const KEYWORD_COMMAND_ALIASES: Readonly<Record<string, string>> = {
+  compress: "compact",
+  summarize: "compact",
+  summarise: "compact",
+  context: "compact",
+  objective: "goal",
+  target: "goal",
+  aim: "goal",
+  goals: "goal",
+};
+
 export type GoalCommand =
   | { kind: "status" }
   | { kind: "clear" }
@@ -179,6 +198,9 @@ export function getMatchingSkillSuggestions(
 
   const builtinMatches = builtinCommands.filter(({ name, description }) => {
     if (!normalizedQuery) {
+      return true;
+    }
+    if (KEYWORD_COMMAND_ALIASES[normalizedQuery] === name.toLowerCase()) {
       return true;
     }
     return (

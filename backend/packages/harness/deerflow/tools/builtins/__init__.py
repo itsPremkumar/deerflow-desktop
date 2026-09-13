@@ -7,6 +7,7 @@ from .harness_refine_tool import harness_refine_tool
 from .list_uploaded_files_tool import list_uploaded_files
 from .present_file_tool import present_file_tool
 from .process_handle_tool import process_handle_tool
+from .propose_skill_tool import propose_skill_tool
 from .python_repl_tool import python_repl_tool
 from .review_skill_package_tool import review_skill_package
 from .session_search_tool import session_search_tool
@@ -30,6 +31,7 @@ __all__ = [
     "setup_agent",
     "update_agent",
     "present_file_tool",
+    "propose_skill_tool",
     "review_skill_package",
     "session_search_tool",
     "ask_clarification_tool",

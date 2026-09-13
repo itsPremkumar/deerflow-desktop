@@ -27,6 +27,22 @@ SQLITE_MSG_TYPE_PROJECTION = (
     "ELSE 'text' END"
 )
 
+# Trigger-body variants: inside CREATE TRIGGER, bare column names do NOT
+# resolve to the triggering row (SQLite raises "no such column"), so the
+# projections must be qualified with NEW. The SELECT backfill above keeps the
+# bare versions (NEW is invalid outside a trigger).
+SQLITE_TRIGGER_TEXT_PROJECTION = (
+    "CASE WHEN json_valid(NEW.content) AND json_type(NEW.content) = 'object' "
+    "THEN COALESCE(json_extract(NEW.content, '$.content'), NEW.content) "
+    "ELSE NEW.content END"
+)
+
+SQLITE_TRIGGER_MSG_TYPE_PROJECTION = (
+    "CASE WHEN json_valid(NEW.content) AND json_type(NEW.content) = 'object' "
+    "THEN COALESCE(json_extract(NEW.content, '$.type'), 'other') "
+    "ELSE 'text' END"
+)
+
 SQLITE_FTS_DDL: tuple[str, ...] = (
     "CREATE VIRTUAL TABLE IF NOT EXISTS run_events_fts USING fts5("
     "content, thread_id UNINDEXED, run_id UNINDEXED, "
@@ -37,8 +53,8 @@ SQLITE_FTS_DDL: tuple[str, ...] = (
     "WHEN NEW.category = 'message' BEGIN "
     "INSERT INTO run_events_fts(rowid, content, thread_id, run_id, "
     "event_type, msg_type, seq, user_id, created_at) "
-    f"VALUES (NEW.id, {SQLITE_TEXT_PROJECTION}, NEW.thread_id, NEW.run_id, "
-    f"NEW.event_type, {SQLITE_MSG_TYPE_PROJECTION}, "
+    f"VALUES (NEW.id, {SQLITE_TRIGGER_TEXT_PROJECTION}, NEW.thread_id, NEW.run_id, "
+    f"NEW.event_type, {SQLITE_TRIGGER_MSG_TYPE_PROJECTION}, "
     "NEW.seq, NEW.user_id, NEW.created_at); END",
     "DROP TRIGGER IF EXISTS run_events_fts_delete",
     "CREATE TRIGGER run_events_fts_delete AFTER DELETE ON run_events "

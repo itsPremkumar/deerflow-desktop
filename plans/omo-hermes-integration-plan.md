@@ -174,10 +174,12 @@ gateway contract rules). Runner later. Effort: M now / XL later.
 `skills/public/project-cartographer/` (read-only AGENTS.md drafts →
 human approval via H4) + conditional-rules store in `core/settings`.
 Effort: S/M. Good first-UI slice.
+Status (2026-09-13): landed — `skills/public/project-cartographer/SKILL.md` + `test_public_skill_cartographer.py`, `core/rules.ts` + rules settings page wired into settings dialog, 8/8 rstest green.
 
 ### O10. Keyword intent routing → composer slash router
 Deterministic keyword→mode hints (`ulw `→`/plan`) in `builtinSlashCommands`
 matching; zero-LLM-cost. Effort: S.
+Status (2026-09-13): landed — `KEYWORD_COMMAND_ALIASES` in `input-box-helpers.ts` (exact-match only, no slash-contract change) + 4/4 rstest green.
 
 ### O11. Review guards → review pipeline (no new binary)
 `read_before_write` already covers write-guards; add comment-density +

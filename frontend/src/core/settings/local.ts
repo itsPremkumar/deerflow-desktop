@@ -1,4 +1,5 @@
 import type { TokenUsageInlineMode } from "../messages/usage-model";
+import { normalizeProjectRules, type ProjectRule } from "../rules";
 import type { AgentThreadContext } from "../threads";
 
 export const DEFAULT_LOCAL_SETTINGS: LocalSettings = {
@@ -6,6 +7,9 @@ export const DEFAULT_LOCAL_SETTINGS: LocalSettings = {
     enabled: true,
   },
   projectsDisplayMode: "flat",
+  projectRules: {
+    rules: [],
+  },
   tokenUsage: {
     headerTotal: true,
     inlineMode: "per_turn",
@@ -68,6 +72,9 @@ export interface LocalSettings {
     enabled: boolean;
   };
   projectsDisplayMode: "flat" | "grouped";
+  projectRules: {
+    rules: ProjectRule[];
+  };
   tokenUsage: {
     headerTotal: boolean;
     inlineMode: TokenUsageInlineMode;
@@ -105,6 +112,9 @@ function mergeLocalSettings(settings?: Partial<LocalSettings>): LocalSettings {
     projectsDisplayMode:
       settings?.projectsDisplayMode ??
       DEFAULT_LOCAL_SETTINGS.projectsDisplayMode,
+    projectRules: {
+      rules: normalizeProjectRules(settings?.projectRules?.rules),
+    },
   };
 }
 

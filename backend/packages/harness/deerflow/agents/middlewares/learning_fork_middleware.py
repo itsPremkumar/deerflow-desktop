@@ -1,0 +1,256 @@
+"""Post-turn learning fork middleware.
+
+Runs a cheap aux-model replay after each turn with a bounded digest of the
+latest conversation. The fork uses a whitelisted toolset (memory + proposal
+tools only) so it cannot mutate sandbox state or invoke arbitrary tools.
+All writes go through the existing MemoryManager and SkillProposalStore;
+exceptions are isolated and never affect the primary run.
+"""
+
+import logging
+from typing import TYPE_CHECKING, override
+
+from langchain.agents import AgentState
+from langchain.agents.middleware import AgentMiddleware
+from langgraph.config import get_config
+from langgraph.runtime import Runtime
+
+from deerflow.config.learning_fork_config import LearningForkConfig, get_learning_fork_config
+from deerflow.models import create_chat_model
+from deerflow.trace_context import DEERFLOW_TRACE_METADATA_KEY, resolve_trace_id
+
+if TYPE_CHECKING:
+    from deerflow.agents.memory import MemoryManager
+    from deerflow.skills.proposals import SkillProposalStore
+
+logger = logging.getLogger(__name__)
+
+
+class LearningForkMiddlewareState(AgentState):
+    """Compatible with the ThreadState schema."""
+
+    pass
+
+
+_WHITELISTED_TOOL_NAMES = frozenset(
+    {
+        "add_memory",
+        "recall_memory",
+        "propose_skill",
+    }
+)
+
+
+def _build_digest(messages: list, max_chars: int) -> str:
+    """Build a newest-first conversation digest capped at max_chars."""
+    if not messages:
+        return ""
+
+    parts: list[str] = []
+    total = 0
+    for msg in reversed(messages):
+        role = getattr(msg, "type", getattr(msg, "role", "unknown"))
+        content = getattr(msg, "content", "")
+        if isinstance(content, list):
+            # Handle multimodal content (e.g. image + text)
+            text_parts = [c.get("text", "") for c in content if isinstance(c, dict)]
+            content = " ".join(text_parts)
+        chunk = f"[{role}] {content}"
+        if total + len(chunk) > max_chars:
+            break
+        parts.append(chunk)
+        total += len(chunk)
+
+    return "\n".join(reversed(parts))
+
+
+class LearningForkMiddleware(AgentMiddleware[LearningForkMiddlewareState]):
+    """Middleware that runs a post-turn learning fork with whitelisted tools."""
+
+    state_schema = LearningForkMiddlewareState
+
+    def __init__(
+        self,
+        *,
+        learning_fork_config: LearningForkConfig | None = None,
+        memory_manager: "MemoryManager | None" = None,
+        proposal_store: "SkillProposalStore | None" = None,
+    ) -> None:
+        super().__init__()
+        self._config = learning_fork_config or get_learning_fork_config()
+        self._memory_manager = memory_manager
+        self._proposal_store = proposal_store
+
+    def _resolve_thread_context(self, state: LearningForkMiddlewareState, runtime: Runtime) -> tuple[str, str, list] | None:
+        """Extract thread_id, user_id, and messages from state/runtime."""
+        thread_id = None
+        if runtime.context:
+            thread_id = runtime.context.get("thread_id")
+        if not thread_id:
+            config_data = get_config()
+            thread_id = config_data.get("configurable", {}).get("thread_id")
+        if not thread_id:
+            logger.debug("LearningFork: no thread_id, skipping")
+            return None
+
+        messages = state.get("messages", [])
+        if not messages:
+            logger.debug("LearningFork: no messages, skipping")
+            return None
+
+        from deerflow.runtime.user_context import resolve_runtime_user_id
+
+        user_id = resolve_runtime_user_id(runtime)
+
+        runtime_context = runtime.context if isinstance(runtime.context, dict) else {}
+        trace_id = resolve_trace_id(runtime_context.get(DEERFLOW_TRACE_METADATA_KEY))
+
+        return thread_id, user_id, messages, trace_id
+
+    def _create_fork_model(self, lead_model_name: str | None) -> any:
+        """Create the aux model for the fork."""
+        model_name = self._config.model_name or lead_model_name
+        if not model_name:
+            logger.warning("LearningFork: no model available, skipping")
+            return None
+        try:
+            return create_chat_model(model_name)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("LearningFork: failed to create model %s: %s", model_name, exc)
+            return None
+
+    def _build_fork_prompt(self, digest: str) -> str:
+        """Build the system prompt for the learning fork."""
+        return (
+            "You are a post-turn learning assistant. Your job is to review the latest "
+            "conversation digest and optionally propose memory facts or new skills.\n\n"
+            "CONVERSATION DIGEST (newest last):\n"
+            f"{digest}\n\n"
+            "AVAILABLE TOOLS:\n"
+            "- add_memory: Store a factual memory for the user\n"
+            "- recall_memory: Search existing memories (read-only)\n"
+            "- propose_skill: Propose a new skill for admin review\n\n"
+            "RULES:\n"
+            "1. Only propose memories that are factual, user-specific, and durable.\n"
+            "2. Only propose skills when the conversation reveals a reusable pattern.\n"
+            f"3. Max {self._config.max_proposals_per_run} proposals per run.\n"
+            "4. Be concise. Do not spam.\n"
+        )
+
+    @override
+    async def after_agent(self, state: LearningForkMiddlewareState, runtime: Runtime) -> dict | None:
+        """Run the learning fork after the primary agent completes."""
+        if not self._config.enabled:
+            return None
+
+        ctx = self._resolve_thread_context(state, runtime)
+        if ctx is None:
+            return None
+
+        thread_id, user_id, messages, trace_id = ctx
+
+        # Resolve lead model name from runtime config
+        lead_model_name = None
+        if runtime.context:
+            lead_model_name = runtime.context.get("model_name")
+        if not lead_model_name:
+            config_data = get_config()
+            lead_model_name = config_data.get("configurable", {}).get("model_name")
+
+        fork_model = self._create_fork_model(lead_model_name)
+        if fork_model is None:
+            return None
+
+        digest = _build_digest(messages, self._config.digest_chars)
+        if not digest.strip():
+            return None
+
+        # Build a minimal toolset with only whitelisted tools
+        from deerflow.tools.builtins import add_memory, propose_skill_tool, recall_memory
+
+        whitelisted_tools = [add_memory, recall_memory, propose_skill_tool]
+
+        # Bind tools to the fork model
+        fork_model_with_tools = fork_model.bind_tools(whitelisted_tools)
+
+        # Inject the fork prompt as a system message
+        from langchain_core.messages import SystemMessage
+
+        fork_messages = [SystemMessage(content=self._build_fork_prompt(digest))]
+
+        try:
+            # Run the fork - single invocation, no streaming
+            response = await fork_model_with_tools.ainvoke(fork_messages)
+
+            # Execute any tool calls the fork made
+            tool_calls = getattr(response, "tool_calls", [])
+            proposals_made = 0
+
+            for tool_call in tool_calls:
+                if proposals_made >= self._config.max_proposals_per_run:
+                    break
+
+                tool_name = tool_call.get("name", "")
+                if tool_name not in _WHITELISTED_TOOL_NAMES:
+                    logger.warning("LearningFork: attempted non-whitelisted tool %s", tool_name)
+                    continue
+
+                try:
+                    if tool_name == "add_memory":
+                        from deerflow.agents.memory import get_memory_manager
+
+                        manager = self._memory_manager or get_memory_manager()
+                        await manager.add(thread_id, [response], user_id, trace_id)
+                        proposals_made += 1
+
+                    elif tool_name == "propose_skill":
+                        from deerflow.skills.proposals import get_skill_proposal_store
+
+                        store = self._proposal_store or get_skill_proposal_store()
+                        args = tool_call.get("args", {})
+                        await store.propose(
+                            name=args.get("name", ""),
+                            description=args.get("description", ""),
+                            content=args.get("content", ""),
+                            proposed_by=user_id,
+                        )
+                        proposals_made += 1
+
+                    elif tool_name == "recall_memory":
+                        # Read-only, just execute for context
+                        from deerflow.agents.memory import get_memory_manager
+
+                        manager = self._memory_manager or get_memory_manager()
+                        await manager.recall(thread_id, args.get("query", ""), user_id)
+
+                except Exception as exc:  # noqa: BLE001
+                    logger.warning("LearningFork: tool %s failed: %s", tool_name, exc)
+                    # Isolate fork failures - never affect primary run
+
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("LearningFork: model invocation failed: %s", exc)
+
+        return None
+
+    def release_policy_parameters(self) -> dict[str, object]:
+        """Expose config for assembly identity."""
+        return {
+            "learning_fork_enabled": self._config.enabled,
+            "learning_fork_model": self._config.model_name,
+            "learning_fork_max_proposals": self._config.max_proposals_per_run,
+            "learning_fork_digest_chars": self._config.digest_chars,
+        }
+
+
+def build_learning_fork_middleware(
+    *,
+    learning_fork_config: LearningForkConfig | None = None,
+    memory_manager: "MemoryManager | None" = None,
+    proposal_store: "SkillProposalStore | None" = None,
+) -> LearningForkMiddleware:
+    """Factory for the learning fork middleware."""
+    return LearningForkMiddleware(
+        learning_fork_config=learning_fork_config,
+        memory_manager=memory_manager,
+        proposal_store=proposal_store,
+    )

@@ -29,6 +29,7 @@ from deerflow.config.memory_config import MemoryConfig, load_memory_config_from_
 from deerflow.config.model_config import ModelConfig, ProviderConfig
 from deerflow.config.read_before_write_config import ReadBeforeWriteConfig
 from deerflow.config.reload_boundary import format_field_description
+from deerflow.config.review_guard_config import ReviewGuardConfig
 from deerflow.config.run_events_config import RunEventsConfig
 from deerflow.config.run_ownership_config import RunOwnershipConfig
 from deerflow.config.runtime_paths import existing_project_file
@@ -263,6 +264,7 @@ class AppConfig(BaseModel):
     tool_progress: ToolProgressConfig = Field(default_factory=ToolProgressConfig, description="Tool progress state machine middleware configuration")
     verification: VerificationConfig = Field(default_factory=VerificationConfig, description="Subagent result verification (receipts, checklist, judge)")
     read_before_write: ReadBeforeWriteConfig = Field(default_factory=ReadBeforeWriteConfig, description="Read-before-write file gate middleware configuration")
+    review_guard: ReviewGuardConfig = Field(default_factory=ReviewGuardConfig, description="Review guard middleware configuration (comment density, role-scoped writes)")
     safety_finish_reason: SafetyFinishReasonConfig = Field(default_factory=SafetyFinishReasonConfig, description="Provider safety-filter finish_reason interception middleware configuration")
     auth: AuthAppConfig = Field(default_factory=AuthAppConfig, description="Authentication configuration (local + OIDC SSO)")
     model_config = ConfigDict(extra="allow")

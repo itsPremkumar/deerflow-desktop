@@ -28,6 +28,7 @@ from deerflow.tools.builtins import (
     list_uploaded_files,
     present_file_tool,
     process_handle_tool,
+    propose_skill_tool,
     python_repl_tool,
     review_skill_package,
     session_search_tool,
@@ -48,6 +49,7 @@ logger = logging.getLogger(__name__)
 
 BUILTIN_TOOLS = [
     present_file_tool,
+    propose_skill_tool,
     ask_clarification_tool,
     review_skill_package,
     # Cross-thread recall: lead-only (denied for subagents by default, see
