@@ -81,6 +81,12 @@ from .ralph_loop_tool import ralph_loop_tool
 # NVIDIA Agentic Variation Operators (AVO) tool
 from .nvidia_avo_tool import run_nvidia_avo_step
 
+# Wave 4: Frontier Governance, Context Superintelligence & Truth Engine
+from .quality_council_tool import deliberate_artifact_quality
+from .context_as_data_tool import manage_context_data
+from .adaptive_autonomy_tool import check_or_set_autonomy_profile
+from .evidence_matrix_tool import audit_finish_first_evidence
+
 __all__ = [
     "setup_agent",
     "update_agent",
@@ -154,4 +160,8 @@ __all__ = [
     "build_autonomous_plan",
     "ralph_loop_tool",
     "run_nvidia_avo_step",
+    "deliberate_artifact_quality",
+    "manage_context_data",
+    "check_or_set_autonomy_profile",
+    "audit_finish_first_evidence",
 ]
