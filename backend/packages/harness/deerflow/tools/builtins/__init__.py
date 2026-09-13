@@ -56,6 +56,14 @@ from .rsi_engine_tool import run_rsi_cycle
 from .consequence_tool import simulate_consequences
 from .self_heal_tool import self_heal_diagnose
 
+# Hermes AGI/ASI Wave 2 Advanced Operating System Tools
+from .blackboard_tool import blackboard_query, blackboard_record_evidence
+from .cognitive_compiler_tool import compile_cognitive_plan
+from .action_transaction_tool import execute_transactional_action
+from .avo_lineage_tool import run_avo_variation
+from .repo_twin_tool import inspect_repo_twin
+from .metacognitive_tool import check_metacognitive_health
+
 __all__ = [
     "setup_agent",
     "update_agent",
@@ -113,4 +121,11 @@ __all__ = [
     "run_rsi_cycle",
     "simulate_consequences",
     "self_heal_diagnose",
+    "blackboard_record_evidence",
+    "blackboard_query",
+    "compile_cognitive_plan",
+    "execute_transactional_action",
+    "run_avo_variation",
+    "inspect_repo_twin",
+    "check_metacognitive_health",
 ]
