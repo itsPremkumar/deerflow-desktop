@@ -34,6 +34,12 @@ from deerflow.tools.builtins import (
     task_tool,
     trajectory_audit_tool,
     view_image_tool,
+    code_mode_tool,
+    catalog_tool_call,
+    catalog_tool_describe,
+    catalog_tool_search,
+    consolidate_memory_dream,
+    update_progress_card,
 )
 from deerflow.tools.mcp_metadata import tag_mcp_tool
 from deerflow.tools.sync import make_sync_tool_wrapper
@@ -61,6 +67,12 @@ BUILTIN_TOOLS = [
     goal_engine_tool,
     canvas_widget_tool,
     trajectory_audit_tool,
+    code_mode_tool,
+    catalog_tool_search,
+    catalog_tool_describe,
+    catalog_tool_call,
+    consolidate_memory_dream,
+    update_progress_card,
 ]
 
 SUBAGENT_TOOLS = [

@@ -21,6 +21,10 @@ from .kanban_board_tool import kanban_board_tool
 from .canvas_widget_tool import canvas_widget_tool
 from .goal_engine_tool import goal_engine_tool
 from .trajectory_audit_tool import trajectory_audit_tool
+from .code_mode_tool import code_mode_tool
+from .tool_search_tool import catalog_tool_call, catalog_tool_describe, catalog_tool_search
+from .dreaming_tool import consolidate_memory_dream
+from .progress_card_tool import update_progress_card
 
 __all__ = [
     "setup_agent",
@@ -49,6 +53,12 @@ __all__ = [
     "canvas_widget_tool",
     "goal_engine_tool",
     "trajectory_audit_tool",
+    "code_mode_tool",
+    "catalog_tool_search",
+    "catalog_tool_describe",
+    "catalog_tool_call",
+    "consolidate_memory_dream",
+    "update_progress_card",
 ]
 
 

@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 from typing import Any, Callable
 
+from deerflow.harness.continuous.loop_detector import ToolLoopDetector
 from deerflow.harness.continuous.models import Goal, Milestone, _now
 from deerflow.harness.continuous.store import GoalStore, get_goal_store
 from deerflow.safety.guard import get_safety_guard
@@ -20,6 +21,7 @@ class ContinuousGoalRunner:
         self.store = store or get_goal_store()
         self.safety = get_safety_guard()
         self.trajectory = get_trajectory_store()
+        self.loop_detector = ToolLoopDetector()
 
     def start_goal(
         self,
@@ -125,6 +127,20 @@ class ContinuousGoalRunner:
             if milestone.attempts >= milestone.max_attempts:
                 self.store.update_milestone_status(goal.goal_id, milestone.milestone_id, "failed", error=error)
             step_status = "failure"
+
+        # Check for repetitive tool loops
+        loop_res = self.loop_detector.record_and_evaluate(
+            tool_name="milestone_executor",
+            args={"milestone_id": milestone.milestone_id, "attempts": milestone.attempts},
+            result=output if success else error,
+            success=success,
+        )
+        if loop_res.is_loop:
+            self.store.update_goal_status(
+                goal_id=goal.goal_id,
+                status="adapting",
+                strategy_note=f"Tool-Loop Breaker: {loop_res.recommendation}",
+            )
 
         # Record trajectory step
         self.trajectory.record_step(

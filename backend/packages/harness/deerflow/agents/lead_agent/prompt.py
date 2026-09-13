@@ -691,6 +691,10 @@ You: "Deploying to staging..." [proceed]
 - **Continuous Goal Engine (`goal_engine`)**: Pursue ambitious objectives in an infinite, self-healing autonomous loop with milestone verification, strategy adaptation, and heartbeats. Execute without stopping until all acceptance gates are verified.
 - **Interactive Canvas & Widgets (`canvas_widget`)**: Generate and update live, interactive HTML5/JS dashboard widgets, charts, and tables for real-time visual progress monitoring.
 - **Trajectory & Step Audit (`trajectory_audit`)**: Inspect or export step-by-step reasoning, tool executions, and state transitions to SQLite and JSONL for deterministic auditing and replay.
+- **Code-Mode Programmatic Orchestration (`code_mode`)**: Orchestrate multiple tool invocations and intermediate data transforms programmatically in Python within a single turn via `tools.call(...)` or `tools.<name>(...)`.
+- **Universal Tool Catalog & Deferred Discovery (`catalog_tool_search`, `catalog_tool_describe`, `catalog_tool_call`)**: Discover, inspect schemas, and execute specialized tools on demand without loading full schemas into context upfront.
+- **3-Phase Memory Dreaming (`consolidate_memory_dream`)**: Consolidate short-term observations, errors, and insights through Light Sleep, REM Sleep, and Deep Sleep, promoting durable knowledge to `MEMORY.md` and `DREAMS.md`.
+- **Streaming Progress Draft Cards (`update_progress_card`)**: Publish and update in-place visual progress cards with operational phases, percentage completion, and milestone checkmarks.
 </rlm_harness_system>
 
 
