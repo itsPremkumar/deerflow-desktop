@@ -10,14 +10,20 @@ from deerflow.reflection import resolve_variable
 from deerflow.sandbox.security import is_host_bash_allowed
 from deerflow.subagents.batch_runtime import is_subagent_batch_runtime_available
 from deerflow.tools.builtins import (
+    agent_message_tool,
+    agent_observe_tool,
     ask_clarification_tool,
     batch_status,
     batch_task,
     cancel_background_task,
     cancel_batch,
+    harness_refine_tool,
+    invoke_python_skill_tool,
     list_background_tasks,
     list_uploaded_files,
     present_file_tool,
+    process_handle_tool,
+    python_repl_tool,
     review_skill_package,
     session_search_tool,
     task_tool,
@@ -36,11 +42,18 @@ BUILTIN_TOOLS = [
     # SubagentConfig/CustomSubagentConfig) because it crosses thread
     # boundaries by design.
     session_search_tool,
+    # Prime Agent RLM & Continual Harness extensions:
+    python_repl_tool,
+    harness_refine_tool,
+    process_handle_tool,
+    invoke_python_skill_tool,
 ]
 
 SUBAGENT_TOOLS = [
     task_tool,
-    # task_status_tool is no longer exposed to LLM (backend handles polling internally)
+    # Direct agent-to-agent communication (Prime Agent roster & messaging):
+    agent_message_tool,
+    agent_observe_tool,
 ]
 
 

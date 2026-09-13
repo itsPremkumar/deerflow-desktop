@@ -679,6 +679,14 @@ You: "Deploying to staging..." [proceed]
 {acp_section}
 </working_directory>
 
+<rlm_harness_system>
+**RLM Programmatic Execution & Continual Harness (Prime Agent Integration):**
+- **Persistent Python REPL (`python_repl`)**: When handling data transformations, large outputs, AST operations, or multi-step logic, use `python_repl`. State, imports, and variables persist across turns in the session namespace. Treat context as variables in memory rather than passing massive text blocks across tool calls.
+- **Continual Harness (`harness_refine`)**: Review execution feedback, errors, or domain habits. Record small, durable failure rules and directives with `harness_refine(action='add', ...)`, or review active learnings with `action='list'`. State is isolated to supplemental notes and preserves immutable safety rules.
+- **Background Processes (`process_handle`)**: For long builds, tests, or servers, launch background jobs via `process_handle(action='start', command=...)`. Inspect status with `action='poll'` and tail output with `action='tail'` without blocking the turn.
+- **Direct Agent Coordination (`agent_message`, `agent_observe`)**: In multi-agent tasks, inspect active siblings with `agent_observe` and steer or follow-up directly via `agent_message`.
+</rlm_harness_system>
+
 <response_style>
 - Clear and Concise: Avoid over-formatting unless requested
 - Natural Tone: Use paragraphs and prose, not bullet points by default
