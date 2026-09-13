@@ -5,6 +5,8 @@ from langchain_openai.chat_models.base import BaseChatOpenAI
 
 from deerflow.config import get_app_config
 from deerflow.config.app_config import AppConfig
+from deerflow.config.model_config import ModelConfig
+from deerflow.models.fallback import FallbackChatModel
 from deerflow.reflection import resolve_class
 from deerflow.tracing import build_tracing_callbacks
 
@@ -171,6 +173,100 @@ def _apply_stream_chunk_timeout_default(model_class: type, model_settings_from_c
     model_settings_from_config["stream_chunk_timeout"] = _DEFAULT_STREAM_CHUNK_TIMEOUT_SECONDS
 
 
+# Constructor settings that are DeerFlow metadata, never provider arguments.
+# ``provider``/``fallbacks`` join the long-standing presentation-only set:
+# they steer factory resolution and must not reach the model client (which
+# would divert unknown kwargs into the request payload — see
+# _warn_unknown_model_settings).
+_NON_CONSTRUCTOR_MODEL_KEYS = {
+    "use",
+    "name",
+    "display_name",
+    "description",
+    "provider",
+    "fallbacks",
+    "supports_thinking",
+    "supports_reasoning_effort",
+    "when_thinking_enabled",
+    "when_thinking_disabled",
+    "thinking",
+    "supports_vision",
+    # Runtime/UI metadata used to size the context indicator. Provider
+    # clients do not accept this as a model-constructor argument.
+    "context_window",
+    # Presentation-only metadata (consumed by the console's cost
+    # display) — must never reach the provider client, which would
+    # forward unknown kwargs into the completion request payload.
+    "pricing",
+}
+
+
+def _resolve_chain_configs(name: str, config: AppConfig) -> list[ModelConfig]:
+    """Resolve a primary model plus its transitive fallback chain.
+
+    Order is depth-first (primary, first fallback, its fallbacks, ...),
+    duplicates collapse to first occurrence, and reference cycles raise a
+    fail-closed error naming the loop. Unknown names raise an actionable
+    error identifying the referencing entry.
+    """
+    resolved: list[ModelConfig] = []
+    seen: set[str] = set()
+    stack: list[str] = []
+
+    def visit(current: str, parent: str | None) -> None:
+        if current in stack:
+            raise ValueError(f"Fallback cycle detected: {' -> '.join([*stack, current])}. Fallback chains must be acyclic.")
+        if current in seen:
+            return
+        model_config = config.get_model_config(current)
+        if model_config is None:
+            if parent is None:
+                raise ValueError(f"Model {current} not found in config") from None
+            raise ValueError(f"Model '{parent}' references unknown fallback model '{current}'. Fallbacks must name entries in the top-level `models:` list.") from None
+        stack.append(current)
+        seen.add(current)
+        resolved.append(model_config)
+        for fallback_name in model_config.fallbacks or []:
+            visit(fallback_name, current)
+        stack.pop()
+
+    visit(name, None)
+    return resolved
+
+
+def _effective_model_settings(model_config: ModelConfig, config: AppConfig) -> dict:
+    """Merge provider-profile defaults under model-level keys.
+
+    Model-level keys always win; ``name`` is never inherited so a profile
+    cannot steal a model's identity. Unknown provider references raise a
+    fail-closed error.
+    """
+    merged: dict = {}
+    if model_config.provider:
+        provider = config.get_provider_config(model_config.provider)
+        if provider is None:
+            raise ValueError(f"Model '{model_config.name}' references unknown provider '{model_config.provider}'. Providers must be declared in the top-level `providers:` section.") from None
+        merged.update(provider.model_dump(exclude_none=True, exclude={"name"}))
+    merged.update(
+        model_config.model_dump(
+            exclude_none=True,
+            exclude={"name", "provider", "fallbacks"},
+        )
+    )
+    return merged
+
+
+def _resolve_effective_use(model_config: ModelConfig, config: AppConfig) -> str:
+    """Resolve the model class path from the entry or its provider profile."""
+    if model_config.use:
+        return model_config.use
+    if model_config.provider:
+        provider = config.get_provider_config(model_config.provider)
+        if provider is not None and provider.use:
+            return provider.use
+    raise ValueError(f"Model '{model_config.name}' declares neither `use` nor a provider supplying `use`. Set a class path on the model or on its provider profile.") from None
+
+
 def create_chat_model(name: str | None = None, thinking_enabled: bool = False, *, app_config: AppConfig | None = None, attach_tracing: bool = True, model_overrides: dict | None = None, **kwargs) -> BaseChatModel:
     """Create a chat model instance from the config.
 
@@ -197,37 +293,67 @@ def create_chat_model(name: str | None = None, thinking_enabled: bool = False, *
             get stripped.
 
     Returns:
-        A chat model instance.
+        A chat model instance. When the resolved chain has a single member
+        this is the provider client directly (identical to previous
+        behaviour); otherwise it is a :class:`FallbackChatModel` that fails
+        over across the chain on retryable errors.
     """
     config = app_config or get_app_config()
     if name is None:
         name = config.models[0].name
-    model_config = config.get_model_config(name)
-    if model_config is None:
-        raise ValueError(f"Model {name} not found in config") from None
-    model_class = resolve_class(model_config.use, BaseChatModel)
-    model_settings_from_config = model_config.model_dump(
-        exclude_none=True,
-        exclude={
-            "use",
-            "name",
-            "display_name",
-            "description",
-            "supports_thinking",
-            "supports_reasoning_effort",
-            "when_thinking_enabled",
-            "when_thinking_disabled",
-            "thinking",
-            "supports_vision",
-            # Runtime/UI metadata used to size the context indicator. Provider
-            # clients do not accept this as a model-constructor argument.
-            "context_window",
-            # Presentation-only metadata (consumed by the console's cost
-            # display) — must never reach the provider client, which would
-            # forward unknown kwargs into the completion request payload.
-            "pricing",
-        },
-    )
+    chain = _resolve_chain_configs(name, config)
+    if thinking_enabled:
+        supported = [member for member in chain if member.supports_thinking]
+        if not supported:
+            raise ValueError(f"Model {name} does not support thinking. Set `supports_thinking` to true in the `config.yaml` to enable thinking.") from None
+        skipped = [member.name for member in chain if not member.supports_thinking]
+        if skipped:
+            logger.warning(
+                "Model '%s': skipping fallback member(s) without thinking support: %s",
+                name,
+                skipped,
+            )
+        chain = supported
+    members = [
+        # Each member gets its own kwargs copy: the single-model pipeline
+        # pops keys (e.g. reasoning_effort) that must remain for siblings.
+        _build_single_model(member, thinking_enabled, config, attach_tracing, model_overrides, dict(kwargs))
+        for member in chain
+    ]
+    if len(members) == 1:
+        return members[0]
+    wrapper = FallbackChatModel(instances=members, model_names=[member.name for member in chain])
+    primary_profile = getattr(members[0], "profile", None)
+    if isinstance(primary_profile, dict):
+        # Summarization triggers and the context indicator read the profile
+        # off the served instance; mirror the primary's so a wrapped model
+        # behaves like the direct one it replaces.
+        wrapper.profile = dict(primary_profile)
+    logger.info("Model '%s' built with fallback chain: %s", name, [member.name for member in chain])
+    return wrapper
+
+
+def _build_single_model(
+    model_config: ModelConfig,
+    thinking_enabled: bool,
+    config: AppConfig,
+    attach_tracing: bool,
+    model_overrides: dict | None,
+    kwargs: dict,
+) -> BaseChatModel:
+    """Build one provider client from a resolved model entry.
+
+    Provider-profile defaults are merged under model-level keys first, so
+    every transform below operates on the effective settings exactly as if
+    the operator had written them inline on the entry.
+    """
+    name = model_config.name
+    model_class = resolve_class(_resolve_effective_use(model_config, config), BaseChatModel)
+    model_settings_from_config = _effective_model_settings(model_config, config)
+    # Drop DeerFlow metadata keys the provider constructor must never see
+    # (they would divert into request payloads — see _warn_unknown_model_settings).
+    for metadata_key in _NON_CONSTRUCTOR_MODEL_KEYS:
+        model_settings_from_config.pop(metadata_key, None)
     # Layer per-caller sampling overrides (e.g. a custom agent's temperature /
     # max_tokens) on top of the profile. Ignore None so an unset override never
     # clobbers a configured profile value. Applied here — before the thinking

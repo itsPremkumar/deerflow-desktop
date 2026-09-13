@@ -240,3 +240,42 @@ export async function searchThreadsByArchive({
   }
   return (await response.json()) as AgentThread[];
 }
+
+export type ThreadContentHit = {
+  thread_id: string;
+  run_id: string;
+  seq: number;
+  event_type: string;
+  snippet: string;
+  created_at: string;
+};
+
+/** Full-text search over displayable messages in owned threads (no embeddings). */
+export async function searchThreadContent({
+  query,
+  threadId,
+  limit,
+}: {
+  query: string;
+  threadId?: string;
+  limit?: number;
+}): Promise<ThreadContentHit[]> {
+  const response = await fetchWithAuth(
+    `${getBackendBaseURL()}/api/threads/search/content`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        query,
+        ...(threadId ? { thread_id: threadId } : {}),
+        ...(limit !== undefined ? { limit } : {}),
+      }),
+    },
+  );
+  if (!response.ok) {
+    throw new Error(
+      await readThreadAPIError(response, "Failed to search conversations."),
+    );
+  }
+  return (await response.json()) as ThreadContentHit[];
+}

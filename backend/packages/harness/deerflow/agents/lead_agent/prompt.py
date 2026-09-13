@@ -505,6 +505,12 @@ Expected cost = delegation and startup overhead + duplicate context and reposito
 **Available Subagents:**
 {available_subagents}
 
+**Task categories (optional `category` argument):**
+Intent presets applied to any subagent type. Default `general` (no preset).
+- **research**: thorough multi-source investigation with verified claims.
+- **quick**: terse low-latency execution for small bounded tasks.
+Additional categories may be defined in config.yaml under `subagents.categories`. Unknown names fail closed.
+
 **Delegation workflow:**
 {workflow}
 

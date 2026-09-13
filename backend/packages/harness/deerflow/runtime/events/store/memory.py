@@ -10,8 +10,19 @@ import bisect
 from datetime import UTC, datetime
 
 from deerflow.runtime.events.message_identity import message_identity
+from deerflow.runtime.events.search import (
+    clamp_limit,
+    extract_searchable_text,
+    make_snippet,
+    message_rank_group,
+    normalize_query,
+)
 from deerflow.runtime.events.store.base import RunEventStore
 from deerflow.runtime.user_context import AUTO, _AutoSentinel
+
+#: Bound on scanned message rows per search (dev backend; keeps pathological
+#: threads from stalling recall).
+_MEMORY_SEARCH_SCAN_CAP = 20000
 
 
 class MemoryRunEventStore(RunEventStore):
@@ -201,9 +212,67 @@ class MemoryRunEventStore(RunEventStore):
                     break
         return found
 
+    async def search_message_content(
+        self,
+        query: str,
+        *,
+        user_id: str | None | _AutoSentinel = AUTO,
+        thread_id: str | None = None,
+        limit: int = 20,
+        snippet_chars: int = 300,
+    ):
+        # Dev backend: records carry no owner data, so no owner filter is
+        # possible here (same posture as list_messages ignoring user_id).
+        # Owner isolation for this backend is enforced by callers operating
+        # single-user deployments.
+        del user_id
+        tokens = [token.casefold() for token in normalize_query((query or "")[:200])]
+        if not tokens:
+            return []
+        limit = clamp_limit(limit)
+        snippet_chars = max(50, min(2000, int(snippet_chars or 300)))
+        candidates: list[tuple[int, str, dict, str]] = []
+        scanned = 0
+        threads = [thread_id] if thread_id is not None else list(self._messages)
+        for tid in threads:
+            for record in reversed(self._messages.get(tid, [])):
+                if scanned >= _MEMORY_SEARCH_SCAN_CAP:
+                    break
+                scanned += 1
+                text = extract_searchable_text(record.get("content"))
+                flat = text.casefold()
+                if not text or not all(token in flat for token in tokens):
+                    continue
+                candidates.append(
+                    (
+                        message_rank_group(record.get("content")),
+                        str(record.get("created_at") or ""),
+                        record,
+                        text,
+                    )
+                )
+            if scanned >= _MEMORY_SEARCH_SCAN_CAP:
+                break
+        # Rank group ascending, recency descending (created_at ISO strings
+        # sort lexically; two stable sorts compose in that priority order).
+        candidates.sort(key=lambda item: item[1], reverse=True)
+        candidates.sort(key=lambda item: item[0])
+        hits = []
+        for _, _, record, text in candidates[:limit]:
+            hits.append(
+                {
+                    "thread_id": record["thread_id"],
+                    "run_id": record["run_id"],
+                    "seq": record["seq"],
+                    "event_type": record["event_type"],
+                    "snippet": make_snippet(text, query, snippet_chars),
+                    "created_at": record.get("created_at"),
+                }
+            )
+        return hits
+
     async def delete_by_thread(self, thread_id):
         events = self._events.pop(thread_id, [])
-        self._messages.pop(thread_id, None)
         self._events_by_run.pop(thread_id, None)
         self._messages_by_run.pop(thread_id, None)
         self._seq_counters.pop(thread_id, None)

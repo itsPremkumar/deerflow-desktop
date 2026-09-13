@@ -31,6 +31,13 @@ from pathlib import Path
 from typing import Any
 
 from deerflow.runtime.events.message_identity import message_identity
+from deerflow.runtime.events.search import (
+    clamp_limit,
+    extract_searchable_text,
+    make_snippet,
+    message_rank_group,
+    normalize_query,
+)
 from deerflow.runtime.events.store.base import RunEventStore, match_ai_message_run_id, normalize_message_ids
 from deerflow.runtime.user_context import AUTO, _AutoSentinel
 from deerflow.utils.thread_id import validate_thread_id
@@ -370,6 +377,83 @@ class JsonlRunEventStore(RunEventStore):
                 if len(found) == len(wanted):
                     break
         return found
+
+    def _iter_search_threads(self, thread_id: str | None) -> list[str]:
+        """Thread ids to scan (blocking): one validated id, or every thread dir."""
+        if thread_id is not None:
+            return [self._validate_id(thread_id, "thread_id")]
+        threads_dir = self._base_dir / "threads"
+        if not threads_dir.exists():
+            return []
+        found = []
+        for entry in sorted(threads_dir.iterdir()):
+            if entry.is_dir() and _SAFE_ID_PATTERN.match(entry.name):
+                found.append(entry.name)
+        return found
+
+    def _search_sync(
+        self,
+        tokens: list[str],
+        raw_query: str,
+        thread_id: str | None,
+        limit: int,
+        snippet_chars: int,
+    ) -> list[dict]:
+        """Blocking substring scan; callers offload via asyncio.to_thread."""
+        candidates: list[tuple[int, str, dict, str]] = []
+        lowered = [token.casefold() for token in tokens]
+        for tid in self._iter_search_threads(thread_id):
+            for event in reversed(self._read_thread_events(tid)):
+                if event.get("category") != "message":
+                    continue
+                text = extract_searchable_text(event.get("content"))
+                flat = text.casefold()
+                if not text or not all(token in flat for token in lowered):
+                    continue
+                candidates.append(
+                    (
+                        message_rank_group(event.get("content")),
+                        str(event.get("created_at") or ""),
+                        event,
+                        text,
+                    )
+                )
+        candidates.sort(key=lambda item: item[1], reverse=True)
+        candidates.sort(key=lambda item: item[0])
+        hits = []
+        for _, _, event, text in candidates[:limit]:
+            hits.append(
+                {
+                    "thread_id": event["thread_id"],
+                    "run_id": event["run_id"],
+                    "seq": event["seq"],
+                    "event_type": event["event_type"],
+                    "snippet": make_snippet(text, raw_query, snippet_chars),
+                    "created_at": event.get("created_at"),
+                }
+            )
+        return hits
+
+    async def search_message_content(
+        self,
+        query: str,
+        *,
+        user_id=None,
+        thread_id: str | None = None,
+        limit: int = 20,
+        snippet_chars: int = 300,
+    ):
+        # Dev backend: records carry no owner data, so no owner filter is
+        # possible here (same posture as list_messages ignoring user_id).
+        del user_id
+        tokens = normalize_query((query or "")[:200])
+        if not tokens:
+            return []
+        limit = clamp_limit(limit)
+        snippet_chars = max(50, min(2000, int(snippet_chars or 300)))
+        return await asyncio.to_thread(
+            self._search_sync, tokens, query, thread_id, limit, snippet_chars
+        )
 
     async def delete_by_thread(self, thread_id):
         async with self._get_write_lock(thread_id):

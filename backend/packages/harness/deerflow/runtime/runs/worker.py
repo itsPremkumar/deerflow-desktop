@@ -1042,6 +1042,12 @@ async def run_agent(
         # runtime-internal channel; user code must not depend on the key name.
         if journal is not None:
             runtime_ctx["__run_journal"] = journal
+        # Same channel for the run event store, so the session_search tool
+        # reads the live store instead of constructing an empty one. The key
+        # is server-owned like the journal above (build_run_config strips
+        # caller-supplied `__`-prefixed entries).
+        if event_store is not None:
+            runtime_ctx["__run_event_store"] = event_store
         _install_runtime_context(config, runtime_ctx)
         runtime = Runtime(context=cast(Any, runtime_ctx), store=store)
         config.setdefault("configurable", {})["__pregel_runtime"] = runtime

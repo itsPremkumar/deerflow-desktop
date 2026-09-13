@@ -26,7 +26,7 @@ from deerflow.config.input_polish_config import InputPolishConfig
 from deerflow.config.loop_detection_config import LoopDetectionConfig
 from deerflow.config.mcp_tasks_config import McpTasksConfig
 from deerflow.config.memory_config import MemoryConfig, load_memory_config_from_dict
-from deerflow.config.model_config import ModelConfig
+from deerflow.config.model_config import ModelConfig, ProviderConfig
 from deerflow.config.read_before_write_config import ReadBeforeWriteConfig
 from deerflow.config.reload_boundary import format_field_description
 from deerflow.config.run_events_config import RunEventsConfig
@@ -221,6 +221,10 @@ class AppConfig(BaseModel):
         description="Hard server-side ceiling for a client-supplied run recursion_limit. Client values above this are clamped; prevents runaway LangGraph super-steps (LLM cost / DoS).",
     )
     models: list[ModelConfig] = Field(default_factory=list, description="Available models")
+    providers: dict[str, ProviderConfig] = Field(
+        default_factory=dict,
+        description="Named provider profiles: shared connection defaults referenced by models[].provider",
+    )
     sandbox: SandboxConfig = Field(
         description=format_field_description(
             "sandbox",
@@ -614,6 +618,17 @@ class AppConfig(BaseModel):
             The model config if found, otherwise None.
         """
         return self._models_by_name.get(name)
+
+    def get_provider_config(self, name: str) -> ProviderConfig | None:
+        """Get a named provider profile by name.
+
+        Args:
+            name: The provider name referenced by models[].provider.
+
+        Returns:
+            The provider profile if found, otherwise None.
+        """
+        return self.providers.get(name)
 
     def get_tool_config(self, name: str) -> ToolConfig | None:
         """Get the tool config by name.

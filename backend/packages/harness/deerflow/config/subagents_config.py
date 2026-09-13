@@ -99,6 +99,56 @@ class SubagentOverrideConfig(BaseModel):
     )
 
 
+class SubagentCategoryConfig(BaseModel):
+    """Intent preset applied to any subagent type at `task` dispatch.
+
+    A category names *intent* (research, quick, ...) instead of a model:
+    it selects the first configured model in ``models``, gates on
+    ``requires_models``, and overlays skills/tools/budgets plus an operator
+    guidance suffix on the task input. Unset fields inherit the subagent's
+    own configuration. Built-ins (``general``, ``research``, ``quick``) live
+    in code; operator entries under ``subagents.categories`` win by name.
+    """
+
+    description: str = Field(
+        description="When the lead agent should choose this category",
+    )
+    models: list[str] = Field(
+        default_factory=list,
+        description="Ordered model-name chain; the first entry resolving in top-level `models:` wins. Empty = keep the subagent's own model resolution.",
+    )
+    requires_models: list[str] = Field(
+        default_factory=list,
+        description="Availability gate: every listed model must resolve in top-level `models:`, otherwise the category is unavailable (fail-closed).",
+    )
+    skills: list[str] | None = Field(
+        default=None,
+        description="Skill names whitelist for this category (None = keep the subagent's skills, [] = no skills)",
+    )
+    tools: list[str] | None = Field(
+        default=None,
+        description="Tool names whitelist for this category (None = keep the subagent's tools)",
+    )
+    disallowed_tools: list[str] | None = Field(
+        default=None,
+        description="Tool names to additionally deny (unioned with the subagent's own list; denials are sticky and can never be lifted by a category)",
+    )
+    prompt_append: str | None = Field(
+        default=None,
+        description="Operator guidance appended to the task input (never to the system prompt)",
+    )
+    max_turns: int | None = Field(
+        default=None,
+        ge=1,
+        description="Maximum turns for this category (None = keep the subagent's value)",
+    )
+    timeout_seconds: int | None = Field(
+        default=None,
+        ge=1,
+        description="Execution-time cap for this category (None = keep the subagent's value)",
+    )
+
+
 class CustomSubagentConfig(BaseModel):
     """User-defined subagent type declared in config.yaml."""
 
@@ -113,7 +163,7 @@ class CustomSubagentConfig(BaseModel):
         description="Tool names whitelist (None = inherit all tools from parent)",
     )
     disallowed_tools: list[str] | None = Field(
-        default_factory=lambda: ["task", "ask_clarification", "present_files"],
+        default_factory=lambda: ["task", "ask_clarification", "present_files", "session_search"],
         description="Tool names to deny",
     )
     skills: list[str] | None = Field(
@@ -166,6 +216,10 @@ class SubagentsAppConfig(BaseModel):
     custom_agents: dict[str, CustomSubagentConfig] = Field(
         default_factory=dict,
         description="User-defined subagent types keyed by agent name",
+    )
+    categories: dict[str, SubagentCategoryConfig] = Field(
+        default_factory=dict,
+        description="Intent presets for `task(category=...)` keyed by category name; entries override built-in categories of the same name",
     )
 
     # True when ``token_budget`` was NOT explicitly provided by the user, i.e.

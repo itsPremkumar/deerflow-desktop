@@ -87,19 +87,19 @@ _SANDBOX_TOOL_CASES = [
         read_file_tool,
         {"path": "/tmp/x"},
         ("path",),
-        ("path", "description", "start_line", "end_line"),
+        ("path", "description", "start_line", "end_line", "hashline"),
     ),
     (
         write_file_tool,
         {"path": "/tmp/x", "content": "hi"},
         ("path", "content"),
-        ("path", "content", "description", "append"),
+        ("path", "content", "description", "append", "anchor_hash"),
     ),
     (
         str_replace_tool,
         {"path": "/tmp/x", "old_str": "a", "new_str": "b"},
         ("path", "old_str", "new_str"),
-        ("path", "old_str", "new_str", "description", "replace_all"),
+        ("path", "old_str", "new_str", "description", "replace_all", "anchor_hash"),
     ),
 ]
 
@@ -126,13 +126,13 @@ _SANDBOX_TOOL_FORWARDING_CASES = [
     ),
     (
         read_file_tool,
-        {"path": "/path", "description": "description", "start_line": 2, "end_line": 3},
-        ("/path", "description", 2, 3),
+        {"path": "/path", "description": "description", "start_line": 2, "end_line": 3, "hashline": True},
+        ("/path", "description", 2, 3, True),
     ),
     (
         write_file_tool,
-        {"path": "/path", "content": "content", "description": "description", "append": True},
-        ("/path", "content", "description", True),
+        {"path": "/path", "content": "content", "description": "description", "append": True, "anchor_hash": "abc123"},
+        ("/path", "content", "description", True, "abc123"),
     ),
     (
         str_replace_tool,
@@ -142,8 +142,9 @@ _SANDBOX_TOOL_FORWARDING_CASES = [
             "new_str": "new",
             "description": "description",
             "replace_all": True,
+            "anchor_hash": "abc123",
         },
-        ("/path", "old", "new", "description", True),
+        ("/path", "old", "new", "description", True, "abc123"),
     ),
 ]
 
@@ -239,7 +240,7 @@ def test_task_tool_description_is_optional_but_discoverable() -> None:
     parameters = convert_to_openai_tool(task_tool)["function"]["parameters"]
 
     assert parameters["required"] == ["prompt", "subagent_type"]
-    assert list(parameters["properties"]) == ["prompt", "subagent_type", "acceptance_criteria", "description", "context_mode"]
+    assert list(parameters["properties"]) == ["prompt", "subagent_type", "acceptance_criteria", "description", "context_mode", "category"]
     assert parameters["properties"]["description"]["description"]
 
     validated = task_tool.tool_call_schema.model_validate({"prompt": "go", "subagent_type": "general-purpose"})

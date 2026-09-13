@@ -1154,6 +1154,60 @@ async def search_threads(body: ThreadSearchRequest, request: Request) -> list[Th
     ]
 
 
+class ThreadContentSearchRequest(BaseModel):
+    """Request body for searching displayable message content across threads."""
+
+    query: str = Field(min_length=1, max_length=200, description="Keyword query (blank queries are rejected)")
+    thread_id: ThreadId | None = Field(default=None, description="Scope to one thread; omit to search all owned threads")
+    limit: int = Field(default=20, ge=1, le=100, description="Max hits")
+
+
+class ThreadContentHit(BaseModel):
+    """One ranked content hit: owner-scoped, snippet-bounded."""
+
+    thread_id: str
+    run_id: str
+    seq: int
+    event_type: str
+    snippet: str
+    created_at: str
+
+
+@router.post("/search/content", response_model=list[ThreadContentHit])
+@require_permission("threads", "read")
+async def search_thread_content(body: ThreadContentSearchRequest, request: Request) -> list[ThreadContentHit]:
+    """Full-text search over displayable messages in owned threads.
+
+    Zero-embedding recall: SQL backends use full-text indexes, memory/JSONL
+    backends substring-scan. Human/model turns rank above tool output, then
+    recency. Snippets are bounded excerpts, never full messages.
+    """
+    store = get_run_event_store(request)
+    user_id = get_effective_user_id()
+    hits = await store.search_message_content(
+        body.query,
+        user_id=user_id,
+        thread_id=body.thread_id,
+        limit=body.limit,
+    )
+    logger.debug(
+        "Content search by %s returned %d hits",
+        sanitize_log_param(user_id),
+        len(hits),
+    )
+    return [
+        ThreadContentHit(
+            thread_id=hit["thread_id"],
+            run_id=hit["run_id"],
+            seq=hit["seq"],
+            event_type=hit["event_type"],
+            snippet=hit.get("snippet", ""),
+            created_at=hit.get("created_at") or "",
+        )
+        for hit in hits
+    ]
+
+
 @router.patch("/{thread_id}", response_model=ThreadResponse)
 @require_permission("threads", "write", owner_check=True, require_existing=True)
 async def patch_thread(thread_id: ThreadId, body: ThreadPatchRequest, request: Request) -> ThreadResponse:

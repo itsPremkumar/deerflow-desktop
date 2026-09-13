@@ -1,15 +1,47 @@
 from pydantic import BaseModel, ConfigDict, Field
 
 
+class ProviderConfig(BaseModel):
+    """Named provider profile: shared connection defaults for model entries.
+
+    A model entry references a profile via ``ModelConfig.provider`` and
+    inherits every key it does not set itself (class path, endpoint, keys,
+    timeouts, retries, headers, ...). Model-level keys always win, so a
+    profile carries organization-wide defaults while each model keeps its
+    identity (``name``/``model``/``display_name`` are never inherited).
+    """
+
+    name: str = Field(..., description="Unique provider name referenced by models[].provider")
+    use: str | None = Field(
+        default=None,
+        description="Default model class path (e.g. langchain_openai:ChatOpenAI); a model entry's own `use` wins.",
+    )
+    model_config = ConfigDict(extra="allow")
+
+
 class ModelConfig(BaseModel):
     """Config section for a model"""
 
     name: str = Field(..., description="Unique name for the model")
     display_name: str | None = Field(..., default_factory=lambda: None, description="Display name for the model")
     description: str | None = Field(..., default_factory=lambda: None, description="Description for the model")
-    use: str = Field(
-        ...,
-        description="Class path of the model provider(e.g. langchain_openai.ChatOpenAI)",
+    use: str | None = Field(
+        default=None,
+        description=("Class path of the model provider (e.g. langchain_openai:ChatOpenAI). May be omitted when `provider` names a profile that supplies it; the factory raises an actionable error when neither provides one."),
+    )
+    provider: str | None = Field(
+        default=None,
+        description=("Name of a top-level `providers:` profile whose keys act as defaults for this entry. Keys set on the model itself always take precedence; `name` is never inherited."),
+    )
+    fallbacks: list[str] | None = Field(
+        default=None,
+        max_length=5,
+        description=(
+            "Ordered fallback model names tried when this model fails with a "
+            "retryable error (rate limit 429, server 5xx, timeout/connection "
+            "failure). Entries reference other `models[]` names; chains resolve "
+            "transitively with cycle detection. Empty/None disables failover."
+        ),
     )
     model: str = Field(..., description="Model name")
     model_config = ConfigDict(extra="allow")

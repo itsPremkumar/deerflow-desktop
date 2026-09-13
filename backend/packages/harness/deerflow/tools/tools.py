@@ -19,6 +19,7 @@ from deerflow.tools.builtins import (
     list_uploaded_files,
     present_file_tool,
     review_skill_package,
+    session_search_tool,
     task_tool,
     view_image_tool,
 )
@@ -31,6 +32,10 @@ BUILTIN_TOOLS = [
     present_file_tool,
     ask_clarification_tool,
     review_skill_package,
+    # Cross-thread recall: lead-only (denied for subagents by default, see
+    # SubagentConfig/CustomSubagentConfig) because it crosses thread
+    # boundaries by design.
+    session_search_tool,
 ]
 
 SUBAGENT_TOOLS = [

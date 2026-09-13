@@ -32,6 +32,14 @@ Design invariants:
   keep the original arguments, and nothing is externalized to disk: handing
   the model a file reference to content it must re-derive after reading the
   target would only invite bypassing the gate through ``bash``.
+- Hashline anchors (``anchor_hash`` from ``read_file(hashline=True)``): an
+  explicit revision token proving the observed version. A valid anchor passes
+  without any read mark — anchors survive summarization while marks do not.
+  A stale anchor is rejected even where a mark would pass, because the anchor
+  names a strictly newer observation. Malformed (non-string/empty) anchors
+  are rejected. Anchor args are small scalars, never payload fields, so they
+  stay visible after elision. Shared hashing/formatting lives in
+  ``deerflow.sandbox.hashline`` (single source for the read tool and gate).
 """
 
 import asyncio
@@ -54,6 +62,7 @@ from deerflow.agents.middlewares.tool_call_args import rewrite_messages_tool_cal
 from deerflow.agents.middlewares.tool_result_meta import normalize_tool_result, stamp_exception_meta
 from deerflow.config.read_before_write_config import ReadBeforeWriteConfig
 from deerflow.sandbox.exceptions import SandboxAuthorizationError
+from deerflow.sandbox.hashline import REVISION_TOKEN_CHARS
 from deerflow.sandbox.tools import (
     read_current_file_content,
     sandbox_authorization_scope,
@@ -89,6 +98,14 @@ _BLOCK_MESSAGE = (
     "Call read_file on it (a ranged read of the relevant section is enough, e.g. the last ~30 lines "
     "before an append), check what is already there, then retry."
 )
+
+_ANCHOR_ABSENT: Any = object()
+
+_STALE_ANCHOR_MESSAGE = (
+    "Error: {tool_name} blocked — anchor_hash for {path} is stale: the file changed since that revision. Call read_file on it (pass hashline=true for a fresh anchor), check what is already there, then retry with the new anchor."
+)
+
+_MALFORMED_ANCHOR_MESSAGE = "Error: {tool_name} blocked — anchor_hash must be the revision token string from a read_file(hashline=True) response. Re-read the file and pass the token exactly as shown."
 
 # Per-(scope, path) locks serializing gate check + tool execution. Same
 # WeakValueDictionary pattern as sandbox/file_operation_lock.py, but a
@@ -273,16 +290,23 @@ class ReadBeforeWriteMiddleware(AgentMiddleware):
             logger.debug("read-before-write gate got an error-string read for %r; allowing the write (fail-open)", path)
             return None
         norm_path = _normalize_mark_path(path)
+        anchor = self._requested_anchor(request)
+        if anchor is not _ANCHOR_ABSENT:
+            # Explicit hashline anchor: proof of the observed version that
+            # survives summarization (unlike read marks, which die with the
+            # read result). A valid anchor passes on its own; a stale one is
+            # rejected even when a mark would pass, because the anchor names
+            # a strictly newer observation contract.
+            tool_name = str(tool_call.get("name", "write"))
+            if not isinstance(anchor, str) or not anchor:
+                return self._blocked_result(tool_call, norm_path, path, tool_name, _MALFORMED_ANCHOR_MESSAGE)
+            if anchor == _content_hash(current)[:REVISION_TOKEN_CHARS]:
+                return None
+            return self._blocked_result(tool_call, norm_path, path, tool_name, _STALE_ANCHOR_MESSAGE)
         if self._latest_mark_hash(request.state, norm_path) == _content_hash(current):
             return None
         tool_name = str(tool_call.get("name", "write"))
-        return ToolMessage(
-            content=_BLOCK_MESSAGE.format(tool_name=tool_name, path=path),
-            tool_call_id=str(tool_call.get("id", "")),
-            name=tool_name,
-            status="error",
-            additional_kwargs={WRITE_BLOCK_KEY: {"path": norm_path, "tool": tool_name}},
-        )
+        return self._blocked_result(tool_call, norm_path, path, tool_name, _BLOCK_MESSAGE)
 
     @staticmethod
     def _requested_path(request: ToolCallRequest) -> str | None:
@@ -291,6 +315,31 @@ class ReadBeforeWriteMiddleware(AgentMiddleware):
             return None
         path = args.get("path")
         return path if isinstance(path, str) and path else None
+
+    @staticmethod
+    def _requested_anchor(request: ToolCallRequest) -> Any:
+        """Return the presented ``anchor_hash`` or ``_ANCHOR_ABSENT``.
+
+        An explicit JSON null is treated as absent (lenient, matching the
+        ``exclude_none`` conventions elsewhere); any other non-string is
+        returned as-is so the gate can reject it as malformed.
+        """
+        args = request.tool_call.get("args") or {}
+        if not isinstance(args, dict) or "anchor_hash" not in args:
+            return _ANCHOR_ABSENT
+        anchor = args.get("anchor_hash")
+        return _ANCHOR_ABSENT if anchor is None else anchor
+
+    @staticmethod
+    def _blocked_result(tool_call: dict, norm_path: str, path: str, tool_name: str, template: str) -> ToolMessage:
+        """Build a gate-blocked error result, stamped for elision like all blocks."""
+        return ToolMessage(
+            content=template.format(tool_name=tool_name, path=path),
+            tool_call_id=str(tool_call.get("id", "")),
+            name=tool_name,
+            status="error",
+            additional_kwargs={WRITE_BLOCK_KEY: {"path": norm_path, "tool": tool_name}},
+        )
 
     @staticmethod
     def _latest_mark_hash(state: Any, norm_path: str) -> str | None:

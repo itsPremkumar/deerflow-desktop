@@ -2398,6 +2398,7 @@ def read_file_tool(
     description: str = "",
     start_line: int | None = None,
     end_line: int | None = None,
+    hashline: bool = False,
 ) -> str:
     """Read the contents of a text file. Use this to examine source code, configuration files, logs, or any text-based file.
 
@@ -2406,6 +2407,9 @@ def read_file_tool(
         description: Optional short explanation of this read shown in the UI.
         start_line: Optional starting line number (1-indexed, inclusive). Omit to start at the first line.
         end_line: Optional ending line number (1-indexed, inclusive). Omit to read through the last line.
+        hashline: When True, tag each line as `LINE#HASH|` with absolute line
+            numbers and include a file revision token; pass it as anchor_hash
+            to str_replace/write_file to prove the version. Defaults to False.
     """
     try:
         # Block access to disabled skill files
@@ -2437,6 +2441,19 @@ def read_file_tool(
             max_chars = sandbox_cfg.read_file_output_max_chars if sandbox_cfg else 50000
         except Exception:
             max_chars = 50000
+        if hashline:
+            from deerflow.sandbox.hashline import format_hashline, format_hashline_ranged
+
+            if use_line_range:
+                # The token must cover the whole file even for ranged displays:
+                # a slice-scoped token would let same-slice edits mask concurrent
+                # changes elsewhere in the file.
+                full_content = read_current_file_content(runtime, path)
+                return _truncate_read_file_output(
+                    format_hashline_ranged(full_content, content, start_line=effective_start),
+                    max_chars,
+                )
+            return _truncate_read_file_output(format_hashline(content), max_chars)
         return _truncate_read_file_output(content, max_chars)
     except SandboxError as e:
         return f"Error: {e}"
@@ -2462,8 +2479,9 @@ async def _read_file_tool_async(
     description: str = "",
     start_line: int | None = None,
     end_line: int | None = None,
+    hashline: bool = False,
 ) -> str:
-    return await _run_sync_tool_after_async_sandbox_init(read_file_tool.func, runtime, path, description, start_line, end_line)
+    return await _run_sync_tool_after_async_sandbox_init(read_file_tool.func, runtime, path, description, start_line, end_line, hashline)
 
 
 read_file_tool.coroutine = _read_file_tool_async
@@ -2493,6 +2511,7 @@ def write_file_tool(
     content: str,
     description: str = "",
     append: bool = False,
+    anchor_hash: str | None = None,
 ) -> str:
     """Write text content to a file. By default this overwrites the target file; set append=True to add content to the end without replacing existing content.
 
@@ -2501,6 +2520,11 @@ def write_file_tool(
     Any write invalidates earlier reads, so re-read between consecutive
     modifications — a ranged read of the relevant section is enough. Writes
     that fail this check are rejected with an error.
+
+    HASH ANCHORS: alternatively pass anchor_hash with the revision token from
+    a read_file(hashline=True) response. The anchor proves the exact version
+    independently of read marks (which summarization can drop); stale anchors
+    are rejected with a re-read hint.
 
     SIZE POLICY (issue #3189):
     A single non-append write_file call must not exceed 80 KB of UTF-8 content.
@@ -2527,6 +2551,7 @@ def write_file_tool(
         content: The content to write to the file.
         description: Optional short explanation of this write shown in the UI.
         append: Whether to append content to the end of the file instead of overwriting it. Defaults to False.
+        anchor_hash: Optional revision token from read_file(hashline=True) proving the version. Defaults to None.
     """
     if not append:
         max_bytes = _effective_write_file_max_bytes()
@@ -2578,8 +2603,9 @@ async def _write_file_tool_async(
     content: str,
     description: str = "",
     append: bool = False,
+    anchor_hash: str | None = None,
 ) -> str:
-    return await _run_sync_tool_after_async_sandbox_init(write_file_tool.func, runtime, path, content, description, append)
+    return await _run_sync_tool_after_async_sandbox_init(write_file_tool.func, runtime, path, content, description, append, anchor_hash)
 
 
 write_file_tool.coroutine = _write_file_tool_async
@@ -2593,6 +2619,7 @@ def str_replace_tool(
     new_str: str,
     description: str = "",
     replace_all: bool = False,
+    anchor_hash: str | None = None,
 ) -> str:
     """Replace a substring in a file with another substring.
     If `replace_all` is False (default), the substring to replace must appear **exactly once** in the file.
@@ -2600,12 +2627,18 @@ def str_replace_tool(
     READ-BEFORE-WRITE (issue #3857): you must have read the file's CURRENT
     version with read_file first; any write invalidates earlier reads.
 
+    HASH ANCHORS: alternatively pass anchor_hash with the revision token from
+    a read_file(hashline=True) response. The anchor proves the exact version
+    independently of read marks (which summarization can drop); stale anchors
+    are rejected with a re-read hint.
+
     Args:
         path: The **absolute** path to the file to replace the substring in.
         old_str: The substring to replace.
         new_str: The new substring.
         description: Optional short explanation of this replacement shown in the UI.
         replace_all: Whether to replace all occurrences of the substring. If False, only the first occurrence will be replaced. Default is False.
+        anchor_hash: Optional revision token from read_file(hashline=True) proving the version. Defaults to None.
     """
     try:
         sandbox = ensure_sandbox_initialized(runtime)
@@ -2648,6 +2681,7 @@ async def _str_replace_tool_async(
     new_str: str,
     description: str = "",
     replace_all: bool = False,
+    anchor_hash: str | None = None,
 ) -> str:
     return await _run_sync_tool_after_async_sandbox_init(
         str_replace_tool.func,
@@ -2657,6 +2691,7 @@ async def _str_replace_tool_async(
         new_str,
         description,
         replace_all,
+        anchor_hash,
     )
 
 

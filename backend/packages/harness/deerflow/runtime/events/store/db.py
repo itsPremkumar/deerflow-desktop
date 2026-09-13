@@ -17,7 +17,24 @@ from sqlalchemy import delete, func, or_, select, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from deerflow.persistence.models.run_event import RunEventRow
+from deerflow.persistence.migrations.run_events_fts_ddl import (
+    FTS_TABLE,
+    PG_INDEX_DDL,
+    PG_TEXT_PROJECTION,
+    PG_TSVECTOR_EXPR,
+    SQLITE_FTS_DDL,
+)
 from deerflow.runtime.events.message_identity import message_identity
+from deerflow.runtime.events.search import (
+    MAX_SEARCH_LIMIT,
+    clamp_limit,
+    escape_like,
+    extract_searchable_text,
+    make_snippet,
+    message_rank_group,
+    normalize_query,
+    sanitize_fts_query,
+)
 from deerflow.runtime.events.store.base import RunEventStore
 from deerflow.runtime.user_context import AUTO, _AutoSentinel, get_current_user, resolve_user_id
 from deerflow.utils.time import coerce_iso
@@ -29,6 +46,11 @@ class DbRunEventStore(RunEventStore):
     def __init__(self, session_factory: async_sessionmaker[AsyncSession], *, max_trace_content: int = 10240):
         self._sf = session_factory
         self._max_trace_content = max_trace_content
+        # Full-text search availability is probed lazily (fresh databases
+        # stamped past migrations lack the FTS objects until ensured here).
+        # None = unknown, True/False cached per process lifetime.
+        self._fts_available: bool | None = None
+        self._fts_lock = asyncio.Lock()
         # Per-thread asyncio locks serialize seq assignment for concurrent
         # in-process writers on the same thread. The DB-level FOR UPDATE /
         # advisory lock guards cross-process races; this guards the common
@@ -514,3 +536,232 @@ class DbRunEventStore(RunEventStore):
                 await session.execute(delete(RunEventRow).where(*count_conditions))
                 await session.commit()
             return count
+
+    # -- content search (session recall) ------------------------------------
+
+    @staticmethod
+    def _session_dialect(session) -> str | None:
+        try:
+            bind = getattr(session, "bind", None)
+            if bind is None:
+                get_bind = getattr(session, "get_bind", None)
+                bind = get_bind() if callable(get_bind) else None
+            dialect = getattr(bind, "dialect", None)
+            return getattr(dialect, "name", None)
+        except Exception:
+            return None
+
+    async def _ensure_fts_objects(self, session) -> bool:
+        """Idempotently create FTS objects missing from this database.
+
+        Covers fresh databases stamped past the FTS migration plus any drift.
+        Cached per process; failures degrade to the LIKE fallback (logged).
+        """
+        if self._fts_available is not None:
+            return self._fts_available
+        async with self._fts_lock:
+            if self._fts_available is not None:
+                return self._fts_available
+            try:
+                dialect = self._session_dialect(session)
+                if dialect == "sqlite":
+                    probe = await session.execute(
+                        text("SELECT 1 FROM sqlite_master WHERE type='table' AND name=:name"),
+                        {"name": FTS_TABLE},
+                    )
+                    if probe.scalar() is None:
+                        for statement in SQLITE_FTS_DDL:
+                            await session.execute(text(statement))
+                        await session.commit()
+                elif dialect == "postgresql":
+                    await session.execute(text(PG_INDEX_DDL))
+                    await session.commit()
+                else:
+                    self._fts_available = False
+                    return False
+                self._fts_available = True
+            except Exception:
+                logger.warning("Run-event FTS objects unavailable; content search degrades to LIKE", exc_info=True)
+                self._fts_available = False
+            return self._fts_available
+
+    @staticmethod
+    def _hit(thread_id, run_id, seq, event_type, snippet, created_at) -> dict:
+        if isinstance(created_at, datetime):
+            created_at = coerce_iso(created_at)
+        return {
+            "thread_id": thread_id,
+            "run_id": run_id,
+            "seq": seq,
+            "event_type": event_type,
+            "snippet": snippet,
+            "created_at": created_at,
+        }
+
+    async def search_message_content(
+        self,
+        query: str,
+        *,
+        user_id: str | None | _AutoSentinel = AUTO,
+        thread_id: str | None = None,
+        limit: int = 20,
+        snippet_chars: int = 300,
+    ) -> list[dict]:
+        from deerflow.runtime.events.search import DEFAULT_SNIPPET_CHARS
+
+        resolved_user_id = resolve_user_id(user_id, method_name="DbRunEventStore.search_message_content")
+        tokens = normalize_query((query or "")[:200])
+        if not tokens:
+            return []
+        limit = clamp_limit(limit)
+        snippet_chars = max(50, min(2000, int(snippet_chars or DEFAULT_SNIPPET_CHARS)))
+        async with self._sf() as session:
+            dialect = self._session_dialect(session)
+            if dialect == "sqlite" and await self._ensure_fts_objects(session):
+                return await self._search_sqlite_fts(
+                    session, tokens, resolved_user_id, thread_id, limit, snippet_chars, query
+                )
+            if dialect == "postgresql" and await self._ensure_fts_objects(session):
+                return await self._search_postgres(
+                    session, tokens, resolved_user_id, thread_id, limit, snippet_chars, query
+                )
+            return await self._search_like(
+                session, tokens, resolved_user_id, thread_id, limit, snippet_chars, query
+            )
+
+    async def _search_sqlite_fts(self, session, tokens, user_id, thread_id, limit, snippet_chars, raw_query):
+        match = sanitize_fts_query(" ".join(tokens))
+        conditions = ["run_events_fts MATCH :match"]
+        params: dict = {"match": match, "limit": limit}
+        if user_id is not None:
+            # NULL-owner rows never match: fail-closed (orphan migration
+            # assigns them at boot, so absence here is transient at worst).
+            conditions.append("user_id = :uid")
+            params["uid"] = user_id
+        if thread_id is not None:
+            conditions.append("thread_id = :tid")
+            params["tid"] = thread_id
+        rows = (
+            await session.execute(
+                text(
+                    "SELECT thread_id, run_id, seq, event_type, created_at,"
+                    " snippet(run_events_fts, 0, '', '', '…', 12) AS snippet"
+                    f" FROM {FTS_TABLE} WHERE {' AND '.join(conditions)}"
+                    " ORDER BY (msg_type IN ('human', 'ai', 'text')) DESC,"
+                    " rank ASC, created_at DESC LIMIT :limit"
+                ),
+                params,
+            )
+        ).all()
+        hits = []
+        for row in rows:
+            snippet = " ".join(str(row.snippet or "").split())
+            hits.append(
+                self._hit(row.thread_id, row.run_id, row.seq, row.event_type, snippet[:snippet_chars], row.created_at)
+            )
+        return hits
+
+    async def _search_postgres(self, session, tokens, user_id, thread_id, limit, snippet_chars, raw_query):
+        plainto = "plainto_tsquery('english', :query)"
+        rank_expr = f"ts_rank({PG_TSVECTOR_EXPR}, {plainto})"
+        conditions = [f"{PG_TSVECTOR_EXPR} @@ {plainto}", "category = 'message'"]
+        params: dict = {"query": " ".join(tokens), "limit": limit}
+        if user_id is not None:
+            conditions.append("user_id = :uid")
+            params["uid"] = user_id
+        if thread_id is not None:
+            conditions.append("thread_id = :tid")
+            params["tid"] = thread_id
+        rows = (
+            await session.execute(
+                text(
+                    "SELECT thread_id, run_id, seq, event_type, created_at,"
+                    f" ts_headline('english', {PG_TEXT_PROJECTION}, {plainto},"
+                    " 'StartSel=, StopSel=, MaxWords=25, MinWords=10,"
+                    " MaxFragments=2, FragmentDelimiter=\" … \"') AS snippet,"
+                    f" {rank_expr} AS rank"
+                    f" FROM run_events WHERE {' AND '.join(conditions)}"
+                    " ORDER BY (COALESCE(content->>'type', '') IN ('human', 'ai')) DESC,"
+                    " rank DESC, created_at DESC LIMIT :limit"
+                ),
+                params,
+            )
+        ).all()
+        hits = []
+        for row in rows:
+            snippet = " ".join(str(row.snippet or "").split())
+            hits.append(
+                self._hit(row.thread_id, row.run_id, row.seq, row.event_type, snippet[:snippet_chars], row.created_at)
+            )
+        return hits
+
+    async def _search_like(self, session, tokens, user_id, thread_id, limit, snippet_chars, raw_query):
+        # Correctness fallback when FTS objects are unavailable: LIKE scan
+        # with precision post-filtering on extracted text (raw JSON would
+        # otherwise match keys). Bounded candidate window, documented.
+        likes = " AND ".join(f"CAST(content AS TEXT) LIKE :p{i} ESCAPE '\\'" for i in range(len(tokens)))
+        conditions = [f"category = 'message'", f"({likes})"]
+        params: dict = {f"p{i}": f"%{escape_like(token)}%" for i, token in enumerate(tokens)}
+        if user_id is not None:
+            conditions.append("user_id = :uid")
+            params["uid"] = user_id
+        if thread_id is not None:
+            conditions.append("thread_id = :tid")
+            params["tid"] = thread_id
+        rows = (
+            await session.execute(
+                text(
+                    "SELECT thread_id, run_id, seq, event_type, created_at, content"
+                    f" FROM run_events WHERE {' AND '.join(conditions)}"
+                    " ORDER BY created_at DESC LIMIT :scan"
+                ),
+                {**params, "scan": MAX_SEARCH_LIMIT * 5},
+            )
+        ).all()
+        lowered = [token.casefold() for token in tokens]
+        ranked: list[tuple[int, str, object]] = []
+        for row in rows:
+            text = extract_searchable_text(_restore_json_content(row.content))
+            flat = text.casefold()
+            if not text or not all(token in flat for token in lowered):
+                continue
+            ranked.append((message_rank_group(_restore_json_content(row.content)), row.created_at, row))
+        ranked.sort(key=lambda item: (item[0],), reverse=False)
+        # Stable recency within rank groups: rows arrived created_at DESC.
+        grouped: dict[int, list] = {}
+        for group, _, row in ranked:
+            grouped.setdefault(group, []).append(row)
+        hits = []
+        for group in sorted(grouped):
+            for row in grouped[group]:
+                if len(hits) >= limit:
+                    break
+                text = extract_searchable_text(_restore_json_content(row.content))
+                hits.append(
+                    self._hit(
+                        row.thread_id,
+                        row.run_id,
+                        row.seq,
+                        row.event_type,
+                        make_snippet(text, raw_query, snippet_chars),
+                        row.created_at,
+                    )
+                )
+            if len(hits) >= limit:
+                break
+        return hits
+
+
+def _restore_json_content(raw: object) -> object:
+    """Best-effort decode of a stored content cell for text extraction."""
+    if isinstance(raw, (dict, str)):
+        if isinstance(raw, str):
+            try:
+                import json as _json
+
+                parsed = _json.loads(raw)
+                return parsed
+            except (ValueError, TypeError):
+                return raw
+        return raw
+    return raw

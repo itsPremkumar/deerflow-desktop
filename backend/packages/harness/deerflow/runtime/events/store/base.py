@@ -267,6 +267,33 @@ class RunEventStore(abc.ABC):
         """
 
     @abc.abstractmethod
+    async def search_message_content(
+        self,
+        query: str,
+        *,
+        user_id: str | None | _AutoSentinel = AUTO,
+        thread_id: str | None = None,
+        limit: int = 20,
+        snippet_chars: int = 300,
+    ) -> list[dict]:
+        """Ranked content search over ``category="message"`` events.
+
+        Zero-embedding recall across threads: SQL backends use full-text
+        indexes, memory/JSONL backends substring-scan. Each hit carries
+        ``thread_id``, ``run_id``, ``seq``, ``event_type``, ``snippet``
+        (bounded excerpt around the match), and ``created_at``.
+
+        Ordering contract (all backends): human/ai turns before tool output,
+        then recency (``created_at`` descending). Blank queries return []
+        without touching storage. ``thread_id`` scopes to one thread;
+        otherwise every thread the caller owns is searched.
+
+        ``user_id`` follows the same explicit-caller semantics as
+        :meth:`list_messages`: SQL backends enforce it; memory/JSONL stores
+        carry no owner data (dev posture) and search everything.
+        """
+
+    @abc.abstractmethod
     async def delete_by_thread(self, thread_id: str) -> int:
         """Delete all events for a thread. Return the number of deleted events."""
 

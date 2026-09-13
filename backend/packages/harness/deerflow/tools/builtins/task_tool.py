@@ -654,6 +654,7 @@ async def task_tool(
     acceptance_criteria: list[str] | None = None,
     description: str = "",
     context_mode: Literal["isolated", "snapshot"] = "isolated",
+    category: str = "general",
 ) -> str | Command:
     """Delegate a bounded task to a specialized subagent in its own context.
 
@@ -678,6 +679,13 @@ async def task_tool(
     `subagents.custom_agents`. Each custom type can have its own system prompt,
     tools, skills, model, and timeout configuration. If an unknown subagent_type
     is provided, the error message will list all available types.
+
+    Task categories (optional `category` argument) are intent presets applied
+    to any subagent type: `general` (default, no preset), `research`
+    (thorough multi-source investigation), `quick` (terse low-latency
+    execution). Additional categories may be defined in config.yaml under
+    `subagents.categories` with their own model chain, skills, tools, and
+    guidance. Unknown names fail closed listing the available categories.
 
     When to use this tool:
     - Independent tasks that materially reduce wall-clock time when run in parallel
@@ -745,6 +753,9 @@ async def task_tool(
             ["file:../outputs/report.md non-empty"]. Omit for open-ended
             exploration where no crisp acceptance condition exists.
         description: Optional short (3-5 word) description of the task for logging/display.
+        category: Optional intent preset applied to the subagent (`general` by
+            default). Selects a model chain, skills/tools overlays, and operator
+            guidance for the child. Unknown names fail with the available list.
         context_mode: Defaults to isolated (only the delegated prompt). Choose
             snapshot when relevant requirements or failed approaches are spread
             across the parent conversation: it adds retained history and its
@@ -794,6 +805,27 @@ async def task_tool(
 
     # Build config overrides
     overrides: dict = {}
+
+    # Intent preset routing (categories): overlay the operator preset onto the
+    # resolved subagent config before anything else consumes it, so the parent
+    # skill allowlist below still intersects the category selection and the
+    # model override below feeds the standard model resolution. Category
+    # guidance rides the task input (untrusted channel by construction —
+    # operator text is only ever downgraded, never promoted to system).
+    from deerflow.subagents.categories import CategoryResolutionError, apply_category
+
+    try:
+        category_resolution = apply_category(config, category, app_config=runtime_app_config)
+    except CategoryResolutionError as exc:
+        return _task_result_command(
+            tool_call_id=tool_call_id,
+            status="failed",
+            error=str(exc),
+        )
+    if category_resolution.config_overrides:
+        overrides.update(category_resolution.config_overrides)
+    if category_resolution.prompt_suffix:
+        prompt = f"{prompt}{category_resolution.prompt_suffix}"
 
     # Skills are loaded by SubagentExecutor per-session (aligned with Codex's pattern:
     # each subagent loads its own skills based on config, injected as conversation items).
@@ -867,7 +899,7 @@ async def task_tool(
 
     parent_available_skills = metadata.get("available_skills")
     if parent_available_skills is not None:
-        overrides["skills"] = _merge_skill_allowlists(list(parent_available_skills), config.skills)
+        overrides["skills"] = _merge_skill_allowlists(list(parent_available_skills), overrides.get("skills", config.skills))
 
     if overrides:
         config = replace(config, **overrides)

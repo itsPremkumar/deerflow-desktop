@@ -20,7 +20,7 @@
 # ============================================================================
 # Bump this number when the config schema changes.
 # Run `make config-upgrade` to merge new fields into your local config.yaml.
-config_version: 42
+config_version: 43
 
 # ============================================================================
 # Logging
@@ -133,6 +133,31 @@ max_recursion_limit: 1000
 #     output_per_million: 32.0         # price per 1M output tokens
 #     input_cache_hit_per_million: 0.8 # price per 1M cache-hit input tokens
 #                                      # (optional; omit → hits billed at miss price)
+#
+# Provider profiles (optional): named connection defaults shared by model
+# entries. A model sets `provider:` to inherit every key it does not define
+# itself (class path, endpoint, keys, timeouts, retries); model-level keys
+# always win, and `name` is never inherited.
+#
+# providers:
+#   doubao-shared:
+#     use: deerflow.models.patched_deepseek:PatchedChatDeepSeek
+#     api_base: https://ark.cn-beijing.volces.com/api/v3
+#     api_key: $VOLCENGINE_API_KEY
+#     timeout: 600.0
+#     max_retries: 2
+#
+# Fallback chains (optional): when a model fails with a retryable error
+# (rate limit 429, server 5xx, timeout/connection failure), the call fails
+# over to the next listed model entry. Deterministic failures (400/401/404,
+# bad request, content blocks) raise immediately without failover. Chains
+# resolve transitively, cap at 5 entries, and must be acyclic.
+#
+#   - name: doubao-seed-1.8
+#     provider: doubao-shared           # inherits use/api_base/api_key above
+#     model: doubao-seed-1-8-251228
+#     fallbacks: [doubao-seed-1.8-lite] # other models[] names, in priority order
+#     context_window: 262144
 
 models:
   # Example: Volcengine (Doubao) model
@@ -1670,6 +1695,22 @@ subagent_runtime:
 #       timeout_seconds: 300   # 5 minutes for quick command execution
 #       max_turns: 80
 #       # skills: []            # No discoverable/activatable skills for bash agent
+#
+#   # Task categories (optional): intent presets applied to any subagent type
+#   # via `task(category=...)`. Built-ins: general (no-op default), research
+#   # (thorough investigation), quick (terse low-latency). Entries below
+#   # override same-named built-ins. A category selects the first configured
+#   # model in `models`, gates on `requires_models`, and overlays skills/tools/
+#   # budgets plus operator guidance on the task input. Unknown names and
+#   # unresolvable chains fail closed. Denials are sticky: a category can never
+#   # lift a `disallowed_tools` entry (nested `task` stays off).
+#   # categories:
+#   #   deep-research:
+#   #     description: "High-effort investigation with the strongest models"
+#   #     models: [doubao-seed-1.8, kimi-k2.5]  # first configured entry wins
+#   #     requires_models: [doubao-seed-1.8]    # category unavailable without these
+#   #     max_turns: 120
+#   #     prompt_append: "Verify every load-bearing claim against primary evidence."
 #
 #   # Custom subagent types: define specialized agents with their own prompts,
 #   # tools, skills, and model configuration. Custom agents are available via
