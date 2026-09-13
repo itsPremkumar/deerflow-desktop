@@ -85,6 +85,21 @@ class KanbanStore:
             self._save()
             return board
 
+    def put_board(self, board: KanbanBoard) -> KanbanBoard:
+        """Persist a fully built board (e.g. from the autonomous planner).
+
+        Keyed by the board's own id; overwrites any board with the same key.
+        Returns the stored board.
+        """
+        key = board.board_id.lower().strip()
+        with self._lock:
+            board.board_id = key
+            for task in board.tasks.values():
+                task.board_id = key
+            self._boards[key] = board
+            self._save()
+            return board
+
     def create_task(
         self,
         board_id: str,

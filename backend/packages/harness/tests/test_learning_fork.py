@@ -3,6 +3,8 @@
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
+from langgraph.runtime import Runtime
+
 from deerflow.agents.middlewares.learning_fork_middleware import (
     LearningForkMiddleware,
     LearningForkMiddlewareState,

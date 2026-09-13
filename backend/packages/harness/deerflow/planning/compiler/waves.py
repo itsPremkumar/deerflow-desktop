@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Set
+from typing import Any, Dict, List, Set, Tuple
 
 
 @dataclass
 class ExecutionWave:
     """A cohort of tasks that can be safely dispatched concurrently."""
+
     wave_index: int
     task_ids: List[str] = field(default_factory=list)
     parallel_allowed: bool = True
@@ -21,33 +22,107 @@ class ExecutionWave:
         }
 
 
-def partition_execution_waves(task_dag: Dict[str, List[str]]) -> List[ExecutionWave]:
+def validate_task_dag(task_dag: Dict[str, List[str]]) -> Tuple[bool, List[str]]:
+    """Validate a task DAG without partitioning it.
+
+    Returns (is_valid, errors). Checks: non-empty ids, list deps,
+    no self-dependency, no unknown references, no cycles.
+    """
+    errors: List[str] = []
+    if not isinstance(task_dag, dict) or not task_dag:
+        return False, ["task_dag must be a non-empty mapping of task_id -> dependencies"]
+    for tid, deps in task_dag.items():
+        if not isinstance(tid, str) or not tid.strip():
+            errors.append(f"Invalid task id: {tid!r}")
+            continue
+        if not isinstance(deps, list):
+            errors.append(f"Task {tid!r} dependencies must be a list")
+            continue
+        for dep in deps:
+            if dep == tid:
+                errors.append(f"Task {tid!r} depends on itself")
+            elif dep not in task_dag:
+                errors.append(f"Task {tid!r} depends on unknown task {dep!r}")
+
+    if not errors:
+        cycle = find_cycle(task_dag)
+        if cycle:
+            errors.append(f"Dependency cycle detected: {' -> '.join(cycle)}")
+    return (len(errors) == 0, errors)
+
+
+def find_cycle(task_dag: Dict[str, List[str]]) -> List[str]:
+    """Return one cycle path if present, else []. Iterative DFS."""
+    visiting: Set[str] = set()
+    visited: Set[str] = set()
+    stack: List[str] = []
+
+    def visit(node: str) -> List[str] | None:
+        visiting.add(node)
+        stack.append(node)
+        for dep in task_dag.get(node, []):
+            if dep not in task_dag:
+                continue
+            if dep in visiting:
+                idx = stack.index(dep)
+                return stack[idx:] + [dep]
+            if dep not in visited:
+                found = visit(dep)
+                if found:
+                    return found
+        visiting.discard(node)
+        visited.add(node)
+        stack.pop()
+        return None
+
+    for tid in task_dag:
+        if tid not in visited:
+            found = visit(tid)
+            if found:
+                return found
+    return []
+
+
+def partition_execution_waves(
+    task_dag: Dict[str, List[str]],
+    *,
+    strict: bool = False,
+) -> List[ExecutionWave]:
     """
     P12: Partition a task dependency graph into sequential execution waves.
     task_dag: mapping of task_id -> list of dependencies (task_ids it depends on).
+
+    strict=True raises ValueError on cycles/unknown refs instead of emitting
+    an emergency wave. Default False preserves the historical lenient behavior.
     """
     if not task_dag:
         return []
 
+    if strict:
+        is_valid, errors = validate_task_dag(task_dag)
+        if not is_valid:
+            raise ValueError(f"Invalid task_dag: {'; '.join(errors)}")
+
     # Copy dependency structure
-    remaining_deps: Dict[str, Set[str]] = {
-        tid: set(deps) for tid, deps in task_dag.items()
-    }
+    remaining_deps: Dict[str, Set[str]] = {tid: set(deps) for tid, deps in task_dag.items()}
+    # Unknown refs can never be satisfied — in lenient mode surface them in a
+    # final fenced wave instead of looping forever.
+    known = set(task_dag.keys())
+    for tid in list(remaining_deps.keys()):
+        remaining_deps[tid] = {d for d in remaining_deps[tid] if d in known}
+
     completed: Set[str] = set()
     waves: List[ExecutionWave] = []
     wave_idx = 1
 
     while remaining_deps:
         # Find all tasks with all dependencies satisfied
-        current_wave_tasks = [
-            tid
-            for tid, deps in remaining_deps.items()
-            if deps.issubset(completed)
-        ]
+        current_wave_tasks = [tid for tid, deps in remaining_deps.items() if deps.issubset(completed)]
 
         if not current_wave_tasks:
-            # Dependency cycle or unresolved reference detected
-            # Break cycle by taking arbitrary remaining tasks into an emergency wave
+            # Dependency cycle detected — in lenient mode fence exactly one
+            # task per emergency wave so progress is observable; strict mode
+            # already raised above.
             current_wave_tasks = sorted(list(remaining_deps.keys()))[:1]
 
         waves.append(

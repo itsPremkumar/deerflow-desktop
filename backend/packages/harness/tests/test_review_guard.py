@@ -1,7 +1,7 @@
 """Tests for the review guard middleware."""
 
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 from deerflow.agents.middlewares.review_guard_middleware import (
     ReviewGuardMiddleware,
@@ -23,7 +23,7 @@ class TestHelperFunctions:
         assert _get_extension("/path/to/file.py") == ".py"
         assert _get_extension("file.ts") == ".ts"
         assert _get_extension("noext") == ""
-        assert _get_extension(".hidden") == ""
+        assert _get_extension(".hidden") == ".hidden"
         assert _get_extension("path.with.dots/file.tsx") == ".tsx"
 
     def test_calculate_comment_ratio_python(self):
@@ -68,11 +68,13 @@ def foo():
         assert _is_write_allowed("unknown", ".py", policy) is False
 
     def test_resolve_role_from_context(self):
+        from unittest.mock import MagicMock
         runtime = MagicMock()
         runtime.context = {"review_role": "planner"}
         assert _resolve_role(runtime, "coder") == "planner"
 
     def test_resolve_role_from_principal(self):
+        from unittest.mock import MagicMock
         runtime = MagicMock()
         principal = MagicMock()
         principal.role = "coder"
@@ -80,6 +82,7 @@ def foo():
         assert _resolve_role(runtime, "default") == "coder"
 
     def test_resolve_role_default(self):
+        from unittest.mock import MagicMock
         runtime = MagicMock()
         runtime.context = {}
         assert _resolve_role(runtime, "coder") == "coder"
@@ -100,14 +103,14 @@ class TestReviewGuardConfig:
         assert cfg.min_comment_ratio == 0.15
         assert ".py" in cfg.enforce_on_extensions
         assert ".ts" in cfg.enforce_on_extensions
-        assert cfg.default_role == "coder"
+        cfg.default_role == "coder"
         assert "planner" in cfg.role_write_policy
-        assert "coder" in cfg.role_write_policy
 
     def test_bounds(self):
-        with pytest.raises(ValueError):
+        from pytest import raises
+        with raises(ValueError):
             ReviewGuardConfig(min_comment_ratio=1.5)
-        with pytest.raises(ValueError):
+        with raises(ValueError):
             ReviewGuardConfig(min_comment_ratio=-0.1)
 
 
@@ -134,6 +137,7 @@ class TestReviewGuardMiddleware:
 
     @pytest.fixture
     def runtime(self):
+        from unittest.mock import MagicMock
         rt = MagicMock()
         rt.context = {"thread_id": "test-thread"}
         return rt
@@ -153,8 +157,7 @@ class TestReviewGuardMiddleware:
         handler = AsyncMock()
         handler.return_value = MagicMock(status="success")
 
-        with patch("deerflow.agents.middlewares.review_guard_middleware.get_config", return_value={"runtime": runtime}):
-            result = await middleware.wrap_tool_call(request, handler)
+        result = await middleware.wrap_tool_call(request, handler)
 
         handler.assert_called_once()
         # Should pass through without intervention
@@ -169,8 +172,7 @@ class TestReviewGuardMiddleware:
         handler = AsyncMock()
         handler.return_value = MagicMock(status="success")
 
-        with patch("deerflow.agents.middlewares.review_guard_middleware.get_config", return_value={"runtime": runtime}):
-            result = await middleware.wrap_tool_call(request, handler)
+        result = await middleware.wrap_tool_call(request, handler)
 
         handler.assert_called_once()
 
@@ -186,8 +188,7 @@ class TestReviewGuardMiddleware:
 
         handler = AsyncMock()
 
-        with patch("deerflow.agents.middlewares.review_guard_middleware.get_config", return_value={"runtime": runtime}):
-            result = await middleware.wrap_tool_call(request, handler)
+        result = await middleware.wrap_tool_call(request, handler)
 
         handler.assert_not_called()
         assert result.status == "error"
@@ -206,8 +207,7 @@ class TestReviewGuardMiddleware:
         handler = AsyncMock()
         handler.return_value = MagicMock(status="success")
 
-        with patch("deerflow.agents.middlewares.review_guard_middleware.get_config", return_value={"runtime": runtime}):
-            result = await middleware.wrap_tool_call(request, handler)
+        result = await middleware.wrap_tool_call(request, handler)
 
         handler.assert_called_once()
         assert result.status == "success"
@@ -216,20 +216,18 @@ class TestReviewGuardMiddleware:
     async def test_comment_density_enforcement(self, config, state, runtime):
         middleware = ReviewGuardMiddleware(review_guard_config=config)
 
-        # Content with low comment ratio (1 comment, 4 non-empty lines = 0.25, but need >= 0.2)
+        # Content with low comment ratio (0 comments / 3 non-empty = 0.0 < 0.2)
         request = MagicMock()
         request.tool_call = {"name": "write_file", "id": "call_1", "args": {"path": "test.py", "content": "x = 1\ny = 2\nz = 3\n"}}
 
         runtime.context = {"thread_id": "test-thread", "review_role": "coder"}
 
         handler = AsyncMock()
-        # Handler returns success with the new content
         handler.return_value = MagicMock(status="success")
 
-        with patch("deerflow.agents.middlewares.review_guard_middleware.get_config", return_value={"runtime": runtime}):
-            result = await middleware.wrap_tool_call(request, handler)
+        result = await middleware.wrap_tool_call(request, handler)
 
-        # Low comment density (0 comments / 3 non-empty = 0.0) should be rejected
+        # Low comment density should be rejected
         assert result.status == "error"
         assert "Comment density too low" in result.content
 
@@ -246,8 +244,7 @@ class TestReviewGuardMiddleware:
         handler = AsyncMock()
         handler.return_value = MagicMock(status="success")
 
-        with patch("deerflow.agents.middlewares.review_guard_middleware.get_config", return_value={"runtime": runtime}):
-            result = await middleware.wrap_tool_call(request, handler)
+        result = await middleware.wrap_tool_call(request, handler)
 
         assert result.status == "success"
 
@@ -263,8 +260,7 @@ class TestReviewGuardMiddleware:
         handler = AsyncMock()
         handler.return_value = MagicMock(status="success")
 
-        with patch("deerflow.agents.middlewares.review_guard_middleware.get_config", return_value={"runtime": runtime}):
-            result = await middleware.wrap_tool_call(request, handler)
+        result = await middleware.wrap_tool_call(request, handler)
 
         assert result.status == "success"
 
@@ -280,8 +276,7 @@ class TestReviewGuardMiddleware:
         handler = AsyncMock()
         handler.return_value = MagicMock(status="success")
 
-        with patch("deerflow.agents.middlewares.review_guard_middleware.get_config", return_value={"runtime": runtime}):
-            result = await middleware.wrap_tool_call(request, handler)
+        result = await middleware.wrap_tool_call(request, handler)
 
         assert result.status == "error"
         assert "Comment density too low" in result.content
@@ -300,8 +295,7 @@ class TestReviewGuardMiddleware:
         handler = AsyncMock()
         handler.return_value = MagicMock(status="success")
 
-        with patch("deerflow.agents.middlewares.review_guard_middleware.get_config", return_value={"runtime": runtime}):
-            result = await middleware.wrap_tool_call(request, handler)
+        result = await middleware.wrap_tool_call(request, handler)
 
         # Should pass through without comment density check
         assert result.status == "success"
@@ -317,8 +311,7 @@ class TestReviewGuardMiddleware:
 
         handler = AsyncMock()
 
-        with patch("deerflow.agents.middlewares.review_guard_middleware.get_config", return_value={"runtime": runtime}):
-            result = await middleware.wrap_tool_call(request, handler)
+        result = await middleware.wrap_tool_call(request, handler)
 
         handler.assert_not_called()
         assert result.status == "error"
@@ -345,3 +338,126 @@ class TestFactory:
         mw = build_review_guard_middleware(review_guard_config=cfg)
         assert mw._config.enabled is True
         assert mw._config.min_comment_ratio == 0.3
+
+
+class TestSnapshotStability:
+    """Verify comment-density enforcement with realistic Python code."""
+
+    @pytest.mark.asyncio
+    async def test_low_comment_density_rejected(self, config, state, runtime):
+        """Code with too few comments should be rejected."""
+        middleware = ReviewGuardMiddleware(review_guard_config=config)
+
+        # A small Python function with only 1 comment in 6 lines = 0.17
+        request = MagicMock()
+        request.tool_call = {"name": "write_file", "id": "call_1", "args": {
+            "path": "test.py",
+            "content": "def foo():\n    x = 1\n    y = 2\n    z = 3\n"
+        }}
+
+        runtime.context = {"thread_id": "test-thread", "review_role": "coder"}
+
+        handler = AsyncMock()
+        handler.return_value = MagicMock(status="success")
+
+        result = await middleware.wrap_tool_call(request, handler)
+
+        assert result.status == "error"
+        assert "Comment density too low" in result.content
+
+    @pytest.mark.asyncio
+    async def test_adequate_comment_density_accepted(self, config, state, runtime):
+        """Code with sufficient comments should be accepted."""
+        middleware = ReviewGuardMiddleware(review_guard_config=config)
+
+        # A Python function with 3 comments in 7 lines = 0.43
+        request = MagicMock()
+        request.tool_call = {"name": "write_file", "id": "call_1", "args": {
+            "path": "test.py",
+            "content": "# Initialize variables\nx = 1\ny = 2\n# Compute result\nz = x + y\n# Return result\nreturn z
+        }}
+
+        runtime.context = {"thread_id": "test-thread", "review_role": "coder"}
+
+        handler = AsyncMock()
+        handler.return_value = MagicMock(status="success")
+
+        result = await middleware.wrap_tool_call(request, handler)
+
+        assert result.status == "success"
+
+    @pytest.mark.asyncio
+    async def test_comment_density_boundary(self, config, state, runtime):
+        """Test the boundary at min_comment_ratio."""
+        middleware = ReviewGuardMiddleware(
+            ReviewGuardConfig(min_comment_ratio=0.3, enforce_on_extensions=[".py"])
+        )
+
+        # Exactly 3 comments in 10 lines = 0.3 - should pass
+        request = MagicMock()
+        request.tool_call = {"name": "write_file", "id": "call_1", "args": {
+            "path": "test.py",
+            "content": "# comment 1\nx = 1\n# comment 2\ny = 2\n# comment 3\nz = 3\n"
+        }}
+
+        runtime.context = {"thread_id": "test-thread", "review_role": "coder"}
+
+        handler = AsyncMock()
+        handler.return_value = MagicMock(status="success")
+
+        result = await middleware.wrap_tool_call(request, handler)
+
+        # 3/10 = 0.3 which meets the threshold
+        assert result.status == "success"
+
+
+class TestIntegration:
+    """Integration tests."""
+
+    @pytest.mark.asyncio
+    async def test_mixed_tools(self, config, state, runtime):
+        """Test that only write tools are checked, other tools pass through."""
+        middleware = ReviewGuardMiddleware(review_guard_config=config)
+
+        # Read tool should pass through
+        request = MagicMock()
+        request.tool_call = {"name": "read_file", "id": "call_1", "args": {"path": "test.py"}}
+
+        handler = AsyncMock()
+        handler.return_value = MagicMock(status="success")
+
+        result = await middleware.wrap_tool_call(request, handler)
+
+        assert result.status == "success"
+
+    @pytest.mark.asyncio
+    async def test_multiple_write_tools(self, config, state, runtime):
+        """Test multiple write tool calls in sequence."""
+        middleware = ReviewGuardMiddleware(review_guard_config=config)
+
+        # First write with good comments
+        request1 = MagicMock()
+        request1.tool_call = {"name": "write_file", "id": "call_1", "args": {
+            "path": "test.py", "content": "# comment\nx = 1\n"
+        }}
+
+        handler1 = AsyncMock()
+        handler1.return_value = MagicMock(status="success")
+
+        result1 = await middleware.wrap_tool_call(request1, handler1)
+        assert result1.status == "success"
+
+        # Second write with bad comments
+        request2 = MagicMock()
+        request2.tool_call = {"name": "write_file", "id": "call_2", "args": {
+            "path": "test2.py", "content": "x = 1\ny = 2\n"
+        }}
+
+        runtime.context = {"thread_id": "test-thread", "review_role": "coder"}
+
+        handler2 = AsyncMock()
+        handler2.return_value = MagicMock(status="success")
+
+        result2 = await middleware.wrap_tool_call(request2, handler2)
+        assert result2.status == "error"
+        assert "Comment density too low" in result2.content

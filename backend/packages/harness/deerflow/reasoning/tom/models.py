@@ -8,9 +8,9 @@ from typing import Any, Dict, List, Optional
 
 
 class RiskTolerance(str, Enum):
-    LOW = "low"         # Production/critical: zero breakage, full backwards compatibility
-    MEDIUM = "medium"   # Standard engineering: balanced progress with validation
-    HIGH = "high"       # Prototyping / experimental: move fast, major rewrites tolerated
+    LOW = "low"  # Production/critical: zero breakage, full backwards compatibility
+    MEDIUM = "medium"  # Standard engineering: balanced progress with validation
+    HIGH = "high"  # Prototyping / experimental: move fast, major rewrites tolerated
 
 
 class PriorityDomain(str, Enum):
@@ -20,11 +20,15 @@ class PriorityDomain(str, Enum):
     MINIMAL_DIFF = "minimal_diff"
     READABILITY = "readability"
     TEST_COVERAGE = "test_coverage"
+    SECURITY = "security"
+    EVIDENCE = "evidence"
+    REVERSIBILITY = "reversibility"
 
 
 @dataclass
 class IntentHypothesis:
     """Hypothesized human mental state and implicit requirements."""
+
     stated_goal: str
     inferred_intent: str
     risk_tolerance: RiskTolerance

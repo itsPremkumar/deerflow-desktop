@@ -12,6 +12,8 @@ from deerflow.reasoning.tom.consultant import TheoryOfMindConsultant
 def tom_consult(
     task_description: str,
     proposed_plan: str = "",
+    workspace_context: str = "",
+    context_metadata_json: str = "",
 ) -> str:
     """Consult the Theory of Mind cognitive model to infer unstated user expectations, invariants, and pitfalls.
 
@@ -21,18 +23,35 @@ def tom_consult(
     Args:
         task_description: The user prompt or task goal to model.
         proposed_plan: Optional description of the agent's proposed plan of action.
+        workspace_context: Optional workspace layout snippet for grounding (improves calibration).
+        context_metadata_json: Optional JSON object with repo_map/file_list/prior_tasks hints.
     """
-    consultant = TheoryOfMindConsultant()
-    hypothesis = consultant.consult(task_description=task_description)
+    import json as _json
 
-    return json.dumps({
-        "stated_goal": hypothesis.stated_goal,
-        "inferred_intent": hypothesis.inferred_intent,
-        "risk_tolerance": hypothesis.risk_tolerance.value,
-        "top_priorities": [p.value for p in hypothesis.top_priorities],
-        "unstated_expectations": hypothesis.unstated_expectations,
-        "pitfalls_to_avoid": hypothesis.pitfalls_to_avoid,
-        "recommended_constraints": hypothesis.recommended_constraints,
-        "confidence_score": hypothesis.confidence_score,
-        "summary_markdown": hypothesis.to_markdown(),
-    }, indent=2)
+    metadata = None
+    if context_metadata_json:
+        try:
+            metadata = _json.loads(context_metadata_json)
+        except Exception:
+            metadata = None
+    consultant = TheoryOfMindConsultant()
+    hypothesis = consultant.consult(
+        task_description=task_description,
+        workspace_context=workspace_context or None,
+        context_metadata=metadata,
+    )
+
+    return json.dumps(
+        {
+            "stated_goal": hypothesis.stated_goal,
+            "inferred_intent": hypothesis.inferred_intent,
+            "risk_tolerance": hypothesis.risk_tolerance.value,
+            "top_priorities": [p.value for p in hypothesis.top_priorities],
+            "unstated_expectations": hypothesis.unstated_expectations,
+            "pitfalls_to_avoid": hypothesis.pitfalls_to_avoid,
+            "recommended_constraints": hypothesis.recommended_constraints,
+            "confidence_score": hypothesis.confidence_score,
+            "summary_markdown": hypothesis.to_markdown(),
+        },
+        indent=2,
+    )
