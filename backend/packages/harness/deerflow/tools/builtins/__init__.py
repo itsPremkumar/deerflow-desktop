@@ -101,6 +101,13 @@ from .evaluation_benchmark_tool import run_task_evaluation_benchmark
 from .computer_worker_tool import execute_sandboxed_computer_action
 from .durable_replay_tool import manage_durable_orchestration
 
+# Wave 8: Multi-Model Discipline Team (OpenAI Astra & Claude Fable 5.1 Profile)
+from .discipline_team_tool import (
+    consult_plan_gap_analysis,
+    dispatch_discipline_worker,
+    review_plan_invariant_gate,
+)
+
 __all__ = [
     "setup_agent",
     "update_agent",
@@ -187,4 +194,7 @@ __all__ = [
     "run_task_evaluation_benchmark",
     "execute_sandboxed_computer_action",
     "manage_durable_orchestration",
+    "consult_plan_gap_analysis",
+    "review_plan_invariant_gate",
+    "dispatch_discipline_worker",
 ]
