@@ -11,7 +11,7 @@ from datetime import UTC, datetime
 from sqlalchemy import case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from deerflow.persistence.feedback.model import FeedbackRow
+from deerflow.persistence.feedback.model import FeedbackRow, validate_category
 from deerflow.runtime.user_context import AUTO, _AutoSentinel, resolve_user_id
 from deerflow.utils.time import coerce_iso
 
@@ -38,10 +38,12 @@ class FeedbackRepository:
         user_id: str | None | _AutoSentinel = AUTO,
         message_id: str | None = None,
         comment: str | None = None,
+        category: str | None = None,
     ) -> dict:
-        """Create a feedback record. rating must be +1 or -1."""
+        """Create a feedback record. rating must be +1 or -1; category must be a known category or None."""
         if rating not in (1, -1):
             raise ValueError(f"rating must be +1 or -1, got {rating}")
+        resolved_category = validate_category(category)
         resolved_user_id = resolve_user_id(user_id, method_name="FeedbackRepository.create")
         row = FeedbackRow(
             feedback_id=str(uuid.uuid4()),
@@ -51,6 +53,7 @@ class FeedbackRepository:
             message_id=message_id,
             rating=rating,
             comment=comment,
+            category=resolved_category,
             created_at=datetime.now(UTC),
         )
         async with self._sf() as session:
@@ -132,10 +135,12 @@ class FeedbackRepository:
         rating: int,
         user_id: str | None | _AutoSentinel = AUTO,
         comment: str | None = None,
+        category: str | None = None,
     ) -> dict:
-        """Create or update feedback for (thread_id, run_id, user_id). rating must be +1 or -1."""
+        """Create or update feedback for (thread_id, run_id, user_id). rating must be +1 or -1; category must be known or None."""
         if rating not in (1, -1):
             raise ValueError(f"rating must be +1 or -1, got {rating}")
+        resolved_category = validate_category(category)
         resolved_user_id = resolve_user_id(user_id, method_name="FeedbackRepository.upsert")
         async with self._sf() as session:
             stmt = select(FeedbackRow).where(
@@ -148,6 +153,7 @@ class FeedbackRepository:
             if row is not None:
                 row.rating = rating
                 row.comment = comment
+                row.category = resolved_category
                 row.created_at = datetime.now(UTC)
             else:
                 row = FeedbackRow(
@@ -157,6 +163,7 @@ class FeedbackRepository:
                     user_id=resolved_user_id,
                     rating=rating,
                     comment=comment,
+                    category=resolved_category,
                     created_at=datetime.now(UTC),
                 )
                 session.add(row)
@@ -223,8 +230,13 @@ class FeedbackRepository:
             result = await session.execute(stmt)
             return {row.run_id: self._row_to_dict(row) for row in result.scalars()}
 
-    async def aggregate_by_run(self, thread_id: str, run_id: str) -> dict:
-        """Aggregate feedback stats for a run using database-side counting."""
+    async def aggregate_by_run(self, thread_id: str, run_id: str, *, by_category: bool = False) -> dict:
+        """Aggregate feedback stats for a run using database-side counting.
+
+        With ``by_category=True`` the result also carries per-category
+        ``{"category": {"total": n, "positive": n, "negative": n}}`` counts
+        (uncategorized rows group under ``"uncategorized"``).
+        """
         stmt = select(
             func.count().label("total"),
             func.coalesce(func.sum(case((FeedbackRow.rating == 1, 1), else_=0)), 0).label("positive"),
@@ -232,9 +244,29 @@ class FeedbackRepository:
         ).where(FeedbackRow.thread_id == thread_id, FeedbackRow.run_id == run_id)
         async with self._sf() as session:
             row = (await session.execute(stmt)).one()
-            return {
+            stats: dict = {
                 "run_id": run_id,
                 "total": row.total,
                 "positive": row.positive,
                 "negative": row.negative,
             }
+            if by_category:
+                cat_stmt = (
+                    select(
+                        FeedbackRow.category,
+                        func.count().label("total"),
+                        func.coalesce(func.sum(case((FeedbackRow.rating == 1, 1), else_=0)), 0).label("positive"),
+                        func.coalesce(func.sum(case((FeedbackRow.rating == -1, 1), else_=0)), 0).label("negative"),
+                    )
+                    .where(FeedbackRow.thread_id == thread_id, FeedbackRow.run_id == run_id)
+                    .group_by(FeedbackRow.category)
+                )
+                by_cat: dict[str, dict] = {}
+                for cat_row in (await session.execute(cat_stmt)).all():
+                    by_cat[cat_row.category or "uncategorized"] = {
+                        "total": cat_row.total,
+                        "positive": cat_row.positive,
+                        "negative": cat_row.negative,
+                    }
+                stats["by_category"] = by_cat
+            return stats

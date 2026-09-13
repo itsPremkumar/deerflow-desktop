@@ -1703,6 +1703,19 @@ def test_merge_run_context_overrides_forwards_subagent_total_limit():
     assert config["context"]["max_total_subagents"] == 8
 
 
+def test_merge_run_context_overrides_forwards_agent_preset():
+    """``agent_preset`` from ``body.context`` must reach both ``configurable``
+    and ``context`` so HTTP/IM clients can select a preset per request; the
+    factory fail-opens unknown names to ``standard``."""
+    from app.gateway.services import build_run_config, merge_run_context_overrides
+
+    config = build_run_config("thread-1", None, None)
+    merge_run_context_overrides(config, {"agent_preset": "minimal"})
+
+    assert config["configurable"]["agent_preset"] == "minimal"
+    assert config["context"]["agent_preset"] == "minimal"
+
+
 def test_merge_run_context_overrides_noop_for_empty_context():
     from app.gateway.services import build_run_config, merge_run_context_overrides
 

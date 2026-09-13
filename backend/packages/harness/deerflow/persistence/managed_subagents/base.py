@@ -8,7 +8,7 @@ from collections.abc import Hashable
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-REQUIRED_DISALLOWED_TOOLS = frozenset({"task", "ask_clarification", "present_files"})
+REQUIRED_DISALLOWED_TOOLS = frozenset({"task", "ralph_loop", "ask_clarification", "present_files"})
 MANAGED_SUBAGENT_NAME_PATTERN = re.compile(r"^[A-Za-z0-9-]+$")
 
 

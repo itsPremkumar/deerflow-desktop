@@ -72,6 +72,12 @@ from .agency_competence_tool import evaluate_agent_competence
 from .five_pass_search_tool import compile_five_pass_search
 from .delta_checkpoint_tool import create_workflow_checkpoint
 
+# Autonomous one-prompt planner: raw prompt -> fully decided execution plan
+from .autoplan_tool import build_autonomous_plan
+
+# DeepSeek-Harness-style bounded self-improvement loop over delegations
+from .ralph_loop_tool import ralph_loop_tool
+
 __all__ = [
     "setup_agent",
     "update_agent",
@@ -142,4 +148,6 @@ __all__ = [
     "evaluate_agent_competence",
     "compile_five_pass_search",
     "create_workflow_checkpoint",
+    "build_autonomous_plan",
+    "ralph_loop_tool",
 ]

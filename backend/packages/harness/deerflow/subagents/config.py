@@ -35,7 +35,9 @@ class SubagentConfig:
     description: str
     system_prompt: str | None = None
     tools: list[str] | None = None
-    disallowed_tools: list[str] | None = field(default_factory=lambda: ["task", "session_search"])
+    disallowed_tools: list[str] | None = field(default_factory=lambda: ["task", "ralph_loop", "session_search"])
+    # ``task`` and ``ralph_loop`` are denied so delegations cannot nest;
+    # ``session_search`` is lead-only (crosses thread boundaries by design).
     skills: list[str] | None = None
     model: str = "inherit"
     max_turns: int = 50

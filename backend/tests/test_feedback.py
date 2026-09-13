@@ -310,3 +310,60 @@ class TestFollowUpAssociation:
         if recent and recent[0].get("status") == "success":
             follow_up = recent[0]["run_id"]
         assert follow_up == "r3"
+
+
+# -- Feedback categories (Wave 1.4) --
+
+
+class TestFeedbackCategories:
+    @pytest.mark.anyio
+    async def test_create_with_category(self, tmp_path):
+        repo = await _make_feedback_repo(tmp_path)
+        record = await repo.create(run_id="r1", thread_id="t1", rating=-1, category="grounding")
+        assert record["category"] == "grounding"
+        await _cleanup()
+
+    @pytest.mark.anyio
+    async def test_create_category_defaults_to_none(self, tmp_path):
+        repo = await _make_feedback_repo(tmp_path)
+        record = await repo.create(run_id="r1", thread_id="t1", rating=1)
+        assert record["category"] is None
+        await _cleanup()
+
+    @pytest.mark.anyio
+    async def test_create_invalid_category_raises(self, tmp_path):
+        repo = await _make_feedback_repo(tmp_path)
+        with pytest.raises(ValueError):
+            await repo.create(run_id="r1", thread_id="t1", rating=1, category="vibes")
+        await _cleanup()
+
+    @pytest.mark.anyio
+    async def test_upsert_updates_category(self, tmp_path):
+        repo = await _make_feedback_repo(tmp_path)
+        first = await repo.upsert(run_id="r1", thread_id="t1", rating=-1, user_id="u1")
+        assert first["category"] is None
+        second = await repo.upsert(run_id="r1", thread_id="t1", rating=-1, user_id="u1", category="correctness")
+        assert second["feedback_id"] == first["feedback_id"]
+        assert second["category"] == "correctness"
+        await _cleanup()
+
+    @pytest.mark.anyio
+    async def test_aggregate_by_category(self, tmp_path):
+        repo = await _make_feedback_repo(tmp_path)
+        await repo.create(run_id="r1", thread_id="t1", rating=-1, user_id="u1", category="grounding")
+        await repo.create(run_id="r1", thread_id="t1", rating=-1, user_id="u2", category="latency")
+        await repo.create(run_id="r1", thread_id="t1", rating=1, user_id="u3")
+        stats = await repo.aggregate_by_run("t1", "r1", by_category=True)
+        assert stats["total"] == 3
+        assert stats["by_category"]["grounding"] == {"total": 1, "positive": 0, "negative": 1}
+        assert stats["by_category"]["latency"] == {"total": 1, "positive": 0, "negative": 1}
+        assert stats["by_category"]["uncategorized"] == {"total": 1, "positive": 1, "negative": 0}
+        await _cleanup()
+
+    @pytest.mark.anyio
+    async def test_aggregate_default_has_no_category_breakdown(self, tmp_path):
+        repo = await _make_feedback_repo(tmp_path)
+        await repo.create(run_id="r1", thread_id="t1", rating=1, user_id="u1", category="format")
+        stats = await repo.aggregate_by_run("t1", "r1")
+        assert "by_category" not in stats
+        await _cleanup()

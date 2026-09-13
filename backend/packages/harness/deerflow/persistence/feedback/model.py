@@ -9,6 +9,29 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from deerflow.persistence.base import Base
 
+#: Feedback categories (DeepSeek-Harness-style feedback taxonomy): polarity
+#: (``rating``) says *whether* the run was good, the category says *what* was
+#: good or bad so feedback can drive targeted eval cases.
+FEEDBACK_CATEGORIES: frozenset[str] = frozenset(
+    {
+        "correctness",
+        "completeness",
+        "grounding",
+        "format",
+        "latency",
+        "other",
+    }
+)
+
+
+def validate_category(category: str | None) -> str | None:
+    """Validate an optional feedback category. ``None`` stays ``None`` (uncategorized)."""
+    if category is None:
+        return None
+    if category not in FEEDBACK_CATEGORIES:
+        raise ValueError(f"category must be one of {sorted(FEEDBACK_CATEGORIES)}, got {category!r}")
+    return category
+
 
 class FeedbackRow(Base):
     __tablename__ = "feedback"
@@ -25,6 +48,10 @@ class FeedbackRow(Base):
 
     rating: Mapped[int] = mapped_column(nullable=False)
     # +1 (thumbs-up) or -1 (thumbs-down)
+
+    category: Mapped[str | None] = mapped_column(String(32))
+    # Optional category from FEEDBACK_CATEGORIES — what the feedback is about.
+    # NULL means uncategorized (all pre-category rows).
 
     comment: Mapped[str | None] = mapped_column(Text)
     # Optional text feedback from the user

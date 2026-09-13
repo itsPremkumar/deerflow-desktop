@@ -30,6 +30,7 @@ from deerflow.tools.builtins import (
     process_handle_tool,
     propose_skill_tool,
     python_repl_tool,
+    ralph_loop_tool,
     review_skill_package,
     session_search_tool,
     task_tool,
@@ -56,6 +57,7 @@ from deerflow.tools.builtins import (
     hyperplan_review_manage,
     ast_grep_search,
     ast_grep_rewrite,
+    build_autonomous_plan,
 )
 from deerflow.tools.mcp_metadata import tag_mcp_tool
 from deerflow.tools.sync import make_sync_tool_wrapper
@@ -90,6 +92,8 @@ BUILTIN_TOOLS = [
     catalog_tool_call,
     consolidate_memory_dream,
     update_progress_card,
+    # DeepSeek-Harness-style bounded self-improvement loop over delegations:
+    ralph_loop_tool,
     # Hermes Deep Integration extensions:
     learning_graph_manage,
     verify_command_approval,
@@ -107,6 +111,7 @@ BUILTIN_TOOLS = [
     hyperplan_review_manage,
     ast_grep_search,
     ast_grep_rewrite,
+    build_autonomous_plan,
 ]
 
 SUBAGENT_TOOLS = [

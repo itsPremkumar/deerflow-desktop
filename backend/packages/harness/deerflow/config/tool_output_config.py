@@ -86,3 +86,16 @@ class ToolOutputConfig(BaseModel):
         default_factory=dict,
         description="Per-tool externalize_min_chars overrides. Keys are tool names, values are char thresholds. Use 0 to disable externalization for a specific tool.",
     )
+    prune_tiers: dict[str, int] = Field(
+        default_factory=dict,
+        description="Named per-tool-class externalization tiers (e.g. {'bash': 65536, 'web_fetch': 16384}). Precedence per tool: tool_overrides > prune_tiers > externalize_min_chars. 0 disables externalization for matching tools.",
+    )
+
+    @field_validator("prune_tiers")
+    @classmethod
+    def _prune_tiers_non_negative(cls, value: dict[str, int]) -> dict[str, int]:
+        """Reject negative tier budgets loudly — a negative threshold is never a meaningful budget."""
+        for tool_name, threshold in value.items():
+            if threshold < 0:
+                raise ValueError(f"prune_tiers[{tool_name!r}] must be >= 0 (got {threshold!r})")
+        return value

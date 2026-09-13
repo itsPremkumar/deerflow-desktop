@@ -14,10 +14,19 @@ from pydantic import BaseModel, Field
 
 from app.gateway.authz import require_permission
 from app.gateway.deps import get_current_user, get_feedback_repo, get_run_store
+from deerflow.persistence.feedback.model import FEEDBACK_CATEGORIES
 from deerflow.utils.thread_id import ThreadId
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/threads", tags=["feedback"])
+
+
+def _validate_category(category: str | None) -> str | None:
+    if category is None:
+        return None
+    if category not in FEEDBACK_CATEGORIES:
+        raise HTTPException(status_code=400, detail=f"category must be one of {sorted(FEEDBACK_CATEGORIES)}")
+    return category
 
 
 # ---------------------------------------------------------------------------
@@ -29,11 +38,13 @@ class FeedbackCreateRequest(BaseModel):
     rating: int = Field(..., description="Feedback rating: +1 (positive) or -1 (negative)")
     comment: str | None = Field(default=None, description="Optional text feedback")
     message_id: str | None = Field(default=None, description="Optional: scope feedback to a specific message")
+    category: str | None = Field(default=None, description="Optional feedback category (correctness, completeness, grounding, format, latency, other)")
 
 
 class FeedbackUpsertRequest(BaseModel):
     rating: int = Field(..., description="Feedback rating: +1 (positive) or -1 (negative)")
     comment: str | None = Field(default=None, description="Optional text feedback")
+    category: str | None = Field(default=None, description="Optional feedback category (correctness, completeness, grounding, format, latency, other)")
 
 
 class FeedbackResponse(BaseModel):
@@ -44,6 +55,7 @@ class FeedbackResponse(BaseModel):
     message_id: str | None = None
     rating: int
     comment: str | None = None
+    category: str | None = None
     created_at: str = ""
 
 
@@ -52,6 +64,7 @@ class FeedbackStatsResponse(BaseModel):
     total: int = 0
     positive: int = 0
     negative: int = 0
+    by_category: dict[str, dict[str, int]] = Field(default_factory=dict)
 
 
 # ---------------------------------------------------------------------------
@@ -70,6 +83,7 @@ async def upsert_feedback(
     """Create or update feedback for a run (idempotent)."""
     if body.rating not in (1, -1):
         raise HTTPException(status_code=400, detail="rating must be +1 or -1")
+    category = _validate_category(body.category)
 
     user_id = await get_current_user(request)
 
@@ -87,6 +101,7 @@ async def upsert_feedback(
         rating=body.rating,
         user_id=user_id,
         comment=body.comment,
+        category=category,
     )
 
 
@@ -121,6 +136,7 @@ async def create_feedback(
     """Submit feedback (thumbs-up/down) for a run."""
     if body.rating not in (1, -1):
         raise HTTPException(status_code=400, detail="rating must be +1 or -1")
+    category = _validate_category(body.category)
 
     user_id = await get_current_user(request)
 
@@ -140,6 +156,7 @@ async def create_feedback(
         user_id=user_id,
         message_id=body.message_id,
         comment=body.comment,
+        category=category,
     )
 
 
@@ -162,9 +179,9 @@ async def feedback_stats(
     run_id: str,
     request: Request,
 ) -> dict[str, Any]:
-    """Get aggregated feedback stats (positive/negative counts) for a run."""
+    """Get aggregated feedback stats (positive/negative counts, per-category breakdown) for a run."""
     feedback_repo = get_feedback_repo(request)
-    return await feedback_repo.aggregate_by_run(thread_id, run_id)
+    return await feedback_repo.aggregate_by_run(thread_id, run_id, by_category=True)
 
 
 @router.delete("/{thread_id}/runs/{run_id}/feedback/{feedback_id}")

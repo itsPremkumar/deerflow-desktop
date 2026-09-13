@@ -414,6 +414,11 @@ _CONTEXT_CONFIGURABLE_KEYS: frozenset[str] = frozenset(
         "max_total_subagents",
         "agent_name",
         "is_bootstrap",
+        # Per-session agent preset name (operator-defined bundles in
+        # ``agent_presets``; unknown names fall back to ``standard`` in the
+        # factory, so a client-supplied value can only narrow the toolset,
+        # never widen it beyond operator config).
+        "agent_preset",
     }
 )
 

@@ -104,7 +104,9 @@ class TestCustomSubagentConfig:
         assert config.description == "A test agent"
         assert config.system_prompt == "You are a test agent."
         assert config.tools is None
-        assert config.disallowed_tools == ["task", "ask_clarification", "present_files"]
+        # Lead-only session_search and the nesting-capable task/ralph_loop
+        # delegation tools are denied to subagents by default.
+        assert config.disallowed_tools == ["task", "ralph_loop", "ask_clarification", "present_files", "session_search"]
         assert config.skills is None
         assert config.model == "inherit"
         assert config.max_turns == 50
