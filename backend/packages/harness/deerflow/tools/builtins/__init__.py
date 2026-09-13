@@ -87,6 +87,9 @@ from .context_as_data_tool import manage_context_data
 from .adaptive_autonomy_tool import check_or_set_autonomy_profile
 from .evidence_matrix_tool import audit_finish_first_evidence
 
+# Wave 5: OpenAI Astra Security & Telemetry Plane
+from .astra_security_tool import astra_security_manage
+
 __all__ = [
     "setup_agent",
     "update_agent",
@@ -164,4 +167,5 @@ __all__ = [
     "manage_context_data",
     "check_or_set_autonomy_profile",
     "audit_finish_first_evidence",
+    "astra_security_manage",
 ]
