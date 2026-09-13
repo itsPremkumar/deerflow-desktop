@@ -20,7 +20,7 @@
 # ============================================================================
 # Bump this number when the config schema changes.
 # Run `make config-upgrade` to merge new fields into your local config.yaml.
-config_version: 44
+config_version: 45
 
 # ============================================================================
 # Logging
@@ -2758,6 +2758,20 @@ run_ownership:
 #     use: my_package:MyGuardrailProvider
 #     config:
 #       key: value
+
+# ============================================================================
+# Shell Hooks Bridge Configuration
+# ============================================================================
+# Reuse Claude/Codex-style hooks.json command hooks inside DeerFlow runs
+# (SessionStart, UserPromptSubmit, PreToolUse, PostToolUse, SessionEnd).
+# Disabled by default; the file is operator-trusted config (hook commands run
+# with Gateway privileges), so keep it next to config.yaml.
+
+# hooks:
+#   enabled: true
+#   hooks_path: "/etc/deerflow/hooks.json"
+#   default_timeout_seconds: 10.0
+#   fail_open: true
 
 # ============================================================================
 # Authorization Configuration
