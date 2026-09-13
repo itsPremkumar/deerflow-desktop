@@ -13,7 +13,7 @@ shared contract).
 import logging
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 logger = logging.getLogger(__name__)
 
@@ -109,6 +109,25 @@ class MemoryConfig(BaseModel):
             "they do not belong on the shared `MemoryConfig` schema."
         ),
     )
+    user_model: "UserModelConfig" = Field(
+        default_factory=lambda: UserModelConfig(),
+        description="User-model provider configuration for personalized context injection.",
+    )
+
+
+class UserModelConfig(BaseModel):
+    """Configuration for the user-model provider."""
+
+    provider: str | None = Field(
+        default=None,
+        description="Provider name (e.g., 'file', 'null'). None or 'null' uses NullUserModelProvider (byte-identical prompts).",
+    )
+    storage_path: str | None = Field(
+        default=None,
+        description="Storage path for file-backed provider. Required when provider='file'.",
+    )
+
+    model_config = ConfigDict(extra="forbid")
 
 
 def should_use_memory_tools(config: MemoryConfig) -> bool:
@@ -226,3 +245,6 @@ def load_memory_config_from_dict(config_dict: dict) -> None:
         )
     config_dict["backend_config"] = backend_config
     _memory_config = MemoryConfig(**config_dict)
+
+# Resolve forward reference
+MemoryConfig.model_rebuild()

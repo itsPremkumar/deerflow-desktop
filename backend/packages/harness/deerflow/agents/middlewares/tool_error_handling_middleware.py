@@ -296,6 +296,14 @@ def _build_runtime_middlewares(
 
         tail.append(ReadBeforeWriteMiddleware(config=app_config.read_before_write))
 
+    # ReviewGuardMiddleware enforces comment-density and role-scoped write policies.
+    # Sits inside ReadBeforeWrite (after it in the list = inner layer) so it runs
+    # after the read-before-write gate passes but before ToolProgress/ToolErrorHandling.
+    if getattr(app_config, "review_guard", None) and app_config.review_guard.enabled:
+        from deerflow.agents.middlewares.review_guard_middleware import build_review_guard_middleware
+
+        tail.append(build_review_guard_middleware(review_guard_config=app_config.review_guard))
+
     # ToolProgressMiddleware must be outer (lower index) so its wrap_tool_call handler
     # chain includes ToolErrorHandlingMiddleware (inner), which stamps deerflow_tool_meta
     # on every result before ToolProgressMiddleware reads it in _update_state_from_result.

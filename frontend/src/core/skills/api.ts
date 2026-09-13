@@ -223,3 +223,57 @@ export async function uploadSkillArchive(
 
   return response.json();
 }
+
+export type SkillProposalStatus =
+  | "pending"
+  | "approved"
+  | "rejected"
+  | "installed";
+
+export interface SkillProposal {
+  id: string;
+  name: string;
+  description: string;
+  status: SkillProposalStatus;
+  created_by: string;
+  created_at: string;
+  findings: SkillSecurityFinding[];
+  findings_summary: Record<string, number>;
+  reviewed_by: string | null;
+  reviewed_at: string | null;
+  reject_reason: string | null;
+  installed_skill: string | null;
+}
+
+export async function listSkillProposals(scope: "mine" | "all" = "mine"): Promise<SkillProposal[]> {
+  const response = await fetch(
+    `${getBackendBaseURL()}/api/skills/proposals?scope=${scope}`,
+    { method: "GET" },
+  );
+  if (!response.ok) {
+    const detail = await readErrorDetail(response);
+    throw new SkillRequestError(response.status, detail.message, detail);
+  }
+  const json = (await response.json()) as { proposals: SkillProposal[] };
+  return json.proposals;
+}
+
+export async function reviewSkillProposal(
+  id: string,
+  action: "approve" | "reject",
+  reason?: string,
+): Promise<SkillProposal> {
+  const response = await fetch(
+    `${getBackendBaseURL()}/api/skills/proposals/${encodeURIComponent(id)}/${action}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(action === "reject" ? { reason: reason ?? "" } : {}),
+    },
+  );
+  if (!response.ok) {
+    const detail = await readErrorDetail(response);
+    throw new SkillRequestError(response.status, detail.message, detail);
+  }
+  return (await response.json()) as SkillProposal;
+}

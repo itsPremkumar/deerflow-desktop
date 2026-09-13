@@ -721,9 +721,9 @@ class DbRunEventStore(RunEventStore):
         lowered = [token.casefold() for token in tokens]
         ranked: list[tuple[int, str, object]] = []
         for row in rows:
-            text = extract_searchable_text(_restore_json_content(row.content))
-            flat = text.casefold()
-            if not text or not all(token in flat for token in lowered):
+            extracted = extract_searchable_text(_restore_json_content(row.content))
+            flat = extracted.casefold()
+            if not extracted or not all(token in flat for token in lowered):
                 continue
             ranked.append((message_rank_group(_restore_json_content(row.content)), row.created_at, row))
         ranked.sort(key=lambda item: (item[0],), reverse=False)
@@ -736,14 +736,14 @@ class DbRunEventStore(RunEventStore):
             for row in grouped[group]:
                 if len(hits) >= limit:
                     break
-                text = extract_searchable_text(_restore_json_content(row.content))
+                extracted = extract_searchable_text(_restore_json_content(row.content))
                 hits.append(
                     self._hit(
                         row.thread_id,
                         row.run_id,
                         row.seq,
                         row.event_type,
-                        make_snippet(text, raw_query, snippet_chars),
+                        make_snippet(extracted, raw_query, snippet_chars),
                         row.created_at,
                     )
                 )

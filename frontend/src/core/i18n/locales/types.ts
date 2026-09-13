@@ -822,6 +822,18 @@ export interface Translations {
       skills: string;
       notification: string;
       about: string;
+      rules: string;
+    };
+    rules: {
+      title: string;
+      description: string;
+      empty: string;
+      addRule: string;
+      ruleTitlePlaceholder: string;
+      ruleContentPlaceholder: string;
+      ruleEnabled: string;
+      deleteRule: string;
+      emptyRule: string;
     };
     memory: {
       title: string;
@@ -1133,6 +1145,21 @@ export interface Translations {
       invalidArchive: string;
       archiveTooLarge: string;
       installFailed: string;
+      proposalsTitle: string;
+      proposalsDescription: string;
+      proposalsEmpty: string;
+      proposalApprove: string;
+      proposalReject: string;
+      proposalRejectReason: string;
+      proposalRejectConfirm: string;
+      proposalCancel: string;
+      proposalApproved: string;
+      proposalRejected: string;
+      proposalReviewFailed: string;
+      proposalStatusPending: string;
+      proposalStatusApproved: string;
+      proposalStatusRejected: string;
+      proposalStatusInstalled: string;
     };
     notification: {
       title: string;

@@ -617,6 +617,15 @@ def build_middlewares(
             logger.warning("memory.mode is 'tool' but memory.enabled is false; memory tools will not be registered.")
         middlewares.append(MemoryMiddleware(agent_name=agent_name, memory_config=resolved_app_config.memory))
 
+    # Add LearningForkMiddleware after MemoryMiddleware.
+    # Runs a post-turn aux-model replay with whitelisted tools (memory + proposals).
+    from deerflow.agents.middlewares.learning_fork_middleware import build_learning_fork_middleware
+    from deerflow.config.learning_fork_config import get_learning_fork_config
+
+    learning_fork_cfg = get_learning_fork_config()
+    if learning_fork_cfg.enabled:
+        middlewares.append(build_learning_fork_middleware(learning_fork_config=learning_fork_cfg))
+
     # Add ViewImageMiddleware only if the current model supports vision.
     # Use the resolved runtime model_name from make_lead_agent to avoid stale config values.
     model_config = resolved_app_config.get_model_config(model_name) if model_name else None

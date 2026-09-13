@@ -7,6 +7,7 @@ import {
   BrainIcon,
   PaletteIcon,
   PlugZapIcon,
+  ScrollTextIcon,
   SparklesIcon,
   UsersRoundIcon,
   UserIcon,
@@ -68,6 +69,13 @@ const MemorySettingsPage = dynamic(
     ),
   { loading: SettingsPageLoading },
 );
+const RulesSettingsPage = dynamic(
+  () =>
+    import("./rules-settings-page").then(
+      (module) => module.RulesSettingsPage,
+    ),
+  { loading: SettingsPageLoading },
+);
 const NotificationSettingsPage = dynamic(
   () =>
     import("./notification-settings-page").then(
@@ -104,6 +112,7 @@ export type SettingsSection =
   | "channels"
   | "integrations"
   | "memory"
+  | "rules"
   | "tools"
   | "subagents"
   | "skills"
@@ -160,6 +169,7 @@ export function SettingsDialog(props: SettingsDialogProps) {
         label: t.settings.sections.memory,
         icon: BrainIcon,
       },
+      { id: "rules", label: t.settings.sections.rules, icon: ScrollTextIcon },
       { id: "tools", label: t.settings.sections.tools, icon: WrenchIcon },
       {
         id: "subagents",
@@ -175,6 +185,7 @@ export function SettingsDialog(props: SettingsDialogProps) {
       t.settings.sections.channels,
       t.settings.sections.integrations,
       t.settings.sections.memory,
+      t.settings.sections.rules,
       t.settings.sections.tools,
       t.settings.sections.subagents,
       t.settings.sections.skills,
@@ -227,6 +238,7 @@ export function SettingsDialog(props: SettingsDialogProps) {
               {activeSection === "account" && <AccountSettingsPage />}
               {activeSection === "appearance" && <AppearanceSettingsPage />}
               {activeSection === "memory" && <MemorySettingsPage />}
+              {activeSection === "rules" && <RulesSettingsPage />}
               {activeSection === "tools" && <ToolSettingsPage />}
               {activeSection === "subagents" && <SubagentSettingsPage />}
               {activeSection === "skills" && (
