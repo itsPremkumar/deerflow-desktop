@@ -64,6 +64,13 @@ from .avo_lineage_tool import run_avo_variation
 from .repo_twin_tool import inspect_repo_twin
 from .metacognitive_tool import check_metacognitive_health
 
+# Hermes-ASI-Master Wave 3 Tools
+from .skill_forge_tool import forge_skill_from_trace
+from .curriculum_tool import generate_curriculum_plan
+from .agency_competence_tool import evaluate_agent_competence
+from .five_pass_search_tool import compile_five_pass_search
+from .delta_checkpoint_tool import create_workflow_checkpoint
+
 __all__ = [
     "setup_agent",
     "update_agent",
@@ -128,4 +135,9 @@ __all__ = [
     "run_avo_variation",
     "inspect_repo_twin",
     "check_metacognitive_health",
+    "forge_skill_from_trace",
+    "generate_curriculum_plan",
+    "evaluate_agent_competence",
+    "compile_five_pass_search",
+    "create_workflow_checkpoint",
 ]
