@@ -1,0 +1,5 @@
+{
+  "frontendPort": 3000,
+  "gatewayPort": 8201,
+  "nodeVersion": "22.17.0"
+}

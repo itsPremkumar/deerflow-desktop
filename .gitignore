@@ -69,3 +69,8 @@ config.yaml.bak
 
 # Monocle agent-observability trace output (local file exporter)
 .monocle/
+
+# Electron desktop shell
+/electron/dist/
+/electron/node_modules/
+/electron/build/

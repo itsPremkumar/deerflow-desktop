@@ -1,26 +1,14 @@
-import { Footer } from "@/components/landing/footer";
-import { Header } from "@/components/landing/header";
-import { Hero } from "@/components/landing/hero";
-import { CaseStudySection } from "@/components/landing/sections/case-study-section";
-import { CommunitySection } from "@/components/landing/sections/community-section";
-import { SandboxSection } from "@/components/landing/sections/sandbox-section";
-import { SkillsSection } from "@/components/landing/sections/skills-section";
-import { WhatsNewSection } from "@/components/landing/sections/whats-new-section";
-import { DEFAULT_LOCALE } from "@/core/i18n/locale";
+import { redirect } from "next/navigation";
 
-export default function LandingPage() {
-  return (
-    <div className="min-h-screen w-full overflow-x-clip bg-[#0a0a0a]">
-      <Header locale={DEFAULT_LOCALE} />
-      <main className="flex w-full flex-col">
-        <Hero />
-        <CaseStudySection />
-        <SkillsSection />
-        <SandboxSection />
-        <WhatsNewSection />
-        <CommunitySection />
-      </main>
-      <Footer />
-    </div>
-  );
+/**
+ * Desktop-first entry: skip the marketing landing page and open the 2.0
+ * chat directly (the same destination as "Get Started with 2.0").
+ *
+ * Routing through `/workspace` keeps every mode correct: it sends normal
+ * deployments to a fresh `/workspace/chats/new` composer and static-demo
+ * deployments to their fixture thread. Blog/docs remain available by direct
+ * URL; the agent workflow is untouched — only the `/` landing target changes.
+ */
+export default function HomePage() {
+  redirect("/workspace");
 }
