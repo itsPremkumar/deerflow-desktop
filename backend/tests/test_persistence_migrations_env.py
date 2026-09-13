@@ -35,6 +35,22 @@ def test_filter_excludes_langgraph_checkpoint_tables() -> None:
         assert include_object(_table(owned), owned, "table", True, None) is False
 
 
+def test_filter_excludes_fts_auxiliary_tables_but_not_run_events() -> None:
+    # Revision 0023's FTS5 virtual table + shadow tables are index
+    # infrastructure absent from Base.metadata; autogenerate must not propose
+    # dropping them, while the host's own run_events table stays visible.
+    for shadow in (
+        "run_events_fts",
+        "run_events_fts_data",
+        "run_events_fts_idx",
+        "run_events_fts_content",
+        "run_events_fts_docsize",
+        "run_events_fts_config",
+    ):
+        assert include_object(_table(shadow), shadow, "table", True, None) is False
+    assert include_object(_table("run_events"), "run_events", "table", True, None) is True
+
+
 def test_filter_includes_deerflow_tables() -> None:
     for owned in ("runs", "threads_meta", "feedback", "users", "channel_connections"):
         assert include_object(_table(owned), owned, "table", True, None) is True

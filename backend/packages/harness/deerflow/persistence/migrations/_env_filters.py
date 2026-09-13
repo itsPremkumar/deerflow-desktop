@@ -43,6 +43,15 @@ LANGGRAPH_OWNED_TABLES: frozenset[str] = frozenset(
 #: dropping them.
 EXTENSION_TABLE_PREFIXES: set[str] = set()
 
+#: Auxiliary index objects owned by host revisions but absent from
+#: ``Base.metadata``: the FTS5 virtual table ``run_events_fts``, its shadow
+#: tables (``run_events_fts_data/idx/content/docsize/config``), created by
+#: revision 0023 (and the runtime ensure for fresh databases). Virtual tables
+#: are not ORM-mappable, so ``create_all`` never emits them while both
+#: autogenerate paths reflect them — without this exclusion every future
+#: ``make migrate-rev`` would propose dropping the search index.
+AUXILIARY_INDEX_TABLE_PREFIXES: frozenset[str] = frozenset({"run_events_fts"})
+
 
 def _host_table_names() -> frozenset[str]:
     """Every table name the host itself owns.
@@ -145,6 +154,12 @@ def _is_extension_owned(name: object) -> bool:
     return isinstance(name, str) and any(name.startswith(prefix) for prefix in EXTENSION_TABLE_PREFIXES)
 
 
+def _is_auxiliary_index_table(name: object) -> bool:
+    # Exact virtual table plus its shadow tables only: the prefix check is
+    # anchored so the host's own ``run_events`` table never matches.
+    return isinstance(name, str) and (name == "run_events_fts" or name.startswith("run_events_fts_"))
+
+
 def include_object(object_, name, type_, reflected, compare_to):  # noqa: ARG001
     """Returns False for any LangGraph-owned or extension-owned table, or for an
     index/constraint whose parent table is one of those. Returns True otherwise.
@@ -152,10 +167,10 @@ def include_object(object_, name, type_, reflected, compare_to):  # noqa: ARG001
     Signature matches alembic's ``include_object`` callable contract:
     ``(object, name, type_, reflected, compare_to)``.
     """
-    if type_ == "table" and (name in LANGGRAPH_OWNED_TABLES or _is_extension_owned(name)):
+    if type_ == "table" and (name in LANGGRAPH_OWNED_TABLES or _is_extension_owned(name) or _is_auxiliary_index_table(name)):
         return False
     parent_table = getattr(object_, "table", None)
     parent_name = getattr(parent_table, "name", None) if parent_table is not None else None
-    if parent_name is not None and (parent_name in LANGGRAPH_OWNED_TABLES or _is_extension_owned(parent_name)):
+    if parent_name is not None and (parent_name in LANGGRAPH_OWNED_TABLES or _is_extension_owned(parent_name) or _is_auxiliary_index_table(parent_name)):
         return False
     return True

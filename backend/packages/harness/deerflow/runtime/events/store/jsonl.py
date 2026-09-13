@@ -451,9 +451,7 @@ class JsonlRunEventStore(RunEventStore):
             return []
         limit = clamp_limit(limit)
         snippet_chars = max(50, min(2000, int(snippet_chars or 300)))
-        return await asyncio.to_thread(
-            self._search_sync, tokens, query, thread_id, limit, snippet_chars
-        )
+        return await asyncio.to_thread(self._search_sync, tokens, query, thread_id, limit, snippet_chars)
 
     async def delete_by_thread(self, thread_id):
         async with self._get_write_lock(thread_id):

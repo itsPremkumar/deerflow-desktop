@@ -516,7 +516,13 @@ async def test_create_all_and_alembic_upgrade_produce_same_schema(tmp_path: Path
 
         # Same set of tables. A mismatch here means either ``Base.metadata``
         # has gained/lost a table without a matching revision, or a revision
-        # creates/drops a table without a matching model change.
+        # creates/drops a table without a matching model change. The FTS5
+        # auxiliary objects (``run_events_fts*`` virtual table + shadow
+        # tables from revision 0023) are index infrastructure, not ORM
+        # schema: ``create_all`` never emits them (virtual tables are not
+        # ORM-mappable), while the migration and the runtime ensure do.
+        # They are covered by test_migration_0023_run_events_fts.py instead.
+        upgraded_tables = {name: columns for name, columns in upgraded_tables.items() if not name.startswith("run_events_fts")}
         assert set(fresh_tables) == set(upgraded_tables), f"table-set drift between create_all and alembic upgrade: only-in-create_all={set(fresh_tables) - set(upgraded_tables)} only-in-alembic={set(upgraded_tables) - set(fresh_tables)}"
 
         for table in sorted(fresh_tables):

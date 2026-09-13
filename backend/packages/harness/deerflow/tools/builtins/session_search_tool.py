@@ -12,8 +12,6 @@ from __future__ import annotations
 from langchain.tools import tool
 
 from deerflow.runtime.events.search import (
-    DEFAULT_SNIPPET_CHARS,
-    clamp_limit,
     extract_searchable_text,
 )
 from deerflow.runtime.user_context import resolve_runtime_user_id
@@ -44,10 +42,7 @@ def _resolve_store(runtime: Runtime | None):
 
 
 def _format_hit(hit: dict) -> str:
-    return (
-        f"- thread {hit['thread_id']} · run {hit['run_id']} · "
-        f"seq {hit['seq']} ({hit.get('created_at', '?')}): {hit.get('snippet', '')}"
-    )
+    return f"- thread {hit['thread_id']} · run {hit['run_id']} · seq {hit['seq']} ({hit.get('created_at', '?')}): {hit.get('snippet', '')}"
 
 
 def _format_message(record: dict) -> str:
@@ -89,10 +84,7 @@ async def session_search_tool(
     except Exception as exc:
         return f"Error: cannot resolve calling user: {exc}"
     if not (query or "").strip() and not session_id:
-        return (
-            "Error: provide a keyword `query` to search owned threads, or a "
-            "`session_id` to scroll one thread's history."
-        )
+        return "Error: provide a keyword `query` to search owned threads, or a `session_id` to scroll one thread's history."
     try:
         store = _resolve_store(runtime)
     except Exception as exc:
@@ -111,10 +103,7 @@ async def session_search_tool(
             lines = [f'{len(hits)} match(es) for "{query.strip()}":']
             lines.extend(_format_hit(hit) for hit in hits)
             last = hits[-1]
-            lines.append(
-                f"To read around a hit: session_search(session_id=\"{last['thread_id']}\", "
-                f"after_seq={last['seq']})"
-            )
+            lines.append(f'To read around a hit: session_search(session_id="{last["thread_id"]}", after_seq={last["seq"]})')
             return "\n".join(lines)
         messages = await store.list_messages(
             session_id or "",

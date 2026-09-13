@@ -365,6 +365,48 @@ describe("getMatchingSkillSuggestions", () => {
   });
 });
 
+describe("keyword command aliases", () => {
+  const compactOnly: SlashSuggestion[] = [
+    { name: "compact", description: "Summarize context", kind: "builtin" },
+  ];
+  const goalOnly: SlashSuggestion[] = [
+    { name: "goal", description: "Set a goal", kind: "builtin" },
+  ];
+
+  it("surfaces the builtin command for an exact intent keyword", () => {
+    expect(
+      getMatchingSkillSuggestions([], "compress", compactOnly).map((s) => s.name),
+    ).toEqual(["compact"]);
+    expect(
+      getMatchingSkillSuggestions([], "objective", goalOnly).map((s) => s.name),
+    ).toEqual(["goal"]);
+  });
+
+  it("matches keywords case-insensitively", () => {
+    expect(
+      getMatchingSkillSuggestions([], "COMPRESS", compactOnly).map((s) => s.name),
+    ).toEqual(["compact"]);
+  });
+
+  it("does not duplicate a builtin that also matches by name", () => {
+    const result = getMatchingSkillSuggestions([], "compact", compactOnly);
+    expect(result.map((s) => `${s.kind}:${s.name}`)).toEqual(["builtin:compact"]);
+  });
+
+  it("leaves unknown keywords and empty queries to the name matcher", () => {
+    expect(getMatchingSkillSuggestions([], "frobnicate", compactOnly)).toEqual([]);
+    expect(
+      getMatchingSkillSuggestions([], "", compactOnly).map((s) => s.name),
+    ).toEqual(["compact"]);
+  });
+
+  it("never invents slash commands: aliases resolve only to passed builtins", () => {
+    // "compress" maps to compact; with no builtins passed there is nothing
+    // to resolve to, so no suggestion may appear.
+    expect(getMatchingSkillSuggestions([], "compress", [])).toEqual([]);
+  });
+});
+
 describe("readGoalResponseError", () => {
   it("returns the detail string when present", async () => {
     const response = {

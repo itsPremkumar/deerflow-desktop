@@ -273,6 +273,7 @@ class MemoryRunEventStore(RunEventStore):
 
     async def delete_by_thread(self, thread_id):
         events = self._events.pop(thread_id, [])
+        self._messages.pop(thread_id, None)
         self._events_by_run.pop(thread_id, None)
         self._messages_by_run.pop(thread_id, None)
         self._seq_counters.pop(thread_id, None)

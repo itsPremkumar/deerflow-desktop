@@ -38,3 +38,9 @@ Lets a caller pass per-request, short-lived end-user credentials (e.g. an ERP to
 - Build archives from captured bytes and require the preview's revision. Preserve file contents, empty directories, and normalized executable flags; import must not restore privileged permission bits.
 - Keep traversal, YAML parsing, and archive construction bounded and cancellable. Reject unsupported filesystem operations rather than following links; report limits instead of truncating results. Preserve YAML preflight before object construction.
 - Export includes raw saved files and is not a secret audit. Return relative paths and generic errors without leaking source content. See the [export API contract](../../../../docs/API.md#export-a-custom-skill) for response fields and limits.
+
+### Agent skill proposals
+
+- `proposals.py` owns the propose → scan → approve/reject → install queue (`SkillProposalStore`, JSON files under `<home>/skill_proposals`, atomic writes, owner-filtered reads, no cross-user oracle). Blocked content never persists; transitions are pending→approved/rejected, approved→installed.
+- Proposal bodies are untrusted markdown: scanned before storage, served back only to owner/admins, never executed/activated/interpolated. Approve re-scans, stages a `.skill` archive, and installs into the *proposer's* custom skills (never the ambient admin's), then refreshes that user's prompt cache.
+- Agent entry is the `propose_skill` tool (lead and subagents; the admin approve gate is the control). Gateway `routers/skills.py` owns list/propose/approve/reject with admin gates on review; frontend review UI lives in `skill-proposals-section.tsx`. Tests: `tests/test_skill_proposals.py`, `tests/test_gateway_skill_proposals.py`.

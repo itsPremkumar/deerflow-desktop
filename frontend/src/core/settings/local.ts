@@ -1,6 +1,7 @@
 import type { TokenUsageInlineMode } from "../messages/usage-model";
 import { normalizeProjectRules, type ProjectRule } from "../rules";
 import type { AgentThreadContext } from "../threads";
+import { normalizeProjectRules, type ProjectRule } from "../rules";
 
 export const DEFAULT_LOCAL_SETTINGS: LocalSettings = {
   notification: {

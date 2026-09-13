@@ -151,6 +151,15 @@ checkpoint-write admission boundary must repeat the complete audit after
 admission; a pre-admission exact hit can be superseded by a later event just as
 a pre-admission miss can become an exact hit.
 
+**Content search** (`RunEventStore.search_message_content`, `events/search.py`,
+migration `0023_run_events_fts`): zero-embedding recall over
+`category="message"` rows — SQLite FTS5 (`run_events_fts` + triggers, human/ai
+ranked above tool output) / Postgres `tsvector` + GIN / substring scan on
+memory/JSONL. SQL backends enforce the explicit `user_id`; blank queries
+return [] without storage work. Db store self-heals missing FTS objects at
+runtime (fresh stamped DBs) with a LIKE fallback. Surfaced as the
+`session_search` tool (lead-only) and `POST /api/threads/search/content`.
+
 Gateway `POST /api/threads/{id}/history` uses that lookup to migrate legacy AI
 messages. An exhaustive miss preserves the human-boundary fallback; an
 incomplete lookup removes unproven synthesized IDs. Its metadata-only
