@@ -25,6 +25,13 @@ from .code_mode_tool import code_mode_tool
 from .tool_search_tool import catalog_tool_call, catalog_tool_describe, catalog_tool_search
 from .dreaming_tool import consolidate_memory_dream
 from .progress_card_tool import update_progress_card
+from .learning_graph_tool import learning_graph_manage
+from .smart_approval_tool import verify_command_approval
+from .moa_reasoning_tool import moa_multi_model_reasoning
+from .estop_tool import emergency_stop_manage
+from .skills_hub_tool import skills_hub_manage
+from .cronjob_manage_tool import cronjob_manage
+from .browser_supervisor_tool import browser_navigate_and_inspect
 
 __all__ = [
     "setup_agent",
@@ -59,6 +66,13 @@ __all__ = [
     "catalog_tool_call",
     "consolidate_memory_dream",
     "update_progress_card",
+    "learning_graph_manage",
+    "verify_command_approval",
+    "moa_multi_model_reasoning",
+    "emergency_stop_manage",
+    "skills_hub_manage",
+    "cronjob_manage",
+    "browser_navigate_and_inspect",
 ]
 
 

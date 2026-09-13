@@ -40,6 +40,13 @@ from deerflow.tools.builtins import (
     catalog_tool_search,
     consolidate_memory_dream,
     update_progress_card,
+    learning_graph_manage,
+    verify_command_approval,
+    moa_multi_model_reasoning,
+    emergency_stop_manage,
+    skills_hub_manage,
+    cronjob_manage,
+    browser_navigate_and_inspect,
 )
 from deerflow.tools.mcp_metadata import tag_mcp_tool
 from deerflow.tools.sync import make_sync_tool_wrapper
@@ -73,6 +80,14 @@ BUILTIN_TOOLS = [
     catalog_tool_call,
     consolidate_memory_dream,
     update_progress_card,
+    # Hermes Deep Integration extensions:
+    learning_graph_manage,
+    verify_command_approval,
+    moa_multi_model_reasoning,
+    emergency_stop_manage,
+    skills_hub_manage,
+    cronjob_manage,
+    browser_navigate_and_inspect,
 ]
 
 SUBAGENT_TOOLS = [

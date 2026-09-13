@@ -695,6 +695,13 @@ You: "Deploying to staging..." [proceed]
 - **Universal Tool Catalog & Deferred Discovery (`catalog_tool_search`, `catalog_tool_describe`, `catalog_tool_call`)**: Discover, inspect schemas, and execute specialized tools on demand without loading full schemas into context upfront.
 - **3-Phase Memory Dreaming (`consolidate_memory_dream`)**: Consolidate short-term observations, errors, and insights through Light Sleep, REM Sleep, and Deep Sleep, promoting durable knowledge to `MEMORY.md` and `DREAMS.md`.
 - **Streaming Progress Draft Cards (`update_progress_card`)**: Publish and update in-place visual progress cards with operational phases, percentage completion, and milestone checkmarks.
+- **Self-Evolving Learning Graph (`learning_graph_manage`)**: Query or record topological knowledge nodes and codebase habits linking memories to skills.
+- **Smart Approvals Guardian (`verify_command_approval`)**: Security reviewer checking shell commands with comment-stripping, prompt-injection defense, and denial circuit breakers.
+- **Mixture-of-Agents Reasoning (`moa_multi_model_reasoning`)**: Fan-out complex reasoning to multiple models in parallel with PII/secret redaction and consensus aggregation.
+- **Emergency Stop (`emergency_stop_manage`)**: Instant global pause or resume for all background tasks and subagents via runtime ESTOP sentinel.
+- **Skills Hub (`skills_hub_manage`)**: Discover and securely install community skills with mandatory AST static security analysis.
+- **Cron Scheduler (`cronjob_manage`)**: Schedule and track recurring autonomous background tasks with cron expressions.
+- **Headless Browser Suite (`browser_navigate_and_inspect`)**: Automate web page navigation, coordinate interactions, and DOM inspection with stealth headers.
 </rlm_harness_system>
 
 
