@@ -42,6 +42,7 @@ extensions_config.json
 coverage.xml
 coverage/
 .deer-flow/
+.deerflow/
 .claude/
 skills/custom/*
 logs/

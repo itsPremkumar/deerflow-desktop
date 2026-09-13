@@ -15,10 +15,13 @@ from deerflow.tools.builtins import (
     ask_clarification_tool,
     batch_status,
     batch_task,
+    bot_roster_tool,
     cancel_background_task,
     cancel_batch,
+    group_chat_tool,
     harness_refine_tool,
     invoke_python_skill_tool,
+    kanban_board_tool,
     list_background_tasks,
     list_uploaded_files,
     present_file_tool,
@@ -47,6 +50,10 @@ BUILTIN_TOOLS = [
     harness_refine_tool,
     process_handle_tool,
     invoke_python_skill_tool,
+    # Ultra-Advanced Bot Mode & Collaborative Kanban extensions:
+    bot_roster_tool,
+    group_chat_tool,
+    kanban_board_tool,
 ]
 
 SUBAGENT_TOOLS = [
@@ -54,6 +61,8 @@ SUBAGENT_TOOLS = [
     # Direct agent-to-agent communication (Prime Agent roster & messaging):
     agent_message_tool,
     agent_observe_tool,
+    group_chat_tool,
+    kanban_board_tool,
 ]
 
 

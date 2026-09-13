@@ -15,6 +15,10 @@ from .task_tool import task_tool
 from .update_agent_tool import update_agent
 from .view_image_tool import view_image_tool
 
+from .bot_roster_tool import bot_roster_tool
+from .group_chat_tool import group_chat_tool
+from .kanban_board_tool import kanban_board_tool
+
 __all__ = [
     "setup_agent",
     "update_agent",
@@ -36,5 +40,9 @@ __all__ = [
     "agent_observe_tool",
     "process_handle_tool",
     "invoke_python_skill_tool",
+    "bot_roster_tool",
+    "group_chat_tool",
+    "kanban_board_tool",
 ]
+
 
