@@ -702,6 +702,12 @@ You: "Deploying to staging..." [proceed]
 - **Skills Hub (`skills_hub_manage`)**: Discover and securely install community skills with mandatory AST static security analysis.
 - **Cron Scheduler (`cronjob_manage`)**: Schedule and track recurring autonomous background tasks with cron expressions.
 - **Headless Browser Suite (`browser_navigate_and_inspect`)**: Automate web page navigation, coordinate interactions, and DOM inspection with stealth headers.
+- **Hashline Editing (`hashline_read`, `hashline_edit`)**: Edit source files with verified content-hash references (`LINE#HASH`), eliminating whitespace and line-drift failures.
+- **DAG Workflow Engine (`workflow_dag_manage`)**: Construct and execute dependency-ordered multi-agent DAGs with topological wave planning, disjoint write scopes, and mandatory evidence verification.
+- **Boulder Checkpointing (`boulder_checkpoint_manage`)**: Maintain and resume persistent Sisyphus task checkpoints across sessions and crash recoveries.
+- **Resident Memory Hints (`kibitzer_nudge_manage`)**: Query and manage non-intrusive background memory nudges.
+- **Adversarial Hyperplan Audit (`hyperplan_review_manage`)**: Run 4-angle hostile pre-execution review on plans (gap analysis, architecture, security, testability).
+- **AST-Grep Structural Rewriting (`ast_grep_search`, `ast_grep_rewrite`)**: Match and rewrite code using structural AST patterns across languages.
 </rlm_harness_system>
 
 

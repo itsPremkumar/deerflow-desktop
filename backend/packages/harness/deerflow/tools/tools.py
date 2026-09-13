@@ -47,6 +47,14 @@ from deerflow.tools.builtins import (
     skills_hub_manage,
     cronjob_manage,
     browser_navigate_and_inspect,
+    hashline_read,
+    hashline_edit,
+    workflow_dag_manage,
+    boulder_checkpoint_manage,
+    kibitzer_nudge_manage,
+    hyperplan_review_manage,
+    ast_grep_search,
+    ast_grep_rewrite,
 )
 from deerflow.tools.mcp_metadata import tag_mcp_tool
 from deerflow.tools.sync import make_sync_tool_wrapper
@@ -88,6 +96,15 @@ BUILTIN_TOOLS = [
     skills_hub_manage,
     cronjob_manage,
     browser_navigate_and_inspect,
+    # Oh My OpenAgent (OmO / Sisyphus) extensions:
+    hashline_read,
+    hashline_edit,
+    workflow_dag_manage,
+    boulder_checkpoint_manage,
+    kibitzer_nudge_manage,
+    hyperplan_review_manage,
+    ast_grep_search,
+    ast_grep_rewrite,
 ]
 
 SUBAGENT_TOOLS = [

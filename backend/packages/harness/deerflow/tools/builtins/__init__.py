@@ -1,4 +1,4 @@
-from .agent_message_tool import agent_message_tool, agent_observe_tool
+﻿from .agent_message_tool import agent_message_tool, agent_observe_tool
 from .background_tasks_tool import cancel_background_task, list_background_tasks
 from .batch_task_tool import batch_status, batch_task, cancel_batch
 from .clarification_tool import ask_clarification_tool
@@ -32,6 +32,14 @@ from .estop_tool import emergency_stop_manage
 from .skills_hub_tool import skills_hub_manage
 from .cronjob_manage_tool import cronjob_manage
 from .browser_supervisor_tool import browser_navigate_and_inspect
+
+# Oh My OpenAgent (OmO / Sisyphus) Builtin Tools
+from .hashline_tool import hashline_edit, hashline_read
+from .workflow_dag_tool import workflow_dag_manage
+from .boulder_checkpoint_tool import boulder_checkpoint_manage
+from .kibitzer_tool import kibitzer_nudge_manage
+from .hyperplan_tool import hyperplan_review_manage
+from .ast_grep_tool import ast_grep_rewrite, ast_grep_search
 
 __all__ = [
     "setup_agent",
@@ -73,6 +81,12 @@ __all__ = [
     "skills_hub_manage",
     "cronjob_manage",
     "browser_navigate_and_inspect",
+    "hashline_read",
+    "hashline_edit",
+    "workflow_dag_manage",
+    "boulder_checkpoint_manage",
+    "kibitzer_nudge_manage",
+    "hyperplan_review_manage",
+    "ast_grep_search",
+    "ast_grep_rewrite",
 ]
-
-
