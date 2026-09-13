@@ -90,6 +90,10 @@ from .evidence_matrix_tool import audit_finish_first_evidence
 # Wave 5: OpenAI Astra Security & Telemetry Plane
 from .astra_security_tool import astra_security_manage
 
+# Wave 6: Mission Hierarchy, Work Queue DAG & Universal Artifact Lineage
+from .mission_hierarchy_tool import manage_mission_hierarchy, schedule_work_queue
+from .artifact_lineage_tool import trace_artifact_lineage
+
 __all__ = [
     "setup_agent",
     "update_agent",
@@ -168,4 +172,7 @@ __all__ = [
     "check_or_set_autonomy_profile",
     "audit_finish_first_evidence",
     "astra_security_manage",
+    "manage_mission_hierarchy",
+    "schedule_work_queue",
+    "trace_artifact_lineage",
 ]
