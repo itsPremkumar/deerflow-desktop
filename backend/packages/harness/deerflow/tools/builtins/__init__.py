@@ -45,6 +45,10 @@ from .ast_grep_tool import ast_grep_rewrite, ast_grep_search
 from .tom_consult_tool import tom_consult
 from .ask_oracle_tool import ask_oracle
 
+# Autonomous Reproduction and Experience Memory Tools
+from .reproduction_tool import reproduce_and_verify
+from .experience_tool import consult_experience
+
 __all__ = [
     "setup_agent",
     "update_agent",
@@ -95,4 +99,6 @@ __all__ = [
     "ast_grep_rewrite",
     "tom_consult",
     "ask_oracle",
+    "reproduce_and_verify",
+    "consult_experience",
 ]
