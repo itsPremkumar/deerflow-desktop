@@ -78,6 +78,9 @@ from .autoplan_tool import build_autonomous_plan
 # DeepSeek-Harness-style bounded self-improvement loop over delegations
 from .ralph_loop_tool import ralph_loop_tool
 
+# NVIDIA Agentic Variation Operators (AVO) tool
+from .nvidia_avo_tool import run_nvidia_avo_step
+
 __all__ = [
     "setup_agent",
     "update_agent",
@@ -150,4 +153,5 @@ __all__ = [
     "create_workflow_checkpoint",
     "build_autonomous_plan",
     "ralph_loop_tool",
+    "run_nvidia_avo_step",
 ]
