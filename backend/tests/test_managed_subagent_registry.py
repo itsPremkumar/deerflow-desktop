@@ -37,7 +37,7 @@ def test_default_lead_catalog_preserves_builtin_defaults(monkeypatch):
     general = registry.get_subagent_config("general-purpose", app_config=config)
     assert general is not None
     assert general.tools is None
-    assert set(general.disallowed_tools or []) == {"task", "ask_clarification", "present_files"}
+    assert set(general.disallowed_tools or []) == {"task", "ralph_loop", "ask_clarification", "present_files"}
     assert general.model == "inherit"
     assert general.max_turns == 150
     assert general.timeout_seconds == 1800
@@ -45,7 +45,7 @@ def test_default_lead_catalog_preserves_builtin_defaults(monkeypatch):
     bash = registry.get_subagent_config("bash", app_config=config)
     assert bash is not None
     assert bash.tools == ["bash", "ls", "read_file", "write_file", "str_replace"]
-    assert set(bash.disallowed_tools or []) == {"task", "ask_clarification", "present_files"}
+    assert set(bash.disallowed_tools or []) == {"task", "ralph_loop", "ask_clarification", "present_files"}
     assert bash.model == "inherit"
     assert bash.max_turns == 60
     assert bash.timeout_seconds == 1800
