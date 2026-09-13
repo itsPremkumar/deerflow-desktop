@@ -49,6 +49,13 @@ from .ask_oracle_tool import ask_oracle
 from .reproduction_tool import reproduce_and_verify
 from .experience_tool import consult_experience
 
+# Hermes AGI/ASI Executive Control Plane Tools
+from .compile_mission_tool import compile_mission
+from .epistemic_belief_tool import evaluate_epistemic_claim
+from .rsi_engine_tool import run_rsi_cycle
+from .consequence_tool import simulate_consequences
+from .self_heal_tool import self_heal_diagnose
+
 __all__ = [
     "setup_agent",
     "update_agent",
@@ -101,4 +108,9 @@ __all__ = [
     "ask_oracle",
     "reproduce_and_verify",
     "consult_experience",
+    "compile_mission",
+    "evaluate_epistemic_claim",
+    "run_rsi_cycle",
+    "simulate_consequences",
+    "self_heal_diagnose",
 ]
