@@ -1,4 +1,4 @@
-﻿from .agent_message_tool import agent_message_tool, agent_observe_tool
+from .agent_message_tool import agent_message_tool, agent_observe_tool
 from .background_tasks_tool import cancel_background_task, list_background_tasks
 from .batch_task_tool import batch_status, batch_task, cancel_batch
 from .clarification_tool import ask_clarification_tool
@@ -40,6 +40,10 @@ from .boulder_checkpoint_tool import boulder_checkpoint_manage
 from .kibitzer_tool import kibitzer_nudge_manage
 from .hyperplan_tool import hyperplan_review_manage
 from .ast_grep_tool import ast_grep_rewrite, ast_grep_search
+
+# OpenHands Builtin Tools
+from .tom_consult_tool import tom_consult
+from .ask_oracle_tool import ask_oracle
 
 __all__ = [
     "setup_agent",
@@ -89,4 +93,6 @@ __all__ = [
     "hyperplan_review_manage",
     "ast_grep_search",
     "ast_grep_rewrite",
+    "tom_consult",
+    "ask_oracle",
 ]
