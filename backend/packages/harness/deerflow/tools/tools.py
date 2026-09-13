@@ -18,6 +18,8 @@ from deerflow.tools.builtins import (
     bot_roster_tool,
     cancel_background_task,
     cancel_batch,
+    canvas_widget_tool,
+    goal_engine_tool,
     group_chat_tool,
     harness_refine_tool,
     invoke_python_skill_tool,
@@ -30,6 +32,7 @@ from deerflow.tools.builtins import (
     review_skill_package,
     session_search_tool,
     task_tool,
+    trajectory_audit_tool,
     view_image_tool,
 )
 from deerflow.tools.mcp_metadata import tag_mcp_tool
@@ -54,6 +57,10 @@ BUILTIN_TOOLS = [
     bot_roster_tool,
     group_chat_tool,
     kanban_board_tool,
+    # OpenClaw-inspired Continuous Goal, Canvas & Trajectory extensions:
+    goal_engine_tool,
+    canvas_widget_tool,
+    trajectory_audit_tool,
 ]
 
 SUBAGENT_TOOLS = [

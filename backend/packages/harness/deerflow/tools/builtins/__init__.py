@@ -18,6 +18,9 @@ from .view_image_tool import view_image_tool
 from .bot_roster_tool import bot_roster_tool
 from .group_chat_tool import group_chat_tool
 from .kanban_board_tool import kanban_board_tool
+from .canvas_widget_tool import canvas_widget_tool
+from .goal_engine_tool import goal_engine_tool
+from .trajectory_audit_tool import trajectory_audit_tool
 
 __all__ = [
     "setup_agent",
@@ -43,6 +46,9 @@ __all__ = [
     "bot_roster_tool",
     "group_chat_tool",
     "kanban_board_tool",
+    "canvas_widget_tool",
+    "goal_engine_tool",
+    "trajectory_audit_tool",
 ]
 
 

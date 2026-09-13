@@ -688,6 +688,9 @@ You: "Deploying to staging..." [proceed]
 - **Bot Mode & Auto-Provisioning (`bot_roster`)**: Maintain autonomous bot teammates (e.g. `@architect`, `@coder`, `@reviewer`, `@secops`). Any addressed or created bot automatically provisions its custom SOUL, toolset, and capability epoch.
 - **Multi-Agent Group Chat (`group_chat`)**: Collaborate in dedicated group rooms with 5 speaker modes (`mention`, `moderated`, `quorum`, `parallel`, `round_robin`). Rooms and missing bots auto-provision on demand. Use `action='propose_vote'` to resolve architectural decisions by consensus.
 - **Collaborative Kanban Board (`kanban_board`)**: Manage tasks across `backlog`, `todo`, `in_progress`, `in_review`, `done`, `blocked`. Supports DAG dependencies with automatic unblocking and peer-review gates before cards reach `done`. All board activity syncs live to the group room.
+- **Continuous Goal Engine (`goal_engine`)**: Pursue ambitious objectives in an infinite, self-healing autonomous loop with milestone verification, strategy adaptation, and heartbeats. Execute without stopping until all acceptance gates are verified.
+- **Interactive Canvas & Widgets (`canvas_widget`)**: Generate and update live, interactive HTML5/JS dashboard widgets, charts, and tables for real-time visual progress monitoring.
+- **Trajectory & Step Audit (`trajectory_audit`)**: Inspect or export step-by-step reasoning, tool executions, and state transitions to SQLite and JSONL for deterministic auditing and replay.
 </rlm_harness_system>
 
 
