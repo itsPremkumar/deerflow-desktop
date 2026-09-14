@@ -316,6 +316,17 @@ def _build_runtime_middlewares(
 
     tail.append(ToolErrorHandlingMiddleware(app_config=app_config))
 
+    # HooksBridgeMiddleware is the innermost wrap_tool_call layer: PreToolUse
+    # fires only for calls that survived every guard above (no hook runs for
+    # short-circuited calls), and PostToolUse observes the final converted
+    # result. Gated on hooks.enabled (default off); the lead builder appends
+    # ClarificationMiddleware afterwards, so the clarification-is-last
+    # invariant is unaffected.
+    if getattr(app_config, "hooks", None) is not None and app_config.hooks.enabled:
+        from deerflow.agents.middlewares.hooks_bridge_middleware import HooksBridgeMiddleware
+
+        tail.append(HooksBridgeMiddleware(config=app_config.hooks))
+
     middlewares = [*outer_wrappers, *thread_hooks, *tail]
 
     # Ordering invariants are declared in deerflow.extensions.ordering and

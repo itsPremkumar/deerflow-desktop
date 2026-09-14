@@ -2,6 +2,10 @@
 
 Memory and Redis bridges take their default idle heartbeat cadence from the startup-only `stream_bridge.heartbeat_interval_seconds` setting. Keep the default on the bridge instance so SSE, `/wait`, and internal subscribers stay aligned; an explicit `subscribe(..., heartbeat_interval=...)` remains a per-subscription override.
 
+### Token Meter (`runtime/token_meter.py`)
+
+Process-local cumulative token ledger (DeepSeek-Harness-style `ctx.tokenMeter`): `TokenMeter.record()` accumulates per `(user_id, thread_id, model)` scope with a bounded scope cap (oldest-inserted evicted), `snapshot()` aggregates over wildcard filters, `check_budget()` compares against a token budget (non-positive budgets fail closed), and `reset()` clears scopes. `TokenUsageMiddleware` feeds the process-global meter from every response carrying `usage_metadata` totals (side-effect only; injectable per-instance for tests). Per-run enforcement stays in `TokenBudgetMiddleware`; durable reporting stays in `runs.token_usage_by_model` + the console `/usage` route — the meter is for in-process budgets and live guards, never billing. Tests: `tests/test_token_meter.py`.
+
 ### Checkpoint Channel Modes (`full` / `delta`)
 
 Checkpointer storage runs in one of two channel modes, selected by `checkpoint_channel_mode` in `config.yaml` (default `full`). `delta` mode adopts LangGraph 1.2's `DeltaChannel` for `messages`: checkpoints store a sentinel + per-step writes instead of the full message list, so storage/serde grows O(N) instead of O(N²) in turns. All checkpointer backends (memory/sqlite/postgres) serve both modes unchanged — the semantics live in the compiled graph's channel table, not in the saver.

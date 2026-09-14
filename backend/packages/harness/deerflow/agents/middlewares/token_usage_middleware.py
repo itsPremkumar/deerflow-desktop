@@ -12,6 +12,7 @@ from langchain.agents.middleware.todo import Todo
 from langchain_core.messages import AIMessage, ToolMessage
 from langgraph.runtime import Runtime
 
+from deerflow.runtime.token_meter import TokenMeter, default_meter
 from deerflow.subagents.status_contract import SUBAGENT_TOKEN_USAGE_KEY, normalize_token_usage
 
 logger = logging.getLogger(__name__)
@@ -278,7 +279,17 @@ def _build_attribution(message: AIMessage, todos: list[Todo]) -> dict[str, Any]:
 
 
 class TokenUsageMiddleware(AgentMiddleware):
-    """Logs token usage from model responses and annotates the AI step."""
+    """Logs token usage from model responses and annotates the AI step.
+
+    Every response carrying ``usage_metadata`` totals is also recorded on a
+    :class:`TokenMeter` (process-global by default) keyed by the
+    runtime-resolved user, thread, and model — the cumulative ledger that
+    per-run budgets (:class:`TokenBudgetMiddleware`) cannot see. Recording is
+    side-effect only: it never changes the returned state update.
+    """
+
+    def __init__(self, meter: TokenMeter | None = None) -> None:
+        self._meter = meter if meter is not None else default_meter()
 
     def _apply(self, state: AgentState) -> dict | None:
         messages = state.get("messages", [])
@@ -365,8 +376,45 @@ class TokenUsageMiddleware(AgentMiddleware):
 
     @override
     def after_model(self, state: AgentState, runtime: Runtime) -> dict | None:
-        return self._apply(state)
+        result = self._apply(state)
+        self._record_meter(state, runtime)
+        return result
 
     @override
     async def aafter_model(self, state: AgentState, runtime: Runtime) -> dict | None:
-        return self._apply(state)
+        result = self._apply(state)
+        self._record_meter(state, runtime)
+        return result
+
+    def _record_meter(self, state: AgentState, runtime: Runtime) -> None:
+        """Record the latest response totals on the meter (side-effect only).
+
+        Reads the last message's ``usage_metadata`` exactly like the logging
+        path above. Identity coercion is defensive (mocks/tests may carry
+        non-string runtime values); recording never raises out of the
+        model-response path.
+        """
+        from deerflow.runtime.user_context import resolve_runtime_user_id
+
+        try:
+            messages = state.get("messages", []) if isinstance(state, dict) else []
+            last = messages[-1] if messages else None
+            usage = getattr(last, "usage_metadata", None) if isinstance(last, AIMessage) else None
+            if not isinstance(usage, dict):
+                return
+            context = getattr(runtime, "context", None)
+            context = context if isinstance(context, dict) else {}
+            config = getattr(runtime, "config", None)
+            config = config if isinstance(config, dict) else {}
+            metadata = config.get("metadata", {})
+            metadata = metadata if isinstance(metadata, dict) else {}
+            user_id = resolve_runtime_user_id(runtime)
+            self._meter.record(
+                user_id=user_id if isinstance(user_id, str) and user_id else "unknown",
+                thread_id=context.get("thread_id") if isinstance(context.get("thread_id"), str) else "unknown",
+                model=metadata.get("model_name") if isinstance(metadata.get("model_name"), str) else "unknown",
+                input_tokens=usage.get("input_tokens", 0),
+                output_tokens=usage.get("output_tokens", 0),
+            )
+        except Exception:
+            logger.debug("Token meter recording skipped", exc_info=True)
