@@ -34,7 +34,7 @@ export function assertNever(x: never): never {
 }
 
 export function buildLoginUrl(returnPath: string): string {
-  return `/login?next=${encodeURIComponent(returnPath)}`;
+  return `/workspace`;
 }
 
 // ── Backend error response parsing ────────────────────────────────

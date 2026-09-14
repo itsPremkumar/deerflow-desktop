@@ -19,9 +19,23 @@ from importlib import import_module
 from pathlib import Path
 from typing import Literal
 
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
+def configure_stdio() -> None:
+    """Prefer UTF-8 output so Unicode status markers and box characters render on Windows."""
+    for stream_name in ("stdout", "stderr"):
+        stream = getattr(sys, stream_name, None)
+        if hasattr(stream, "reconfigure"):
+            try:
+                stream.reconfigure(encoding="utf-8", errors="replace")
+            except (OSError, ValueError):
+                continue
+
+
+configure_stdio()
 
 Status = Literal["ok", "warn", "fail", "skip"]
 PNPM_SCRIPT_PATH = Path(__file__).resolve().with_name("pnpm.py")
@@ -222,6 +236,16 @@ def check_nginx() -> CheckResult:
         out = _run(["nginx", "-v"]) or ""
         version = out.split("/", 1)[-1] if "/" in out else out
         return CheckResult("nginx", "ok", version)
+    if sys.platform.startswith("win"):
+        return CheckResult(
+            "nginx",
+            "warn",
+            "not installed (direct dev mode uses Next.js proxy on :3000)",
+            fix=(
+                "Optional on Windows. Direct dev mode (start.ps1) routes through Next.js.\n"
+                "For port 2026 unified proxy, use Docker mode or install nginx."
+            ),
+        )
     return CheckResult(
         "nginx",
         "fail",
