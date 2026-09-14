@@ -170,6 +170,8 @@ export interface Translations {
     createSkillPrompt: string;
     addAttachments: string;
     inputPolish: string;
+    inputPolishShort: string;
+    inputPolishHint: string;
     inputPolishing: string;
     inputPolishNoChanges: string;
     inputPolishFailed: string;

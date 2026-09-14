@@ -248,6 +248,7 @@ class AppConfig(BaseModel):
     task_continuity: TaskContinuityConfig = Field(default_factory=TaskContinuityConfig, description="Thread-local notes and compacted-source recall")
     memory: MemoryConfig = Field(default_factory=MemoryConfig, description="Memory subsystem configuration")
     agents_api: AgentsApiConfig = Field(default_factory=AgentsApiConfig, description="Custom-agent management API configuration")
+    agent_presets: dict[str, AgentPresetConfig] = Field(default_factory=dict, description="Named per-session agent presets for DeepSeek-Harness style execution modes.")
     acp_agents: dict[str, ACPAgentConfig] = Field(default_factory=dict, description="ACP-compatible agent configuration")
     subagents: SubagentsAppConfig = Field(default_factory=SubagentsAppConfig, description="Subagent runtime configuration")
     guardrails: GuardrailsConfig = Field(default_factory=GuardrailsConfig, description="Guardrail middleware configuration")

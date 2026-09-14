@@ -201,12 +201,15 @@ export const enUS: Translations = {
     createSkillPrompt:
       "We're going to build a new skill step by step with `skill-creator`. To start, what do you want this skill to do?",
     addAttachments: "Add attachments",
-    inputPolish: "Polish input",
-    inputPolishing: "Polishing input...",
-    inputPolishNoChanges: "This input is already clear.",
-    inputPolishFailed: "Failed to polish input.",
-    inputPolishUndo: "Undo polish",
-    inputPolishCancel: "Cancel polishing",
+    inputPolish: "Enhance prompt",
+    inputPolishShort: "Enhance",
+    inputPolishHint:
+      "Fix spelling, grammar & make your prompt clearer. Original meaning is kept.",
+    inputPolishing: "Enhancing prompt...",
+    inputPolishNoChanges: "This prompt is already clear.",
+    inputPolishFailed: "Failed to enhance prompt.",
+    inputPolishUndo: "Undo enhance",
+    inputPolishCancel: "Cancel enhancing",
     voiceInputStartLabel: "Dictate with voice",
     voiceInputStopLabel: "Stop voice input",
     voiceInputStart:

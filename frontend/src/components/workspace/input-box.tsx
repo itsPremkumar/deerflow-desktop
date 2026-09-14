@@ -2374,7 +2374,7 @@ export function InputBox({
                   ? t.inputBox.inputPolishing
                   : inputPolishUndoAvailable
                     ? t.inputBox.inputPolishUndo
-                    : t.inputBox.inputPolish
+                    : t.inputBox.inputPolishHint
               }
             >
               <PromptInputButton
@@ -2383,7 +2383,7 @@ export function InputBox({
                     ? t.inputBox.inputPolishUndo
                     : t.inputBox.inputPolish
                 }
-                className="px-2!"
+                className="gap-1.5 px-2.5!"
                 data-testid="polish-input-button"
                 disabled={inputPolishDisabled}
                 onClick={
@@ -2399,6 +2399,11 @@ export function InputBox({
                 ) : (
                   <SparklesIcon className="size-3" />
                 )}
+                <span className="hidden text-xs font-medium sm:inline">
+                  {inputPolishUndoAvailable
+                    ? t.inputBox.inputPolishUndo
+                    : t.inputBox.inputPolishShort}
+                </span>
               </PromptInputButton>
             </Tooltip>
             <PromptInputActionMenu>
