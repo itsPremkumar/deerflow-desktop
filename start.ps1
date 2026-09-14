@@ -129,6 +129,15 @@ Write-Host "[2/2] Starting Next.js Web Interface on port $FrontendPort..." -Fore
 $frontendPsi = New-Object System.Diagnostics.ProcessStartInfo
 $frontendPsi.FileName = "node"
 if ($Prod) {
+    if (-not (Test-Path "$RepoRoot\frontend\.next\BUILD_ID")) {
+        Write-Host "Production build not found. Building frontend..." -ForegroundColor Yellow
+        Push-Location "$RepoRoot\frontend"
+        try {
+            & node node_modules/next/dist/bin/next build
+        } finally {
+            Pop-Location
+        }
+    }
     $frontendPsi.Arguments = "node_modules/next/dist/bin/next start -p $FrontendPort"
 } else {
     $frontendPsi.Arguments = "scripts/dev.mjs"
