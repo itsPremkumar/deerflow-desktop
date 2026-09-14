@@ -2,7 +2,6 @@
 
 from deerflow.workspace_changes.patch_synthesizer import (
     PatchSynthesizer,
-    PatchValidationResult,
 )
 
 

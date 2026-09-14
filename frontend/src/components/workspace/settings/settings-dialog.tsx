@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  AppWindowIcon,
   BellIcon,
   CableIcon,
   InfoIcon,
@@ -105,6 +106,13 @@ const AboutSettingsPage = dynamic(
     import("./about-settings-page").then((module) => module.AboutSettingsPage),
   { loading: SettingsPageLoading },
 );
+const DesktopSettingsPage = dynamic(
+  () =>
+    import("./desktop-settings-page").then(
+      (module) => module.DesktopSettingsPage,
+    ),
+  { loading: SettingsPageLoading },
+);
 
 export type SettingsSection =
   | "account"
@@ -117,6 +125,7 @@ export type SettingsSection =
   | "subagents"
   | "skills"
   | "notification"
+  | "desktop"
   | "about";
 
 type SettingsDialogProps = React.ComponentProps<typeof Dialog> & {
@@ -128,6 +137,11 @@ export function SettingsDialog(props: SettingsDialogProps) {
   const { t } = useI18n();
   const [activeSection, setActiveSection] =
     useState<SettingsSection>(defaultSection);
+  // Desktop-only section: the bridge exists solely inside Electron.
+  // Guarded by typeof window so server rendering stays deterministic.
+  const showDesktop =
+    typeof window !== "undefined" &&
+    typeof window.deerflow !== "undefined";
 
   useEffect(() => {
     // When opening the dialog, ensure the active section follows the caller's intent.
@@ -177,6 +191,15 @@ export function SettingsDialog(props: SettingsDialogProps) {
         icon: UsersRoundIcon,
       },
       { id: "skills", label: t.settings.sections.skills, icon: SparklesIcon },
+      ...(showDesktop
+        ? [
+            {
+              id: "desktop",
+              label: t.settings.sections.desktop,
+              icon: AppWindowIcon,
+            },
+          ]
+        : []),
       { id: "about", label: t.settings.sections.about, icon: InfoIcon },
     ],
     [
@@ -190,7 +213,9 @@ export function SettingsDialog(props: SettingsDialogProps) {
       t.settings.sections.subagents,
       t.settings.sections.skills,
       t.settings.sections.notification,
+      t.settings.sections.desktop,
       t.settings.sections.about,
+      showDesktop,
     ],
   );
   return (
@@ -247,6 +272,7 @@ export function SettingsDialog(props: SettingsDialogProps) {
                 />
               )}
               {activeSection === "notification" && <NotificationSettingsPage />}
+              {activeSection === "desktop" && <DesktopSettingsPage />}
               {activeSection === "channels" && <ChannelsSettingsPage />}
               {activeSection === "integrations" && <IntegrationsSettingsPage />}
               {activeSection === "about" && <AboutSettingsPage />}

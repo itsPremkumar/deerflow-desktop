@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import enum
 from dataclasses import dataclass
-from typing import Any, Dict, Optional
+from typing import Any
 
 
 class AutonomyProfile(enum.Enum):
@@ -36,7 +36,7 @@ class PolicyEvaluationResult:
     reason: str
     action_signature: str
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "decision": self.decision.value,
             "profile": self.profile.value,

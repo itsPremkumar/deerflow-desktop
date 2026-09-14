@@ -1,6 +1,7 @@
 """Tests for Theory of Mind (ToM) Intent Consultant subsystem."""
 
 import json
+
 from deerflow.reasoning.tom.consultant import TheoryOfMindConsultant
 from deerflow.reasoning.tom.models import PriorityDomain, RiskTolerance
 from deerflow.tools.builtins.tom_consult_tool import tom_consult

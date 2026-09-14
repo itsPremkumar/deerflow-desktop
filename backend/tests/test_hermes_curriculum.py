@@ -1,10 +1,8 @@
-import pytest
 
 from deerflow.learning.curriculum import (
     CapabilityGap,
     Curriculum,
     CurriculumBuilder,
-    PracticeTask,
 )
 
 

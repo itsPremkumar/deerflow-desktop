@@ -11,7 +11,7 @@ Inspired by Oh My OpenAgent (OmO / Sisyphus):
 from __future__ import annotations
 
 import time
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from deerflow.orchestration.discipline.consultant import PlanConsultant
 from deerflow.orchestration.discipline.recon import FastReconWorker
@@ -34,9 +34,9 @@ class CategoryTeamDispatcher:
         self,
         category: str,
         task_prompt: str,
-        context: Optional[Dict[str, Any]] = None,
-        constraints: Optional[List[str]] = None,
-    ) -> Dict[str, Any]:
+        context: dict[str, Any] | None = None,
+        constraints: list[str] | None = None,
+    ) -> dict[str, Any]:
         """Dispatch a task to the specialized model and worker for the requested category."""
         cat = category.strip().lower()
         ctx = context or {}

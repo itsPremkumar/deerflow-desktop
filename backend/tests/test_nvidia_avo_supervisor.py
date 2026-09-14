@@ -1,4 +1,3 @@
-import pytest
 
 from deerflow.avo.supervisor import AVOSupervisor
 

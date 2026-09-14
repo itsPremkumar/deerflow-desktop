@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from typing import Optional
+
 from langchain.tools import tool
 
 from deerflow.runtime.rlm import RLMEngine

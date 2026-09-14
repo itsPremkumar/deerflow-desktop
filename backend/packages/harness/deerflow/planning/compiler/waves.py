@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Set, Tuple
+from typing import Any
 
 
 @dataclass
@@ -9,11 +9,11 @@ class ExecutionWave:
     """A cohort of tasks that can be safely dispatched concurrently."""
 
     wave_index: int
-    task_ids: List[str] = field(default_factory=list)
+    task_ids: list[str] = field(default_factory=list)
     parallel_allowed: bool = True
     barrier_required: bool = True
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "wave_index": self.wave_index,
             "task_ids": self.task_ids,
@@ -22,13 +22,13 @@ class ExecutionWave:
         }
 
 
-def validate_task_dag(task_dag: Dict[str, List[str]]) -> Tuple[bool, List[str]]:
+def validate_task_dag(task_dag: dict[str, list[str]]) -> tuple[bool, list[str]]:
     """Validate a task DAG without partitioning it.
 
     Returns (is_valid, errors). Checks: non-empty ids, list deps,
     no self-dependency, no unknown references, no cycles.
     """
-    errors: List[str] = []
+    errors: list[str] = []
     if not isinstance(task_dag, dict) or not task_dag:
         return False, ["task_dag must be a non-empty mapping of task_id -> dependencies"]
     for tid, deps in task_dag.items():
@@ -51,13 +51,13 @@ def validate_task_dag(task_dag: Dict[str, List[str]]) -> Tuple[bool, List[str]]:
     return (len(errors) == 0, errors)
 
 
-def find_cycle(task_dag: Dict[str, List[str]]) -> List[str]:
+def find_cycle(task_dag: dict[str, list[str]]) -> list[str]:
     """Return one cycle path if present, else []. Iterative DFS."""
-    visiting: Set[str] = set()
-    visited: Set[str] = set()
-    stack: List[str] = []
+    visiting: set[str] = set()
+    visited: set[str] = set()
+    stack: list[str] = []
 
-    def visit(node: str) -> List[str] | None:
+    def visit(node: str) -> list[str] | None:
         visiting.add(node)
         stack.append(node)
         for dep in task_dag.get(node, []):
@@ -84,10 +84,10 @@ def find_cycle(task_dag: Dict[str, List[str]]) -> List[str]:
 
 
 def partition_execution_waves(
-    task_dag: Dict[str, List[str]],
+    task_dag: dict[str, list[str]],
     *,
     strict: bool = False,
-) -> List[ExecutionWave]:
+) -> list[ExecutionWave]:
     """
     P12: Partition a task dependency graph into sequential execution waves.
     task_dag: mapping of task_id -> list of dependencies (task_ids it depends on).
@@ -104,15 +104,15 @@ def partition_execution_waves(
             raise ValueError(f"Invalid task_dag: {'; '.join(errors)}")
 
     # Copy dependency structure
-    remaining_deps: Dict[str, Set[str]] = {tid: set(deps) for tid, deps in task_dag.items()}
+    remaining_deps: dict[str, set[str]] = {tid: set(deps) for tid, deps in task_dag.items()}
     # Unknown refs can never be satisfied — in lenient mode surface them in a
     # final fenced wave instead of looping forever.
     known = set(task_dag.keys())
     for tid in list(remaining_deps.keys()):
         remaining_deps[tid] = {d for d in remaining_deps[tid] if d in known}
 
-    completed: Set[str] = set()
-    waves: List[ExecutionWave] = []
+    completed: set[str] = set()
+    waves: list[ExecutionWave] = []
     wave_idx = 1
 
     while remaining_deps:

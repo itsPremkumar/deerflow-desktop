@@ -1,6 +1,5 @@
 import os
 import tempfile
-import pytest
 
 from deerflow.blackboard import (
     ALL_20_PLANES,

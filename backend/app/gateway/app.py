@@ -15,31 +15,45 @@ from app.gateway.csrf_middleware import CORS_EXPOSED_HEADERS, CSRFMiddleware, ge
 from app.gateway.deps import langgraph_runtime
 from app.gateway.health import READINESS_CHECKPOINTER_CONFIG_ATTR, readiness_payload
 from app.gateway.routers import (
+    a2a,
+    agent_messages,
     agents,
     artifacts,
     assistants_compat,
     auth,
+    bots,
     browser,
     channel_connections,
     channels,
+    company,
     console,
+    deliberation,
+
     features,
     feedback,
     github_webhooks,
+    goal_integrity,
+    groups,
     input_polish,
     integrations,
+    jobs,
+
     mcp,
     mcp_tasks,
     memory,
     models,
     ops,
+    plan_mode,
     projects,
     runs,
     scheduled_tasks,
     skills,
     subagent_batches,
+    subagent_control,
     subagents,
     suggestions,
+    supervision,
+    swarms,
     thread_runs,
     threads,
     uploads,
@@ -851,6 +865,24 @@ This gateway provides runtime endpoints for agent runs plus custom endpoints for
 
     # Deployment-level subagent catalog and admin management.
     app.include_router(subagents.router)
+
+    # First-class coordination: bot profiles, group chat rooms, and
+    # thread-scoped agent-to-agent messaging. These make the harness-layer
+    # bots/groups/messaging modules real system parts with Gateway auth,
+    # validation, and blocking-IO offload.
+    app.include_router(bots.router)
+    app.include_router(groups.router)
+    app.include_router(agent_messages.router)
+    app.include_router(swarms.router)
+    app.include_router(plan_mode.router)
+    app.include_router(subagent_control.router)
+    app.include_router(deliberation.router)
+    app.include_router(jobs.router)
+    app.include_router(supervision.router)
+    app.include_router(goal_integrity.router)
+    app.include_router(a2a.router)
+    app.include_router(company.router)
+
 
     # Suggestions API is mounted at /api/threads/{thread_id}/suggestions
     app.include_router(suggestions.router)

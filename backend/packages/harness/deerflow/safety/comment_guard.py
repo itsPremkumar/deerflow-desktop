@@ -11,7 +11,6 @@ critical production code with lazy placeholders such as:
 from __future__ import annotations
 
 import re
-from typing import List, Optional
 
 
 class LazyCommentDetectedError(ValueError):
@@ -27,13 +26,13 @@ LAZY_PATTERNS = [
 ]
 
 
-def check_for_lazy_comments(code: str, strict: bool = True) -> List[str]:
+def check_for_lazy_comments(code: str, strict: bool = True) -> list[str]:
     """Scan code for lazy omission patterns.
     
     If strict=True, raises LazyCommentDetectedError on first detection.
     Otherwise returns list of matched pattern descriptions.
     """
-    violations: List[str] = []
+    violations: list[str] = []
     for pat in LAZY_PATTERNS:
         matches = pat.findall(code)
         if matches:

@@ -6,7 +6,7 @@ import time
 import uuid
 from dataclasses import asdict, dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 
 class ActionType(str, Enum):
@@ -25,9 +25,9 @@ class Action:
     thought: str = ""
     action_id: str = field(default_factory=lambda: str(uuid.uuid4()))
     timestamp: float = field(default_factory=time.time)
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         data = asdict(self)
         data["action_type"] = self.action_type.value
         return data
@@ -38,14 +38,14 @@ class CmdRunAction(Action):
     """Execution of a shell command."""
     command: str = ""
     is_background: bool = False
-    cwd: Optional[str] = None
+    cwd: str | None = None
 
     def __init__(
         self,
         command: str,
         thought: str = "",
         is_background: bool = False,
-        cwd: Optional[str] = None,
+        cwd: str | None = None,
         **kwargs: Any,
     ):
         super().__init__(action_type=ActionType.CMD_RUN, thought=thought, **kwargs)
@@ -58,17 +58,17 @@ class CmdRunAction(Action):
 class FileEditAction(Action):
     """File creation, deletion, or replacement."""
     path: str = ""
-    content: Optional[str] = None
-    old_str: Optional[str] = None
-    new_str: Optional[str] = None
+    content: str | None = None
+    old_str: str | None = None
+    new_str: str | None = None
     mode: str = "write"  # "write", "replace", "append", "delete"
 
     def __init__(
         self,
         path: str,
-        content: Optional[str] = None,
-        old_str: Optional[str] = None,
-        new_str: Optional[str] = None,
+        content: str | None = None,
+        old_str: str | None = None,
+        new_str: str | None = None,
         mode: str = "write",
         thought: str = "",
         **kwargs: Any,
@@ -85,12 +85,12 @@ class FileEditAction(Action):
 class CriticAction(Action):
     """Evaluation by a quality or completion critic."""
     critic_name: str = ""
-    target_action_id: Optional[str] = None
+    target_action_id: str | None = None
 
     def __init__(
         self,
         critic_name: str,
-        target_action_id: Optional[str] = None,
+        target_action_id: str | None = None,
         thought: str = "",
         **kwargs: Any,
     ):
@@ -103,12 +103,12 @@ class CriticAction(Action):
 class AgentFinishAction(Action):
     """Agent declaration of task completion."""
     final_thought: str = ""
-    deliverables: List[str] = field(default_factory=list)
+    deliverables: list[str] = field(default_factory=list)
 
     def __init__(
         self,
         final_thought: str = "",
-        deliverables: Optional[List[str]] = None,
+        deliverables: list[str] | None = None,
         **kwargs: Any,
     ):
         super().__init__(action_type=ActionType.AGENT_FINISH, thought=final_thought, **kwargs)

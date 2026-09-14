@@ -1,5 +1,5 @@
 from pathlib import Path
-import pytest
+
 from deerflow.safety.self_repo_guard import SelfRepoGuard
 
 

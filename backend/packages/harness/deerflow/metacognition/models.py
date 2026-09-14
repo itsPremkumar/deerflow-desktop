@@ -3,7 +3,7 @@ from __future__ import annotations
 import time
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List
+from typing import Any
 
 
 class CognitiveMode(str, Enum):
@@ -28,13 +28,13 @@ class MetacognitiveAssessment:
     mode: CognitiveMode
     confidence: float
     calibrated_confidence: float
-    detected_biases: List[BiasFlag] = field(default_factory=list)
+    detected_biases: list[BiasFlag] = field(default_factory=list)
     stagnation_score: float = 0.0
     recommendation: str = "Continue nominal execution"
     should_switch_strategy: bool = False
     timestamp: float = field(default_factory=time.time)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "mode": self.mode.value,
             "confidence": self.confidence,

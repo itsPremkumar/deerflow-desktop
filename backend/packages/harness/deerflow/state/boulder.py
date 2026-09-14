@@ -10,12 +10,11 @@ and system restarts:
 from __future__ import annotations
 
 import json
-import os
 import time
 import uuid
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 DEFAULT_BOULDER_PATH = Path(".omo") / "boulder.json"
 
@@ -31,17 +30,17 @@ class ChecklistItem:
 class BoulderState:
     work_id: str
     top_level_task: str
-    checklist: List[ChecklistItem] = field(default_factory=list)
-    session_ids: List[str] = field(default_factory=list)
+    checklist: list[ChecklistItem] = field(default_factory=list)
+    session_ids: list[str] = field(default_factory=list)
     status: str = "in_progress"  # "in_progress", "completed", "failed"
     created_at: float = field(default_factory=time.time)
     updated_at: float = field(default_factory=time.time)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> BoulderState:
+    def from_dict(cls, data: dict[str, Any]) -> BoulderState:
         checklist = [
             ChecklistItem(
                 item=c["item"],
@@ -63,9 +62,9 @@ class BoulderState:
 
 def create_boulder(
     task: str,
-    checklist: List[str],
-    path: Optional[Path] = None,
-    session_id: Optional[str] = None,
+    checklist: list[str],
+    path: Path | None = None,
+    session_id: str | None = None,
 ) -> BoulderState:
     """Create and persist a new Boulder state."""
     state = BoulderState(
@@ -78,7 +77,7 @@ def create_boulder(
     return state
 
 
-def save_boulder(state: BoulderState, path: Optional[Path] = None) -> None:
+def save_boulder(state: BoulderState, path: Path | None = None) -> None:
     """Save BoulderState to JSON checkpoint file."""
     target = path or DEFAULT_BOULDER_PATH
     target.parent.mkdir(parents=True, exist_ok=True)
@@ -87,13 +86,13 @@ def save_boulder(state: BoulderState, path: Optional[Path] = None) -> None:
         json.dump(state.to_dict(), f, indent=2)
 
 
-def load_boulder(path: Optional[Path] = None) -> Optional[BoulderState]:
+def load_boulder(path: Path | None = None) -> BoulderState | None:
     """Load current active BoulderState if it exists."""
     target = path or DEFAULT_BOULDER_PATH
     if not target.exists():
         return None
     try:
-        with open(target, "r", encoding="utf-8") as f:
+        with open(target, encoding="utf-8") as f:
             data = json.load(f)
         return BoulderState.from_dict(data)
     except Exception:
@@ -104,7 +103,7 @@ def update_checklist_item(
     item_index: int,
     completed: bool,
     evidence: str = "",
-    path: Optional[Path] = None,
+    path: Path | None = None,
 ) -> BoulderState:
     """Mark a checklist item completed with verification evidence."""
     state = load_boulder(path)
@@ -125,7 +124,7 @@ def update_checklist_item(
     return state
 
 
-def append_session_id(session_id: str, path: Optional[Path] = None) -> BoulderState:
+def append_session_id(session_id: str, path: Path | None = None) -> BoulderState:
     """Record a new session ID into the multi-session chain."""
     state = load_boulder(path)
     if not state:
@@ -136,7 +135,7 @@ def append_session_id(session_id: str, path: Optional[Path] = None) -> BoulderSt
     return state
 
 
-def complete_boulder(path: Optional[Path] = None) -> BoulderState:
+def complete_boulder(path: Path | None = None) -> BoulderState:
     """Mark the entire boulder task as successfully completed."""
     state = load_boulder(path)
     if not state:
@@ -146,7 +145,7 @@ def complete_boulder(path: Optional[Path] = None) -> BoulderState:
     return state
 
 
-def clear_boulder(path: Optional[Path] = None) -> None:
+def clear_boulder(path: Path | None = None) -> None:
     """Remove active boulder file upon cleanup."""
     target = path or DEFAULT_BOULDER_PATH
     if target.exists():

@@ -1,105 +1,44 @@
-from .agent_message_tool import agent_message_tool, agent_observe_tool
-from .background_tasks_tool import cancel_background_task, list_background_tasks
-from .batch_task_tool import batch_status, batch_task, cancel_batch
-from .clarification_tool import ask_clarification_tool
-from .executable_skill_tool import invoke_python_skill_tool
-from .harness_refine_tool import harness_refine_tool
-from .list_uploaded_files_tool import list_uploaded_files
-from .present_file_tool import present_file_tool
-from .process_handle_tool import process_handle_tool
-from .propose_skill_tool import propose_skill_tool
-from .python_repl_tool import python_repl_tool
-from .review_skill_package_tool import review_skill_package
-from .session_search_tool import session_search_tool
-from .setup_agent_tool import setup_agent
-from .task_tool import task_tool
-from .update_agent_tool import update_agent
-from .view_image_tool import view_image_tool
-
-from .bot_roster_tool import bot_roster_tool
-from .group_chat_tool import group_chat_tool
-from .kanban_board_tool import kanban_board_tool
-from .canvas_widget_tool import canvas_widget_tool
-from .goal_engine_tool import goal_engine_tool
-from .trajectory_audit_tool import trajectory_audit_tool
-from .code_mode_tool import code_mode_tool
-from .tool_search_tool import catalog_tool_call, catalog_tool_describe, catalog_tool_search
-from .dreaming_tool import consolidate_memory_dream
-from .progress_card_tool import update_progress_card
-from .learning_graph_tool import learning_graph_manage
-from .smart_approval_tool import verify_command_approval
-from .moa_reasoning_tool import moa_multi_model_reasoning
-from .estop_tool import emergency_stop_manage
-from .skills_hub_tool import skills_hub_manage
-from .cronjob_manage_tool import cronjob_manage
-from .browser_supervisor_tool import browser_navigate_and_inspect
-
-# Oh My OpenAgent (OmO / Sisyphus) Builtin Tools
-from .hashline_tool import hashline_edit, hashline_read
-from .workflow_dag_tool import workflow_dag_manage
-from .boulder_checkpoint_tool import boulder_checkpoint_manage
-from .kibitzer_tool import kibitzer_nudge_manage
-from .hyperplan_tool import hyperplan_review_manage
-from .ast_grep_tool import ast_grep_rewrite, ast_grep_search
-
-# OpenHands Builtin Tools
-from .tom_consult_tool import tom_consult
-from .ask_oracle_tool import ask_oracle
-
-# Autonomous Reproduction and Experience Memory Tools
-from .reproduction_tool import reproduce_and_verify
-from .experience_tool import consult_experience
-
-# Hermes AGI/ASI Executive Control Plane Tools
-from .compile_mission_tool import compile_mission
-from .epistemic_belief_tool import evaluate_epistemic_claim
-from .rsi_engine_tool import run_rsi_cycle
-from .consequence_tool import simulate_consequences
-from .self_heal_tool import self_heal_diagnose
-
-# Hermes AGI/ASI Wave 2 Advanced Operating System Tools
-from .blackboard_tool import blackboard_query, blackboard_record_evidence
-from .cognitive_compiler_tool import compile_cognitive_plan
+from .a2a_tool import a2a_tool
 from .action_transaction_tool import execute_transactional_action
-from .avo_lineage_tool import run_avo_variation
-from .repo_twin_tool import inspect_repo_twin
-from .metacognitive_tool import check_metacognitive_health
-
-# Hermes-ASI-Master Wave 3 Tools
-from .skill_forge_tool import forge_skill_from_trace
-from .curriculum_tool import generate_curriculum_plan
-from .agency_competence_tool import evaluate_agent_competence
-from .five_pass_search_tool import compile_five_pass_search
-from .delta_checkpoint_tool import create_workflow_checkpoint
-
-# Autonomous one-prompt planner: raw prompt -> fully decided execution plan
-from .autoplan_tool import build_autonomous_plan
-
-# DeepSeek-Harness-style bounded self-improvement loop over delegations
-from .ralph_loop_tool import ralph_loop_tool
-
-# NVIDIA Agentic Variation Operators (AVO) tool
-from .nvidia_avo_tool import run_nvidia_avo_step
-
-# Wave 4: Frontier Governance, Context Superintelligence & Truth Engine
-from .quality_council_tool import deliberate_artifact_quality
-from .context_as_data_tool import manage_context_data
 from .adaptive_autonomy_tool import check_or_set_autonomy_profile
-from .evidence_matrix_tool import audit_finish_first_evidence
+from .agency_competence_tool import evaluate_agent_competence
+from .agent_message_tool import agent_message_tool, agent_observe_tool
+from .artifact_lineage_tool import trace_artifact_lineage
+from .ask_oracle_tool import ask_oracle
+from .ast_grep_tool import ast_grep_rewrite, ast_grep_search
 
 # Wave 5: OpenAI Astra Security & Telemetry Plane
 from .astra_security_tool import astra_security_manage
 
-# Wave 6: Mission Hierarchy, Work Queue DAG & Universal Artifact Lineage
-from .mission_hierarchy_tool import manage_mission_hierarchy, schedule_work_queue
-from .artifact_lineage_tool import trace_artifact_lineage
+# Autonomous one-prompt planner: raw prompt -> fully decided execution plan
+from .autoplan_tool import build_autonomous_plan
+from .avo_lineage_tool import run_avo_variation
+from .background_tasks_tool import cancel_background_task, list_background_tasks
+from .batch_task_tool import batch_status, batch_task, cancel_batch
 
-# Wave 7: Enterprise Harness Expansion
-from .performance_registry_tool import manage_model_performance_registry
-from .knowledge_graph_tool import query_knowledge_graph
-from .evaluation_benchmark_tool import run_task_evaluation_benchmark
+# Hermes AGI/ASI Wave 2 Advanced Operating System Tools
+from .blackboard_tool import blackboard_query, blackboard_record_evidence
+from .bot_roster_tool import bot_roster_tool
+from .boulder_checkpoint_tool import boulder_checkpoint_manage
+from .browser_supervisor_tool import browser_navigate_and_inspect
+from .canvas_widget_tool import canvas_widget_tool
+from .clarification_tool import ask_clarification_tool
+from .code_mode_tool import code_mode_tool
+from .cognitive_compiler_tool import compile_cognitive_plan
+
+# Cognitive Plan Mode: 8-Dimensional Strategic Evaluation & Autonomous Dispatch
+from .cognitive_plan_tool import cognitive_plan
+from .company_tool import company_tool
+
+# Hermes AGI/ASI Executive Control Plane Tools
+from .compile_mission_tool import compile_mission
 from .computer_worker_tool import execute_sandboxed_computer_action
-from .durable_replay_tool import manage_durable_orchestration
+from .consequence_tool import simulate_consequences
+from .context_as_data_tool import manage_context_data
+from .cronjob_manage_tool import cronjob_manage
+from .curriculum_tool import generate_curriculum_plan
+from .deliberation_tool import deliberation_tool
+from .delta_checkpoint_tool import create_workflow_checkpoint
 
 # Wave 8: Multi-Model Discipline Team (OpenAI Astra & Claude Fable 5.1 Profile)
 from .discipline_team_tool import (
@@ -107,6 +46,77 @@ from .discipline_team_tool import (
     dispatch_discipline_worker,
     review_plan_invariant_gate,
 )
+from .dreaming_tool import consolidate_memory_dream
+from .durable_replay_tool import manage_durable_orchestration
+from .epistemic_belief_tool import evaluate_epistemic_claim
+from .estop_tool import emergency_stop_manage
+from .evaluation_benchmark_tool import run_task_evaluation_benchmark
+from .evidence_matrix_tool import audit_finish_first_evidence
+from .executable_skill_tool import invoke_python_skill_tool
+from .experience_tool import consult_experience
+from .five_pass_search_tool import compile_five_pass_search
+from .goal_engine_tool import goal_engine_tool
+from .goal_integrity_tool import goal_integrity_tool
+from .group_chat_tool import group_chat_tool
+from .harness_refine_tool import harness_refine_tool
+
+# Oh My OpenAgent (OmO / Sisyphus) Builtin Tools
+from .hashline_tool import hashline_edit, hashline_read
+from .hyperplan_tool import hyperplan_review_manage
+from .job_tool import job_tool
+from .kanban_board_tool import kanban_board_tool
+from .kibitzer_tool import kibitzer_nudge_manage
+from .knowledge_graph_tool import query_knowledge_graph
+from .learning_graph_tool import learning_graph_manage
+from .list_uploaded_files_tool import list_uploaded_files
+from .metacognitive_tool import check_metacognitive_health
+
+# Wave 6: Mission Hierarchy, Work Queue DAG & Universal Artifact Lineage
+from .mission_hierarchy_tool import manage_mission_hierarchy, schedule_work_queue
+from .moa_reasoning_tool import moa_multi_model_reasoning
+
+# NVIDIA Agentic Variation Operators (AVO) tool
+from .nvidia_avo_tool import run_nvidia_avo_step
+
+# Wave 7: Enterprise Harness Expansion
+from .performance_registry_tool import manage_model_performance_registry
+from .present_file_tool import present_file_tool
+from .process_handle_tool import process_handle_tool
+from .progress_card_tool import update_progress_card
+from .propose_skill_tool import propose_skill_tool
+from .python_repl_tool import python_repl_tool
+
+# Wave 4: Frontier Governance, Context Superintelligence & Truth Engine
+from .quality_council_tool import deliberate_artifact_quality
+
+# DeepSeek-Harness-style bounded self-improvement loop over delegations
+from .ralph_loop_tool import ralph_loop_tool
+from .repo_twin_tool import inspect_repo_twin
+
+# Autonomous Reproduction and Experience Memory Tools
+from .reproduction_tool import reproduce_and_verify
+from .review_skill_package_tool import review_skill_package
+from .rsi_engine_tool import run_rsi_cycle
+from .self_heal_tool import self_heal_diagnose
+from .session_search_tool import session_search_tool
+from .setup_agent_tool import setup_agent
+
+# Hermes-ASI-Master Wave 3 Tools
+from .skill_forge_tool import forge_skill_from_trace
+from .skills_hub_tool import skills_hub_manage
+from .smart_approval_tool import verify_command_approval
+from .subagent_control_tool import subagent_control
+from .supervision_tool import supervision_tool
+from .swarm_tool import swarm_tool
+from .task_tool import task_tool
+
+# OpenHands Builtin Tools
+from .tom_consult_tool import tom_consult
+from .tool_search_tool import catalog_tool_call, catalog_tool_describe, catalog_tool_search
+from .trajectory_audit_tool import trajectory_audit_tool
+from .update_agent_tool import update_agent
+from .view_image_tool import view_image_tool
+from .workflow_dag_tool import workflow_dag_manage
 
 __all__ = [
     "setup_agent",
@@ -131,6 +141,7 @@ __all__ = [
     "process_handle_tool",
     "invoke_python_skill_tool",
     "bot_roster_tool",
+    "swarm_tool",
     "group_chat_tool",
     "kanban_board_tool",
     "canvas_widget_tool",
@@ -197,4 +208,14 @@ __all__ = [
     "consult_plan_gap_analysis",
     "review_plan_invariant_gate",
     "dispatch_discipline_worker",
+    "cognitive_plan",
+    "subagent_control",
+    "deliberation_tool",
+    "job_tool",
+    "supervision_tool",
+    "goal_integrity_tool",
+    "a2a_tool",
+    "company_tool",
 ]
+
+

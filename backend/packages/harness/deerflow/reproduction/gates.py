@@ -3,12 +3,10 @@
 from __future__ import annotations
 
 import logging
-import os
 import subprocess
 import sys
 import time
 from pathlib import Path
-from typing import Optional
 
 from deerflow.reproduction.models import GateResult
 
@@ -22,7 +20,7 @@ class PreFixFailureGate:
         self,
         script_path: Path,
         workspace_dir: Path,
-        python_executable: Optional[str] = None,
+        python_executable: str | None = None,
         timeout: int = 30,
     ) -> GateResult:
         py_bin = python_executable or sys.executable
@@ -77,7 +75,7 @@ class PostFixVerificationGate:
         self,
         script_path: Path,
         workspace_dir: Path,
-        python_executable: Optional[str] = None,
+        python_executable: str | None = None,
         timeout: int = 30,
     ) -> GateResult:
         py_bin = python_executable or sys.executable

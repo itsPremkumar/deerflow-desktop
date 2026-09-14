@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 
 class StrategyArchetype(str, Enum):
@@ -23,11 +23,11 @@ class StrategyCandidate:
     risk_score: float  # 0.0 to 1.0 (0.0 = zero risk)
     token_cost_estimate: int  # approximate tokens
     latency_ms_estimate: float  # approximate latency
-    pros: List[str] = field(default_factory=list)
-    cons: List[str] = field(default_factory=list)
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    pros: list[str] = field(default_factory=list)
+    cons: list[str] = field(default_factory=list)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
-    def score(self, weights: Optional[Dict[str, float]] = None) -> float:
+    def score(self, weights: dict[str, float] | None = None) -> float:
         w = {
             "success": 0.45,
             "reversibility": 0.25,
@@ -43,7 +43,7 @@ class StrategyCandidate:
         composite = w["success"] * self.success_prob + w["reversibility"] * self.reversibility - w["risk"] * self.risk_score - w["cost"] * norm_cost
         return round(composite, 4)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "archetype": self.archetype.value,
             "name": self.name,
@@ -60,7 +60,7 @@ class StrategyCandidate:
         }
 
 
-def generate_strategy_candidates(goal: str, risk_tier: str = "R1") -> List[StrategyCandidate]:
+def generate_strategy_candidates(goal: str, risk_tier: str = "R1") -> list[StrategyCandidate]:
     """P8 Strategy Generation: emit discrete Candidates A, B, and C.
 
     Probabilities are goal-aware heuristics, not learned estimates:

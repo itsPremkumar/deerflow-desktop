@@ -9,8 +9,8 @@ Inspired by Chapters 16 and 17 of the Master Architecture Blueprint:
 from __future__ import annotations
 
 import time
-from dataclasses import asdict, dataclass, field
-from typing import Any, Dict, List, Optional, Tuple
+from dataclasses import dataclass, field
+from typing import Any
 
 
 @dataclass
@@ -66,7 +66,7 @@ class ModelPerformanceMetrics:
         self.total_verification_score += verification_score
         self.last_updated = time.time()
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "model_id": self.model_id,
             "task_type": self.task_type,
@@ -85,7 +85,7 @@ class ModelPerformanceRegistry:
 
     def __init__(self):
         # Key: (model_id.lower(), task_type.lower()) -> ModelPerformanceMetrics
-        self._metrics: Dict[Tuple[str, str], ModelPerformanceMetrics] = {}
+        self._metrics: dict[tuple[str, str], ModelPerformanceMetrics] = {}
 
     def record_run(
         self,
@@ -116,10 +116,10 @@ class ModelPerformanceRegistry:
         )
         return metrics
 
-    def get_metrics(self, model_id: str, task_type: str) -> Optional[ModelPerformanceMetrics]:
+    def get_metrics(self, model_id: str, task_type: str) -> ModelPerformanceMetrics | None:
         return self._metrics.get((model_id.strip().lower(), task_type.strip().lower()))
 
-    def list_all(self, task_type: Optional[str] = None) -> List[Dict[str, Any]]:
+    def list_all(self, task_type: str | None = None) -> list[dict[str, Any]]:
         if task_type:
             tt = task_type.strip().lower()
             return [m.to_dict() for (m_id, t), m in self._metrics.items() if t == tt]
@@ -135,16 +135,16 @@ class DynamicCostLatencyRouter:
     def select_optimal_model(
         self,
         task_type: str,
-        candidate_models: List[str],
-        max_cost_usd: Optional[float] = None,
-        max_latency_ms: Optional[float] = None,
+        candidate_models: list[str],
+        max_cost_usd: float | None = None,
+        max_latency_ms: float | None = None,
         min_success_rate: float = 0.7,
         weight_quality: float = 0.5,
         weight_cost: float = 0.3,
         weight_latency: float = 0.2,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Rank candidates by multi-attribute utility: U = w_q*Q - w_c*C - w_l*L."""
-        candidates_evaluated: List[Dict[str, Any]] = []
+        candidates_evaluated: list[dict[str, Any]] = []
 
         for m_id in candidate_models:
             metrics = self.registry.get_metrics(m_id, task_type)

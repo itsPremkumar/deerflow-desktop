@@ -1,5 +1,4 @@
-import pytest
-from deerflow.safety.net_policy import NetworkPolicyGuard, get_net_policy_guard
+from deerflow.safety.net_policy import NetworkPolicyGuard
 
 
 def test_net_policy_blocks_loopback_and_private():

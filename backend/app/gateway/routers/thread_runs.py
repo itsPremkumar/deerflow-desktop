@@ -1188,6 +1188,88 @@ async def cancel_run(
     raise HTTPException(status_code=409, detail=_cancel_conflict_detail(run_id, record))
 
 
+async def _resolve_head_checkpoint_id(request: Request, thread_id: str) -> str | None:
+    """Return the thread's current head checkpoint id, or None when absent.
+
+    Small indirection (instead of inlining the accessor) so tests can stub
+    checkpoint resolution without assembling an agent graph.
+    """
+    try:
+        accessor, config = await build_thread_checkpoint_state_accessor(request, thread_id=thread_id)
+        snapshot = await accessor.aget(config)
+    except Exception:
+        logger.warning("Resume checkpoint resolution failed for thread %s", thread_id, exc_info=True)
+        return None
+    if snapshot is None:
+        return None
+    snapshot_config = getattr(snapshot, "config", {}) or {}
+    raw = snapshot_config.get("configurable", {}).get("checkpoint_id")
+    return raw if isinstance(raw, str) and raw else None
+
+
+@router.post("/{thread_id}/runs/{run_id}/resume", response_model=RunResponse, status_code=202)
+@require_permission("runs", "create", owner_check=True, require_existing=True)
+async def resume_run(thread_id: ThreadId, run_id: str, request: Request) -> RunResponse:
+    """Continue an interrupted run from the thread's head checkpoint.
+
+    Transparent crash recovery: a run that never reached a durable final
+    state (Gateway restart, timeout, user interrupt) can continue exactly
+    where it stopped instead of replaying the turn from scratch. The new run
+    carries ``checkpoint_id`` of the current head plus
+    ``metadata.resumed_from_run_id``; goal state, artifacts, and conversation
+    ride the checkpoint, so nothing is re-asked and nothing is duplicated.
+
+    - 404 when the source run is unknown or belongs to another thread.
+    - 409 when the source run is still active (join or cancel it), already
+      succeeded (send a new message instead), has no resumable checkpoint,
+      or the thread has since advanced past it.
+    """
+    run_mgr = get_run_manager(request)
+    user_id = await get_current_user(request)
+    record = await run_mgr.get(run_id, user_id=user_id)
+    if record is None or record.thread_id != thread_id:
+        raise HTTPException(status_code=404, detail=f"Run {run_id} not found")
+
+    status_value = _run_status_value(record)
+    if status_value in (RunStatus.pending.value, RunStatus.running.value):
+        raise HTTPException(
+            status_code=409,
+            detail=f"Run {run_id} is still active; join its stream or cancel it instead of resuming",
+        )
+    if status_value == RunStatus.success.value:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Run {run_id} already completed; send a new message instead of resuming",
+        )
+
+    # The thread must not have advanced past the interrupted run: resuming an
+    # older turn after a newer one finished would fork the conversation.
+    newer_runs = await run_mgr.list_by_thread(thread_id, user_id=user_id, limit=100)
+    for other in newer_runs:
+        if other.run_id != run_id and other.created_at > record.created_at:
+            raise HTTPException(
+                status_code=409,
+                detail=f"Run {run_id} is no longer the latest turn; start a new run instead of resuming",
+            )
+
+    checkpoint_id = await _resolve_head_checkpoint_id(request, thread_id)
+    if checkpoint_id is None:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Run {run_id} has no resumable checkpoint; regenerate or send a new message instead",
+        )
+
+    body = RunCreateRequest(
+        input=None,
+        checkpoint_id=checkpoint_id,
+        assistant_id=record.assistant_id,
+        metadata={"resumed_from_run_id": run_id},
+    )
+    new_record = await start_run(body, thread_id, request, require_existing_thread=True)
+    logger.info("Resumed run %s as %s from checkpoint %s", run_id, new_record.run_id, checkpoint_id)
+    return _record_to_response(new_record)
+
+
 @router.get("/{thread_id}/runs/{run_id}/join")
 @require_permission("runs", "read", owner_check=True)
 async def join_run(thread_id: ThreadId, run_id: str, request: Request) -> StreamingResponse:

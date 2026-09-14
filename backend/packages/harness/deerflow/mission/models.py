@@ -5,7 +5,7 @@ from __future__ import annotations
 import uuid
 from dataclasses import asdict, dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 
 class RiskTier(str, Enum):
@@ -28,7 +28,7 @@ class ProofObligation:
     satisfied: bool = False
     evidence: str = ""
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
 
@@ -41,7 +41,7 @@ class Mission:
     latent_needs: str = ""
     desired_outcome: str = ""
     risk_tier: RiskTier = RiskTier.R2
-    constraints: Dict[str, List[str]] = field(default_factory=lambda: {
+    constraints: dict[str, list[str]] = field(default_factory=lambda: {
         "hard": [],
         "soft": [],
         "forbidden": [],
@@ -49,12 +49,12 @@ class Mission:
         "ethical": [],
         "physical": [],
     })
-    acceptance_criteria: List[str] = field(default_factory=list)
-    proof_obligations: List[ProofObligation] = field(default_factory=list)
-    budget: Dict[str, Any] = field(default_factory=dict)
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    acceptance_criteria: list[str] = field(default_factory=list)
+    proof_obligations: list[ProofObligation] = field(default_factory=list)
+    budget: dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         data = asdict(self)
         data["risk_tier"] = self.risk_tier.value
         data["proof_obligations"] = [p.to_dict() for p in self.proof_obligations]

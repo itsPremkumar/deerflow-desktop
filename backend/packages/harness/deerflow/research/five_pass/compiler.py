@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import time
-from dataclasses import asdict, dataclass, field
+from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List
+from typing import Any
 
 
 class SearchPassType(str, Enum):
@@ -20,9 +20,9 @@ class CompiledSearchLane:
     pass_type: SearchPassType
     query: str
     purpose: str
-    filters: Dict[str, Any] = field(default_factory=dict)
+    filters: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "pass_type": self.pass_type.value,
             "query": self.query,
@@ -35,10 +35,10 @@ class CompiledSearchLane:
 class FivePassSearchPlan:
     """Compiled 5-pass search plan ready for parallel execution."""
     original_question: str
-    lanes: List[CompiledSearchLane] = field(default_factory=list)
+    lanes: list[CompiledSearchLane] = field(default_factory=list)
     created_at: float = field(default_factory=time.time)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "original_question": self.original_question,
             "lanes_count": len(self.lanes),

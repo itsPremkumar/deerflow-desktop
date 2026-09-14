@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-from typing import Dict, List, Optional, Tuple
 
 from deerflow.epistemics.models import Claim, EpistemicStatus
 
@@ -14,7 +13,7 @@ class EpistemicBeliefEngine:
     """Belief engine maintaining calibrated truth claims, Bayesian updating, and falsification tests."""
 
     def __init__(self):
-        self._claims: Dict[str, Claim] = {}
+        self._claims: dict[str, Claim] = {}
 
     def register_claim(
         self,
@@ -37,10 +36,10 @@ class EpistemicBeliefEngine:
         self._claims[claim.claim_id] = claim
         return claim
 
-    def get(self, claim_id: str) -> Optional[Claim]:
+    def get(self, claim_id: str) -> Claim | None:
         return self._claims.get(claim_id)
 
-    def list_all(self) -> List[Claim]:
+    def list_all(self) -> list[Claim]:
         return list(self._claims.values())
 
     def update_with_evidence(
@@ -81,7 +80,7 @@ class EpistemicBeliefEngine:
 
         return claim
 
-    def get_unverified_assumptions(self) -> List[Claim]:
+    def get_unverified_assumptions(self) -> list[Claim]:
         """Return claims marked as ASSUMPTION or HYPOTHESIS lacking empirical validation."""
         return [
             c for c in self._claims.values()

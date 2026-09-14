@@ -7,8 +7,6 @@ from dataclasses import asdict, dataclass, field
 from typing import Any
 from urllib.parse import urlparse
 
-from deerflow.browser.stealth import get_stealth_headers
-
 
 @dataclass
 class BrowserSession:

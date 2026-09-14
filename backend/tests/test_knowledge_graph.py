@@ -1,9 +1,6 @@
-import pytest
 from deerflow.knowledge.graph import (
-    EntityNode,
     EntityType,
     KnowledgeGraph,
-    RelationEdge,
     RelationType,
 )
 

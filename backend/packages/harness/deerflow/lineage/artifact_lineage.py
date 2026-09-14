@@ -14,7 +14,7 @@ import time
 import uuid
 from dataclasses import asdict, dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional, Set
+from typing import Any
 
 
 class ConfidenceClass(str, Enum):
@@ -35,10 +35,10 @@ class ArtifactNode:
     sha256_hash: str = ""
     confidence: ConfidenceClass = ConfidenceClass.UNVERIFIED
     created_at: float = field(default_factory=time.time)
-    location: Optional[str] = None
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    location: str | None = None
+    metadata: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         data = asdict(self)
         data["confidence"] = self.confidence.value
         return data
@@ -52,9 +52,9 @@ class LineageEdge:
     derivation_action: str  # e.g., "extracted_features", "compiled_report", "verified_claims"
     agent_id: str = "orchestrator"
     timestamp: float = field(default_factory=time.time)
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
 
@@ -62,24 +62,24 @@ class ArtifactLineageGraph:
     """Directed Acyclic Graph (DAG) for full causal artifact lineage and provenance tracking."""
 
     def __init__(self):
-        self._artifacts: Dict[str, ArtifactNode] = {}
+        self._artifacts: dict[str, ArtifactNode] = {}
         # Upstream: target_id -> list of incoming edges (sources that produced target)
-        self._incoming: Dict[str, List[LineageEdge]] = {}
+        self._incoming: dict[str, list[LineageEdge]] = {}
         # Downstream: source_id -> list of outgoing edges (targets derived from source)
-        self._outgoing: Dict[str, List[LineageEdge]] = {}
+        self._outgoing: dict[str, list[LineageEdge]] = {}
 
     def register_artifact(
         self,
         name: str,
-        content: Optional[str | bytes] = None,
+        content: str | bytes | None = None,
         task_id: str = "",
         creator: str = "agent",
         mime_type: str = "text/plain",
-        sha256_hash: Optional[str] = None,
+        sha256_hash: str | None = None,
         confidence: ConfidenceClass = ConfidenceClass.UNVERIFIED,
-        location: Optional[str] = None,
-        artifact_id: Optional[str] = None,
-        metadata: Optional[Dict[str, Any]] = None,
+        location: str | None = None,
+        artifact_id: str | None = None,
+        metadata: dict[str, Any] | None = None,
     ) -> ArtifactNode:
         """Register a new artifact in the lineage graph."""
         art_id = artifact_id or str(uuid.uuid4())
@@ -119,7 +119,7 @@ class ArtifactLineageGraph:
         target_id: str,
         derivation_action: str,
         agent_id: str = "orchestrator",
-        metadata: Optional[Dict[str, Any]] = None,
+        metadata: dict[str, Any] | None = None,
     ) -> LineageEdge:
         """Record causal derivation edge: source_id -> target_id."""
         if source_id not in self._artifacts:
@@ -146,7 +146,7 @@ class ArtifactLineageGraph:
 
     def _path_exists(self, source: str, destination: str) -> bool:
         """Helper DFS to check if there is an existing path from source to destination."""
-        visited: Set[str] = set()
+        visited: set[str] = set()
         stack = [source]
         while stack:
             curr = stack.pop()
@@ -158,7 +158,7 @@ class ArtifactLineageGraph:
                     stack.append(edge.target_id)
         return False
 
-    def get_artifact(self, artifact_id: str) -> Optional[ArtifactNode]:
+    def get_artifact(self, artifact_id: str) -> ArtifactNode | None:
         return self._artifacts.get(artifact_id)
 
     def set_confidence(self, artifact_id: str, confidence: ConfidenceClass) -> ArtifactNode:
@@ -168,15 +168,15 @@ class ArtifactLineageGraph:
         node.confidence = confidence
         return node
 
-    def get_upstream_provenance(self, artifact_id: str) -> Dict[str, Any]:
+    def get_upstream_provenance(self, artifact_id: str) -> dict[str, Any]:
         """Recursively trace back all ancestral artifacts and actions that produced artifact_id."""
         target = self.get_artifact(artifact_id)
         if not target:
             raise KeyError(f"Artifact '{artifact_id}' not found.")
 
-        ancestor_edges: List[Dict[str, Any]] = []
-        visited_nodes: Set[str] = set()
-        root_sources: List[Dict[str, Any]] = []
+        ancestor_edges: list[dict[str, Any]] = []
+        visited_nodes: set[str] = set()
+        root_sources: list[dict[str, Any]] = []
 
         def dfs_upstream(curr_id: str):
             visited_nodes.add(curr_id)
@@ -199,15 +199,15 @@ class ArtifactLineageGraph:
             "total_ancestors": len(visited_nodes) - 1,
         }
 
-    def get_downstream_impact(self, artifact_id: str) -> Dict[str, Any]:
+    def get_downstream_impact(self, artifact_id: str) -> dict[str, Any]:
         """Identify all downstream artifacts derived directly or transitively from artifact_id."""
         source = self.get_artifact(artifact_id)
         if not source:
             raise KeyError(f"Artifact '{artifact_id}' not found.")
 
-        downstream_nodes: List[Dict[str, Any]] = []
-        downstream_edges: List[Dict[str, Any]] = []
-        visited: Set[str] = set()
+        downstream_nodes: list[dict[str, Any]] = []
+        downstream_edges: list[dict[str, Any]] = []
+        visited: set[str] = set()
 
         def dfs_downstream(curr_id: str):
             for edge in self._outgoing.get(curr_id, []):
@@ -228,15 +228,15 @@ class ArtifactLineageGraph:
             "impact_count": len(downstream_nodes),
         }
 
-    def verify_provenance_integrity(self, artifact_id: str) -> Dict[str, Any]:
+    def verify_provenance_integrity(self, artifact_id: str) -> dict[str, Any]:
         """Audit the cryptographic and structural chain of custody for an artifact."""
         target = self.get_artifact(artifact_id)
         if not target:
             return {"valid": False, "error": f"Artifact '{artifact_id}' does not exist"}
 
         provenance = self.get_upstream_provenance(artifact_id)
-        missing_nodes: List[str] = []
-        empty_hashes: List[str] = []
+        missing_nodes: list[str] = []
+        empty_hashes: list[str] = []
 
         for step in provenance["derivation_steps"]:
             s_id = step["source_id"]
@@ -268,7 +268,7 @@ class ArtifactLineageGraph:
         lines = [prefix]
 
         for edge in self._incoming.get(artifact_id, []):
-            edge_desc = f"  " * (indent + 1) + f"↳ [{edge.derivation_action} via {edge.agent_id}]"
+            edge_desc = "  " * (indent + 1) + f"↳ [{edge.derivation_action} via {edge.agent_id}]"
             lines.append(edge_desc)
             lines.append(self.render_lineage_ascii(edge.source_id, indent=indent + 2))
 

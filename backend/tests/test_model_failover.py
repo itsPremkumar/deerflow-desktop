@@ -1,4 +1,5 @@
 import pytest
+
 from deerflow.models.failover import (
     ModelEndpointConfig,
     ModelFailoverChain,

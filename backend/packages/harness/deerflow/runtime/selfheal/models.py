@@ -5,7 +5,7 @@ from __future__ import annotations
 import time
 from dataclasses import asdict, dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 
 class FaultType(str, Enum):
@@ -31,7 +31,7 @@ class HealthFault:
     recommended_action: HealingAction
     detected_at: float = field(default_factory=time.time)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         data = asdict(self)
         data["fault_type"] = self.fault_type.value
         data["recommended_action"] = self.recommended_action.value
@@ -41,11 +41,11 @@ class HealthFault:
 @dataclass
 class HealthReport:
     healthy: bool
-    faults: List[HealthFault] = field(default_factory=list)
-    remediations_applied: List[str] = field(default_factory=list)
+    faults: list[HealthFault] = field(default_factory=list)
+    remediations_applied: list[str] = field(default_factory=list)
     scan_duration_ms: float = 0.0
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "healthy": self.healthy,
             "faults": [f.to_dict() for f in self.faults],

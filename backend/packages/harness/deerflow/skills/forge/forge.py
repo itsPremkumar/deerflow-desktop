@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-import re
-from typing import Any, Dict, List, Tuple
+from typing import Any
 
 from .models import Skill, SkillParameter
 
@@ -14,13 +13,13 @@ class SkillForge:
     """
 
     @staticmethod
-    def extract_parameters(trace_steps: List[Dict[str, Any]]) -> Tuple[str, List[SkillParameter]]:
+    def extract_parameters(trace_steps: list[dict[str, Any]]) -> tuple[str, list[SkillParameter]]:
         """
         Scans trace steps, detects concrete strings (file paths, branch names, queries),
         and replaces them with template placeholders.
         """
-        parameters: Dict[str, SkillParameter] = {}
-        template_lines: List[str] = []
+        parameters: dict[str, SkillParameter] = {}
+        template_lines: list[str] = []
 
         for i, step in enumerate(trace_steps):
             tool = step.get("tool", "exec")
@@ -54,8 +53,8 @@ class SkillForge:
         cls,
         name: str,
         description: str,
-        trace_steps: List[Dict[str, Any]],
-        metadata: Dict[str, Any] | None = None,
+        trace_steps: list[dict[str, Any]],
+        metadata: dict[str, Any] | None = None,
     ) -> Skill:
         """Forges a new Skill from a list of successful execution steps."""
         template, params = cls.extract_parameters(trace_steps)

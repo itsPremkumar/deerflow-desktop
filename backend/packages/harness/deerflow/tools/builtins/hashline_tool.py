@@ -8,8 +8,9 @@ Exposes hashline_read and hashline_edit to agents:
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Dict, Optional
+
 from langchain.tools import tool
+
 from deerflow.editing.hashline import (
     HashlineMismatchError,
     apply_hashline_edit,

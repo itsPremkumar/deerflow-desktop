@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import re
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Callable, Literal
+from typing import Literal
 
 from deerflow.safety.guardian.circuit_breaker import get_denial_breaker
 from deerflow.safety.guardian.floors import get_permanent_allowlist

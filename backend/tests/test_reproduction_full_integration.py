@@ -1,8 +1,8 @@
 """End-to-end integration testing: Reproduction Engine, Experience Memory, and Critic Verification."""
 
-import json
 from pathlib import Path
-from deerflow.critic import AgentFinishedCritic, EmptyPatchCritic
+
+from deerflow.critic import AgentFinishedCritic
 from deerflow.learning.experience import ExperienceRecord, ExperienceRetriever, ExperienceStore, OutcomeType
 from deerflow.reproduction import ReproductionEngine, ReproductionStatus
 

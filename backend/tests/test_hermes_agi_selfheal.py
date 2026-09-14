@@ -3,8 +3,8 @@
 import json
 import os
 import time
-from pathlib import Path
-from deerflow.runtime.selfheal.models import FaultType, HealingAction, HealthReport
+
+from deerflow.runtime.selfheal.models import FaultType, HealthReport
 from deerflow.runtime.selfheal.watchdog import SelfHealingWatchdog
 from deerflow.tools.builtins.self_heal_tool import self_heal_diagnose
 

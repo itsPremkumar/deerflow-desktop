@@ -2,9 +2,8 @@
 
 from __future__ import annotations
 
-import json
 from dataclasses import asdict, dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any, Literal
 
 TaskColumn = Literal["backlog", "todo", "in_progress", "in_review", "done", "blocked"]
@@ -12,7 +11,7 @@ TaskPriority = Literal["low", "medium", "high", "critical"]
 
 
 def _now() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 @dataclass

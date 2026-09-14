@@ -5,7 +5,7 @@ import re
 import secrets
 import time
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 logger = logging.getLogger("deerflow.security.astra.credentials")
 
@@ -16,7 +16,7 @@ class CredentialLease:
     lease_id: str
     service_name: str
     token_value: str
-    allowed_scopes: List[str]
+    allowed_scopes: list[str]
     expires_at: float
     created_at: float = field(default_factory=time.time)
     is_revoked: bool = False
@@ -25,7 +25,7 @@ class CredentialLease:
     def is_valid(self) -> bool:
         return not self.is_revoked and time.time() < self.expires_at
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         # Token value is always masked in telemetry and export
         masked = self.token_value[:4] + "..." + self.token_value[-4:] if len(self.token_value) > 8 else "***"
         return {
@@ -46,12 +46,12 @@ class ScopedCredentialVault:
     """
 
     def __init__(self) -> None:
-        self.leases: Dict[str, CredentialLease] = {}
+        self.leases: dict[str, CredentialLease] = {}
 
     def issue_lease(
         self,
         service_name: str,
-        scopes: List[str],
+        scopes: list[str],
         ttl_seconds: int = 300,
     ) -> CredentialLease:
         lease_id = f"lease_{secrets.token_hex(6)}"

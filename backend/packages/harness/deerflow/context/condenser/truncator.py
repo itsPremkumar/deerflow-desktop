@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import copy
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 
 class HeadTailBudgetTruncator:
@@ -19,7 +19,7 @@ class HeadTailBudgetTruncator:
         self.keep_head_turns = keep_head_turns
         self.keep_tail_turns = keep_tail_turns
 
-    def estimate_size(self, messages: List[Dict[str, Any]]) -> int:
+    def estimate_size(self, messages: list[dict[str, Any]]) -> int:
         """Estimate length of message sequence in characters."""
         total = 0
         for m in messages:
@@ -28,7 +28,7 @@ class HeadTailBudgetTruncator:
                 total += len(str(m["tool_calls"]))
         return total
 
-    def truncate(self, messages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    def truncate(self, messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """Truncate middle turns if total size exceeds budget."""
         if not messages:
             return []

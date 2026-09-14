@@ -5,8 +5,9 @@ from __future__ import annotations
 import json
 import logging
 import time
+from collections.abc import Iterator
 from pathlib import Path
-from typing import Any, Dict, Iterator, List, Optional, Tuple, Union
+from typing import Any
 
 from deerflow.events.stream.actions import Action
 from deerflow.events.stream.observations import Observation
@@ -17,11 +18,11 @@ logger = logging.getLogger(__name__)
 class EventStreamLedger:
     """Audit ledger maintaining sequential Action and Observation streams for deterministic replays."""
 
-    def __init__(self, session_id: Optional[str] = None):
+    def __init__(self, session_id: str | None = None):
         self.session_id = session_id or f"session_{int(time.time())}"
-        self._events: List[Union[Action, Observation]] = []
-        self._action_map: Dict[str, Action] = {}
-        self._observation_map: Dict[str, List[Observation]] = {}
+        self._events: list[Action | Observation] = []
+        self._action_map: dict[str, Action] = {}
+        self._observation_map: dict[str, list[Observation]] = {}
 
     def append_action(self, action: Action) -> None:
         self._events.append(action)
@@ -34,24 +35,24 @@ class EventStreamLedger:
         if observation.action_id and observation.action_id in self._observation_map:
             self._observation_map[observation.action_id].append(observation)
 
-    def get_events(self) -> List[Union[Action, Observation]]:
+    def get_events(self) -> list[Action | Observation]:
         return list(self._events)
 
-    def get_action(self, action_id: str) -> Optional[Action]:
+    def get_action(self, action_id: str) -> Action | None:
         return self._action_map.get(action_id)
 
-    def get_observations_for_action(self, action_id: str) -> List[Observation]:
+    def get_observations_for_action(self, action_id: str) -> list[Observation]:
         return self._observation_map.get(action_id, [])
 
-    def get_trajectory(self) -> List[Tuple[Action, List[Observation]]]:
+    def get_trajectory(self) -> list[tuple[Action, list[Observation]]]:
         """Return chronological pairs of (Action, [Observations])."""
-        trajectory: List[Tuple[Action, List[Observation]]] = []
+        trajectory: list[tuple[Action, list[Observation]]] = []
         for action in self._action_map.values():
             obs_list = self._observation_map.get(action.action_id, [])
             trajectory.append((action, obs_list))
         return trajectory
 
-    def replay_session(self) -> Iterator[Dict[str, Any]]:
+    def replay_session(self) -> Iterator[dict[str, Any]]:
         """Yield structured chronological replay steps with duration, type, and payload."""
         start_time = self._events[0].timestamp if self._events else 0.0
 
@@ -66,7 +67,7 @@ class EventStreamLedger:
                 "payload": event.to_dict(),
             }
 
-    def export_jsonl(self, filepath: Union[str, Path]) -> None:
+    def export_jsonl(self, filepath: str | Path) -> None:
         """Export ledger events to JSONL file."""
         fp = Path(filepath)
         fp.parent.mkdir(parents=True, exist_ok=True)
@@ -79,7 +80,7 @@ class EventStreamLedger:
                 }
                 f.write(json.dumps(record) + "\n")
 
-    def summary_stats(self) -> Dict[str, Any]:
+    def summary_stats(self) -> dict[str, Any]:
         """Calculate statistics of actions, observations, errors, and critics."""
         actions_count = sum(1 for e in self._events if isinstance(e, Action))
         obs_count = sum(1 for e in self._events if isinstance(e, Observation))

@@ -1,9 +1,8 @@
-import pytest
 from deerflow.harness.continuous.loop_detector import (
     ToolLoopDetector,
-    LoopIntervention,
     hash_tool_call,
 )
+
 
 def test_hash_tool_call_ignores_volatile():
     h1 = hash_tool_call("bash", {"command": "ls", "timestamp": 12345}, {"output": "files", "elapsed_ms": 50})

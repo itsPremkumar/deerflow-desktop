@@ -1,6 +1,7 @@
 """Tests for Consequence Simulator and Affordance Modeler."""
 
 import json
+
 from deerflow.consequence.affordance import AffordanceModel, EnvironmentAffordances
 from deerflow.consequence.simulator import ConsequenceSimulator, SimulationReport
 from deerflow.tools.builtins.consequence_tool import simulate_consequences

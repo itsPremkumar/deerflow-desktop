@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from typing import List, Optional
+
 from langchain.tools import tool
 
 from deerflow.agent.oracle.service import OracleService
@@ -12,7 +12,7 @@ from deerflow.agent.oracle.service import OracleService
 @tool("ask_oracle", parse_docstring=True)
 def ask_oracle(
     query: str,
-    technical_domain: Optional[str] = None,
+    technical_domain: str | None = None,
 ) -> str:
     """Consult the isolated Oracle advisor on technical standards, API contracts, or architecture best practices.
 

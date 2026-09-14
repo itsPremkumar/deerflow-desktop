@@ -1,7 +1,7 @@
 import pytest
+
 from deerflow.lineage.artifact_lineage import (
     ArtifactLineageGraph,
-    ArtifactNode,
     ConfidenceClass,
 )
 

@@ -4,13 +4,11 @@ from __future__ import annotations
 
 import re
 import shlex
-from typing import List, Optional, Tuple
 
 from deerflow.security.shell_ast.ast_nodes import (
     ASTNode,
     CommandNode,
     CompoundNode,
-    NodeType,
     PipelineNode,
     RedirectionNode,
     SubshellNode,
@@ -44,8 +42,8 @@ class ShellASTParser:
         return self._parse_simple_command(cleaned)
 
     def _split_top_level_operator(
-        self, text: str, operators: List[str]
-    ) -> Optional[Tuple[str, str, str]]:
+        self, text: str, operators: list[str]
+    ) -> tuple[str, str, str] | None:
         """Split string by operators (&&, ||, ;) if they occur at the top level (outside quotes and subshells)."""
         in_single = False
         in_double = False
@@ -77,9 +75,9 @@ class ShellASTParser:
             i += 1
         return None
 
-    def _split_top_level_pipes(self, text: str) -> List[str]:
+    def _split_top_level_pipes(self, text: str) -> list[str]:
         """Split text by '|' (outside quotes, subshells, and not part of '||')."""
-        stages: List[str] = []
+        stages: list[str] = []
         last_idx = 0
         in_single = False
         in_double = False
@@ -116,10 +114,10 @@ class ShellASTParser:
         tokens = self._tokenize(cmd_str)
 
         command_name = ""
-        args: List[str] = []
+        args: list[str] = []
         env_vars = {}
-        redirections: List[RedirectionNode] = []
-        subshells: List[ASTNode] = []
+        redirections: list[RedirectionNode] = []
+        subshells: list[ASTNode] = []
 
         # Find any embedded subshells $(...) or `...`
         for sub_content in self._extract_subshell_contents(cmd_str):
@@ -157,7 +155,7 @@ class ShellASTParser:
             subshells=subshells,
         )
 
-    def _tokenize(self, s: str) -> List[str]:
+    def _tokenize(self, s: str) -> list[str]:
         """Safe lexical tokenization."""
         try:
             return shlex.split(s, posix=True)
@@ -165,7 +163,7 @@ class ShellASTParser:
             # Fallback simple whitespace split for unclosed quotes
             return s.split()
 
-    def _extract_subshell_contents(self, text: str) -> List[str]:
+    def _extract_subshell_contents(self, text: str) -> list[str]:
         """Extract expressions inside $(...) or `...`."""
         subshells = []
         # Match $(...)

@@ -5,7 +5,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 
 class CriticVerdict(str, Enum):
@@ -20,9 +20,9 @@ class CriticResult:
     """Outcome of a Critic check."""
     verdict: CriticVerdict
     reason: str
-    diagnostic_prompt: Optional[str] = None
+    diagnostic_prompt: str | None = None
     critic_name: str = "BaseCritic"
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     @property
     def is_approved(self) -> bool:
@@ -32,7 +32,7 @@ class CriticResult:
     def is_rejected(self) -> bool:
         return self.verdict == CriticVerdict.REJECTED
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "verdict": self.verdict.value,
             "reason": self.reason,
@@ -51,8 +51,8 @@ class BaseCritic(ABC):
     def evaluate(
         self,
         task_description: str,
-        execution_history: Optional[List[Dict[str, Any]]] = None,
-        workspace_dir: Optional[str] = None,
+        execution_history: list[dict[str, Any]] | None = None,
+        workspace_dir: str | None = None,
         **kwargs: Any,
     ) -> CriticResult:
         """Evaluate task completion state and return a CriticResult."""

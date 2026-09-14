@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from typing import Any, Dict, Tuple
-
 
 class MotivationArbiter:
     """
@@ -24,7 +22,7 @@ class MotivationArbiter:
         curiosity_score: float,
         competence_score: float,
         user_priority: float = 1.0,
-    ) -> Tuple[str, float]:
+    ) -> tuple[str, float]:
         """
         Calculates drive intensity and selects dominant operational mode:
           - EXPLORE: high curiosity, novel environment

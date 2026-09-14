@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 
 class ReproductionStatus(str, Enum):
@@ -22,7 +22,7 @@ class ReproductionScript:
     """Reproduction script definition."""
     code: str
     script_name: str = "reproduce_issue.py"
-    target_module: Optional[str] = None
+    target_module: str | None = None
     description: str = ""
 
 
@@ -35,19 +35,19 @@ class GateResult:
     stderr: str
     message: str
     duration_seconds: float = 0.0
-    details: Dict[str, Any] = field(default_factory=dict)
+    details: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
 class ReproductionReport:
     """Comprehensive report summarizing all reproduction gates and verification."""
     status: ReproductionStatus
-    pre_fix_result: Optional[GateResult] = None
-    post_fix_result: Optional[GateResult] = None
-    regression_result: Optional[GateResult] = None
-    reproduction_script_path: Optional[str] = None
+    pre_fix_result: GateResult | None = None
+    post_fix_result: GateResult | None = None
+    regression_result: GateResult | None = None
+    reproduction_script_path: str | None = None
     diagnostics: str = ""
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     @property
     def is_verified(self) -> bool:

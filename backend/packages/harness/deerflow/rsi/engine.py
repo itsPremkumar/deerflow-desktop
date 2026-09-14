@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from deerflow.rsi.models import (
     ABTestResult,
@@ -22,7 +22,7 @@ class RSIEngine:
 
     def __init__(self):
         self.stage = RSIStage.IDLE
-        self.active_configurations: Dict[str, Dict[str, Any]] = {
+        self.active_configurations: dict[str, dict[str, Any]] = {
             "compaction": {"max_budget_chars": 100_000, "keep_last_observations": 4},
             "tool_router": {"retry_limit": 3, "timeout_seconds": 30},
             "context_pruner": {"strip_threshold": 500},

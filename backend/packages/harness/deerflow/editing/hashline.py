@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import re
 import zlib
-from typing import NamedTuple, Tuple
+from typing import NamedTuple
 
 # Base-36 dictionary for short line hashes
 HASHLINE_DICT = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"

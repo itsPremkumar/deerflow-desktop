@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import json
-from typing import Any, Dict, Optional
+from typing import Any
+
 from langchain.tools import tool
 
 from deerflow.consequence.simulator import ConsequenceSimulator
@@ -12,9 +13,9 @@ from deerflow.consequence.simulator import ConsequenceSimulator
 @tool("simulate_consequences", parse_docstring=True)
 def simulate_consequences(
     action_name: str,
-    target_file: Optional[str] = None,
-    command: Optional[str] = None,
-    workspace_path: Optional[str] = None,
+    target_file: str | None = None,
+    command: str | None = None,
+    workspace_path: str | None = None,
 ) -> str:
     """Simulate potential environmental side-effects, blast radius, and cascading failures before execution.
 
@@ -27,7 +28,7 @@ def simulate_consequences(
         command: Shell command line if action is running a command.
         workspace_path: Root path of the current workspace (optional).
     """
-    params: Dict[str, Any] = {}
+    params: dict[str, Any] = {}
     if target_file:
         params["TargetFile"] = target_file
     if command:

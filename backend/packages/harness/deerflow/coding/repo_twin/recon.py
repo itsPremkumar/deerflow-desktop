@@ -2,19 +2,19 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any
 
 
 @dataclass
 class ReconReport:
     root_dir: str
-    build_systems: List[str] = field(default_factory=list)
-    test_frameworks: List[str] = field(default_factory=list)
-    ci_cd_systems: List[str] = field(default_factory=list)
-    languages: List[str] = field(default_factory=list)
+    build_systems: list[str] = field(default_factory=list)
+    test_frameworks: list[str] = field(default_factory=list)
+    ci_cd_systems: list[str] = field(default_factory=list)
+    languages: list[str] = field(default_factory=list)
     total_files_scanned: int = 0
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "root_dir": self.root_dir,
             "build_systems": self.build_systems,

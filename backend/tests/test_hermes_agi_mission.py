@@ -1,8 +1,9 @@
 """Tests for Mission Compiler and Risk Governance (R0-R6)."""
 
 import json
+
 from deerflow.mission.compiler import MissionCompiler
-from deerflow.mission.models import Mission, ProofObligation, RiskTier
+from deerflow.mission.models import Mission, RiskTier
 from deerflow.tools.builtins.compile_mission_tool import compile_mission
 
 

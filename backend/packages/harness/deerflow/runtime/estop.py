@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import json
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -33,11 +33,11 @@ class EmergencyStopManager:
         except OSError:
             return True
 
-    def engage(self, reason: Optional[str] = None) -> Path:
+    def engage(self, reason: str | None = None) -> Path:
         """Engage the emergency stop, writing the ESTOP sentinel."""
         self.home_dir.mkdir(parents=True, exist_ok=True)
         payload = {
-            "engaged_at": datetime.now(timezone.utc).isoformat(),
+            "engaged_at": datetime.now(UTC).isoformat(),
             "reason": reason or "Emergency stop triggered by operator or safety policy.",
         }
         try:

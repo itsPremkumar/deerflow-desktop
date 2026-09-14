@@ -3,13 +3,11 @@
 from __future__ import annotations
 
 import json
+
 from langchain.tools import tool
 
 from deerflow.blackboard import (
-    ALL_20_PLANES,
     BlackboardEngine,
-    CognitivePhase,
-    GoalClassification,
 )
 
 # Global blackboard instance for active session working memory

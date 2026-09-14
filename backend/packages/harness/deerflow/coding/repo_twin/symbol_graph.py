@@ -4,7 +4,7 @@ import ast
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Set
+from typing import Any
 
 
 class SymbolType(str, Enum):
@@ -28,9 +28,9 @@ class SymbolNode:
     file_path: str
     line_number: int
     docstring: str = ""
-    parameters: List[str] = field(default_factory=list)
+    parameters: list[str] = field(default_factory=list)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "name": self.name,
             "symbol_type": self.symbol_type.value,
@@ -45,10 +45,10 @@ class SymbolGraph:
     """AST-based symbol and dependency graph for a codebase."""
 
     def __init__(self) -> None:
-        self.symbols: Dict[str, SymbolNode] = {}  # key: file_path:name
-        self.file_symbols: Dict[str, List[str]] = {}  # file_path -> [symbol_keys]
-        self.call_edges: Dict[str, Set[str]] = {}  # caller_key -> set of callee_keys
-        self.import_edges: Dict[str, Set[str]] = {}  # file_path -> set of imported module names
+        self.symbols: dict[str, SymbolNode] = {}  # key: file_path:name
+        self.file_symbols: dict[str, list[str]] = {}  # file_path -> [symbol_keys]
+        self.call_edges: dict[str, set[str]] = {}  # caller_key -> set of callee_keys
+        self.import_edges: dict[str, set[str]] = {}  # file_path -> set of imported module names
 
     def parse_code(self, file_path: str, code: str) -> None:
         """Parses Python source code into the symbol graph using ast."""
@@ -104,10 +104,10 @@ class SymbolGraph:
             except Exception:
                 pass
 
-    def get_symbols_in_file(self, file_path: str) -> List[SymbolNode]:
+    def get_symbols_in_file(self, file_path: str) -> list[SymbolNode]:
         norm_path = str(Path(file_path))
         keys = self.file_symbols.get(norm_path, [])
         return [self.symbols[k] for k in keys if k in self.symbols]
 
-    def find_symbol_by_name(self, name: str) -> List[SymbolNode]:
+    def find_symbol_by_name(self, name: str) -> list[SymbolNode]:
         return [sym for sym in self.symbols.values() if sym.name == name]

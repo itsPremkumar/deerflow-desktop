@@ -3,7 +3,7 @@ from __future__ import annotations
 import time
 import uuid
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from .scoring import EvaluationVector
 
@@ -15,20 +15,20 @@ class VersionRecord:
     Represents either a committed candidate x_i in P_t or an intermediate trajectory attempt.
     """
     version_id: str = field(default_factory=lambda: f"v_{uuid.uuid4().hex[:8]}")
-    parent_id: Optional[str] = None
+    parent_id: str | None = None
     hypothesis: str = ""
     modification: str = ""
     correctness: bool = False
     performance_score: float = 0.0  # Scalar compatibility
     quality_score: float = 0.0      # Scalar compatibility
     composite_score: float = 0.0    # Scalar weighted score or geomean
-    vector: Optional[EvaluationVector] = None
-    git_hash: Optional[str] = None
+    vector: EvaluationVector | None = None
+    git_hash: str | None = None
     diff_summary: str = ""
     trajectory_depth: int = 0
-    rejection_reason: Optional[str] = None
+    rejection_reason: str | None = None
     created_at: float = field(default_factory=time.time)
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         if self.vector is None and (self.performance_score > 0 or self.quality_score > 0 or self.correctness):
@@ -70,7 +70,7 @@ class VersionRecord:
         self.composite_score = round(score, 4)
         return self.composite_score
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "version_id": self.version_id,
             "parent_id": self.parent_id,
@@ -98,9 +98,9 @@ class AVOLineage:
     """
 
     def __init__(self) -> None:
-        self.versions: Dict[str, VersionRecord] = {}
-        self.rejected_attempts: List[VersionRecord] = []
-        self.head_id: Optional[str] = None
+        self.versions: dict[str, VersionRecord] = {}
+        self.rejected_attempts: list[VersionRecord] = []
+        self.head_id: str | None = None
 
     def commit_candidate(self, candidate: VersionRecord) -> bool:
         """
@@ -153,29 +153,29 @@ class AVOLineage:
 
         return True
 
-    def get_version(self, version_id: str) -> Optional[VersionRecord]:
+    def get_version(self, version_id: str) -> VersionRecord | None:
         return self.versions.get(version_id)
 
-    def get_head(self) -> Optional[VersionRecord]:
+    def get_head(self) -> VersionRecord | None:
         if not self.head_id:
             return None
         return self.versions.get(self.head_id)
 
-    def get_history(self) -> List[VersionRecord]:
+    def get_history(self) -> list[VersionRecord]:
         return sorted(self.versions.values(), key=lambda v: v.created_at)
 
-    def get_trajectory_archive(self) -> List[VersionRecord]:
+    def get_trajectory_archive(self) -> list[VersionRecord]:
         """Returns internal search trajectory including unsuccessful intermediate attempts."""
         all_attempts = list(self.versions.values()) + self.rejected_attempts
         return sorted(all_attempts, key=lambda v: v.created_at)
 
-    def get_pareto_frontier(self) -> List[VersionRecord]:
+    def get_pareto_frontier(self) -> list[VersionRecord]:
         """Returns the non-dominated Pareto frontier of all committed versions."""
         committed = [v for v in self.versions.values() if v.vector is not None]
         if not committed:
             return [v for v in self.versions.values() if v.correctness]
 
-        frontier: List[VersionRecord] = []
+        frontier: list[VersionRecord] = []
         for cand in committed:
             assert cand.vector is not None
             is_dominated = False
@@ -188,7 +188,7 @@ class AVOLineage:
                 frontier.append(cand)
         return frontier
 
-    def stats(self) -> Dict[str, Any]:
+    def stats(self) -> dict[str, Any]:
         head = self.get_head()
         return {
             "total_committed": len(self.versions),

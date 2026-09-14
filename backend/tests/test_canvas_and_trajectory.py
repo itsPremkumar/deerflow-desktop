@@ -1,8 +1,6 @@
 """Unit tests for Canvas Manager and SQLite Trajectory Store."""
 
-import json
 from pathlib import Path
-import pytest
 
 from deerflow.canvas.manager import CanvasManager
 from deerflow.trajectory.store import TrajectoryStore
@@ -74,7 +72,7 @@ def test_trajectory_store_sqlite(tmp_path: Path):
     path = store.export_jsonl("g_alpha", export_file)
     assert Path(path).exists()
 
-    with open(path, "r", encoding="utf-8") as f:
+    with open(path, encoding="utf-8") as f:
         lines = f.readlines()
     assert len(lines) == 2
     assert "Inspecting repository files" in lines[0]

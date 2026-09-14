@@ -1,9 +1,8 @@
 """End-to-end integration test exercising all OpenHands advanced subsystems together."""
 
-import json
 from deerflow.agent.oracle import OracleService
 from deerflow.context.condenser import PipelineCondenser
-from deerflow.critic import AgentFinishedCritic, CriticPipeline, EmptyPatchCritic, RubricCriterion, RubricEvaluator
+from deerflow.critic import AgentFinishedCritic, CriticPipeline, EmptyPatchCritic
 from deerflow.events.stream import (
     CmdOutputObservation,
     CmdRunAction,

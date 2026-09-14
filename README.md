@@ -121,6 +121,26 @@ minutes) or edit `config.yaml` directly — see `config.example.yaml` for every
 provider (OpenAI, Anthropic, Gemini, DeepSeek, GLM, Kimi, MiniMax, Ollama,
 vLLM, OpenRouter, Codex/Claude CLI logins) plus `make doctor` to verify.
 
+Unattended (Docker/CI/automation) setup needs no TTY — everything resolves
+from the environment, including a generated `BETTER_AUTH_SECRET`:
+
+```bash
+DEER_FLOW_SETUP_PROVIDER=deepseek DEER_FLOW_SETUP_API_KEY=$DEEPSEEK_API_KEY \
+  make setup SETUP_ARGS=--non-interactive
+# Omit the provider to auto-detect from exported API keys (or local Ollama).
+# See scripts/wizard/noninteractive.py for all DEER_FLOW_SETUP_* variables.
+```
+
+Once a model is configured, work is hands-off: send one prompt and the agent
+loop runs tools to completion, delegating to subagents in parallel and
+continuing toward `/goal` conditions without re-prompting. If a run is
+interrupted (restart, timeout, cancel), continue it from its checkpoint with
+**Resume** on the **Overview** page (`/workspace/overview`) instead of
+replaying the turn. For team work, open the **Team** page
+(`/workspace/team`), type one objective, and **Run team** — every bot works
+its slice in parallel and the moderator merges a final deliverable
+(`POST /api/groups/{name}/runs`).
+
 ## Configuration essentials
 
 | File | Purpose | Committed? |
@@ -157,6 +177,7 @@ deerflow-desktop/
 ├── scripts/             # setup, doctor, prod_check, deploy, support-bundle
 ├── docs/                # guides incl. PRODUCTION.md runbook
 ├── config.example.yaml  # full config template
+├── PROJECT_GOAL.md      # product vision + verified capability status
 └── Makefile             # make setup | dev | up | prod-check | ...
 ```
 

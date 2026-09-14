@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import logging
 from dataclasses import asdict, dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any
 
-from deerflow.consequence.affordance import AffordanceModel, EnvironmentAffordances
+from deerflow.consequence.affordance import AffordanceModel
 
 logger = logging.getLogger(__name__)
 
@@ -16,30 +16,30 @@ class SimulationReport:
     action_description: str
     safe_to_proceed: bool
     blast_radius: str  # "NONE", "LOCAL_FILE", "PACKAGE_DEPENDENCY", "SYSTEM_WIDE"
-    projected_state_changes: List[str] = field(default_factory=list)
-    warnings: List[str] = field(default_factory=list)
-    remediation_suggestions: List[str] = field(default_factory=list)
+    projected_state_changes: list[str] = field(default_factory=list)
+    warnings: list[str] = field(default_factory=list)
+    remediation_suggestions: list[str] = field(default_factory=list)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
 
 class ConsequenceSimulator:
     """Predicts operational side-effects, blast radius, and potential cascading failures."""
 
-    def __init__(self, affordance_model: Optional[AffordanceModel] = None):
+    def __init__(self, affordance_model: AffordanceModel | None = None):
         self.affordance_model = affordance_model or AffordanceModel()
 
     def simulate(
         self,
         action_name: str,
-        parameters: Dict[str, Any],
-        workspace_path: Optional[str] = None,
+        parameters: dict[str, Any],
+        workspace_path: str | None = None,
     ) -> SimulationReport:
         affordances = self.affordance_model.probe(workspace_path)
-        warnings: List[str] = []
-        projected_changes: List[str] = []
-        remediations: List[str] = []
+        warnings: list[str] = []
+        projected_changes: list[str] = []
+        remediations: list[str] = []
         blast_radius = "LOCAL_FILE"
         safe = True
 

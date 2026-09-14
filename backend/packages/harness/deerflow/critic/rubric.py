@@ -5,9 +5,10 @@ from __future__ import annotations
 import logging
 import os
 import subprocess
-from dataclasses import dataclass, field
+from collections.abc import Callable
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any
 
 from deerflow.critic.base import BaseCritic, CriticResult, CriticVerdict
 
@@ -20,9 +21,9 @@ class RubricCriterion:
     name: str
     description: str
     required: bool = True
-    test_command: Optional[str] = None
-    required_file: Optional[str] = None
-    custom_checker: Optional[Callable[[Dict[str, Any]], bool]] = None
+    test_command: str | None = None
+    required_file: str | None = None
+    custom_checker: Callable[[dict[str, Any]], bool] | None = None
 
 
 class RubricEvaluator(BaseCritic):
@@ -30,8 +31,8 @@ class RubricEvaluator(BaseCritic):
 
     name: str = "rubric_evaluator"
 
-    def __init__(self, criteria: Optional[List[RubricCriterion]] = None):
-        self.criteria: List[RubricCriterion] = criteria or []
+    def __init__(self, criteria: list[RubricCriterion] | None = None):
+        self.criteria: list[RubricCriterion] = criteria or []
 
     def add_criterion(self, criterion: RubricCriterion) -> None:
         self.criteria.append(criterion)
@@ -39,8 +40,8 @@ class RubricEvaluator(BaseCritic):
     def evaluate(
         self,
         task_description: str,
-        execution_history: Optional[List[Dict[str, Any]]] = None,
-        workspace_dir: Optional[str] = None,
+        execution_history: list[dict[str, Any]] | None = None,
+        workspace_dir: str | None = None,
         **kwargs: Any,
     ) -> CriticResult:
         if not self.criteria:
@@ -51,9 +52,9 @@ class RubricEvaluator(BaseCritic):
             )
 
         target_dir = workspace_dir or os.getcwd()
-        passed_criteria: List[str] = []
-        failed_criteria: List[str] = []
-        details: Dict[str, Any] = {}
+        passed_criteria: list[str] = []
+        failed_criteria: list[str] = []
+        details: dict[str, Any] = {}
 
         for criterion in self.criteria:
             crit_name = criterion.name

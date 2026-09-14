@@ -12,9 +12,9 @@ from __future__ import annotations
 
 import re
 import time
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass
 from enum import Enum
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 
 class ActionSafetyTier(str, Enum):
@@ -28,9 +28,9 @@ class CommandRiskClassification:
     command: str
     tier: ActionSafetyTier
     reason: str
-    matched_pattern: Optional[str] = None
+    matched_pattern: str | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         data = asdict(self)
         data["tier"] = self.tier.value
         return data
@@ -40,7 +40,7 @@ class BlastRadiusPolicy:
     """Classifies commands and file actions against security blast-radius enclaves."""
 
     # Patterns that are fundamentally forbidden (cannot be overridden by autonomous agents)
-    FORBIDDEN_PATTERNS: List[Tuple[str, str]] = [
+    FORBIDDEN_PATTERNS: list[tuple[str, str]] = [
         (r"(?i)rm\s+-(?:rf|fr)\s+[/~]", "Root or home recursive deletion"),
         (r"(?i)mkfs(?:\.\w+)?\s+", "Filesystem formatting"),
         (r"(?i)dd\s+if=.*of=/dev/", "Raw disk device overwriting"),
@@ -53,7 +53,7 @@ class BlastRadiusPolicy:
     ]
 
     # Patterns that require explicit human or supervisor sign-off
-    SENSITIVE_PATTERNS: List[Tuple[str, str]] = [
+    SENSITIVE_PATTERNS: list[tuple[str, str]] = [
         (r"(?i)git\s+push\s+.*--force", "Force pushing to git remote"),
         (r"(?i)git\s+reset\s+--hard", "Hard git reset losing uncommitted work"),
         (r"(?i)drop\s+table", "Database table destruction"),
@@ -102,14 +102,14 @@ class ComputerWorker:
 
     def __init__(self, sandbox_name: str = "default_sandbox"):
         self.sandbox_name: str = sandbox_name
-        self._audit_log: List[Dict[str, Any]] = []
+        self._audit_log: list[dict[str, Any]] = []
 
     def execute(
         self,
         command: str,
         approval_granted: bool = False,
         dry_run: bool = False,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Classify and evaluate command execution through safety gates."""
         classification = BlastRadiusPolicy.classify(command)
         t_now = time.time()
@@ -165,5 +165,5 @@ class ComputerWorker:
             "exit_code": 0,
         }
 
-    def get_audit_log(self) -> List[Dict[str, Any]]:
+    def get_audit_log(self) -> list[dict[str, Any]]:
         return list(self._audit_log)

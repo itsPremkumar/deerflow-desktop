@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from typing import Literal
+
 from langchain.tools import tool
 
 from deerflow.harness.continuous.runner import get_goal_runner

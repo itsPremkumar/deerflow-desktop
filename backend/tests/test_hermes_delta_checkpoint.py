@@ -1,9 +1,7 @@
-import pytest
 
 from deerflow.runtime.checkpoint import (
     CheckpointEngine,
     CheckpointStrategy,
-    WorkflowCheckpoint,
 )
 
 

@@ -1,6 +1,5 @@
 """Unit tests for Ethical and Safety Guardrails."""
 
-import pytest
 from deerflow.safety.guard import SafetyGuard
 
 

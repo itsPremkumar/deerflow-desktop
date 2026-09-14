@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from .contradiction import ContradictionDetector
 from .models import ClaimItem, EvidenceEntry, VerificationProof
@@ -20,13 +20,13 @@ class EvidenceMatrix:
     """
 
     def __init__(self) -> None:
-        self.entries: Dict[str, EvidenceEntry] = {}
+        self.entries: dict[str, EvidenceEntry] = {}
         self.detector = ContradictionDetector()
 
     def record_claim(
         self,
         statement: str,
-        target_path: Optional[str] = None,
+        target_path: str | None = None,
         claimed_success: bool = True,
     ) -> ClaimItem:
         claim = ClaimItem(
@@ -41,7 +41,7 @@ class EvidenceMatrix:
         self,
         claim_id: str,
         proof: VerificationProof,
-    ) -> Optional[EvidenceEntry]:
+    ) -> EvidenceEntry | None:
         entry = self.entries.get(claim_id)
         if not entry:
             return None
@@ -59,7 +59,7 @@ class EvidenceMatrix:
 
         return entry
 
-    def summary(self) -> Dict[str, Any]:
+    def summary(self) -> dict[str, Any]:
         total = len(self.entries)
         certified = sum(1 for e in self.entries.values() if e.certified)
         unverified = sum(1 for e in self.entries.values() if e.proof is None)

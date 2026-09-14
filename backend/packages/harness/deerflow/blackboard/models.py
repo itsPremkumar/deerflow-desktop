@@ -4,7 +4,7 @@ import time
 import uuid
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 
 class PlaneStatus(str, Enum):
@@ -35,17 +35,17 @@ class PlaneState:
     """State tracking for an individual cognitive plane."""
     plane_id: str
     status: PlaneStatus = PlaneStatus.IDLE
-    output: Dict[str, Any] = field(default_factory=dict)
-    error: Optional[str] = None
-    started_at: Optional[float] = None
-    completed_at: Optional[float] = None
+    output: dict[str, Any] = field(default_factory=dict)
+    error: str | None = None
+    started_at: float | None = None
+    completed_at: float | None = None
 
     def mark_running(self) -> None:
         self.status = PlaneStatus.RUNNING
         self.started_at = time.time()
         self.error = None
 
-    def mark_completed(self, output: Optional[Dict[str, Any]] = None) -> None:
+    def mark_completed(self, output: dict[str, Any] | None = None) -> None:
         self.status = PlaneStatus.COMPLETED
         self.completed_at = time.time()
         if output is not None:
@@ -56,13 +56,13 @@ class PlaneState:
         self.completed_at = time.time()
         self.error = error
 
-    def mark_skipped(self, reason: Optional[str] = None) -> None:
+    def mark_skipped(self, reason: str | None = None) -> None:
         self.status = PlaneStatus.SKIPPED
         self.completed_at = time.time()
         if reason:
             self.output = {"skipped_reason": reason}
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "plane_id": self.plane_id,
             "status": self.status.value,
@@ -79,11 +79,11 @@ class EvidenceItem:
     evidence_id: str = field(default_factory=lambda: f"evi_{uuid.uuid4().hex[:10]}")
     plane_id: str = ""
     evidence_type: str = ""
-    content: Dict[str, Any] = field(default_factory=dict)
+    content: dict[str, Any] = field(default_factory=dict)
     confidence: float = 1.0  # 0.0 to 1.0
     timestamp: float = field(default_factory=time.time)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "evidence_id": self.evidence_id,
             "plane_id": self.plane_id,
@@ -101,13 +101,13 @@ class BlackboardSnapshot:
     goal: str
     goal_classification: str
     current_phase: str
-    plane_states: Dict[str, Dict[str, Any]]
-    shared_context: Dict[str, Any]
-    evidence_trail: List[Dict[str, Any]]
+    plane_states: dict[str, dict[str, Any]]
+    shared_context: dict[str, Any]
+    evidence_trail: list[dict[str, Any]]
     created_at: float
     updated_at: float
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "session_id": self.session_id,
             "goal": self.goal,

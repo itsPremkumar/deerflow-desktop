@@ -4,7 +4,7 @@ import hashlib
 import json
 import time
 from dataclasses import asdict, dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 
 @dataclass
@@ -13,13 +13,13 @@ class SkillParameter:
     name: str
     description: str = ""
     required: bool = True
-    default: Optional[Any] = None
+    default: Any | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
     @classmethod
-    def from_dict(cls, d: Dict[str, Any]) -> SkillParameter:
+    def from_dict(cls, d: dict[str, Any]) -> SkillParameter:
         return cls(**d)
 
 
@@ -39,12 +39,12 @@ class Skill:
     name: str
     description: str
     template: str  # text instructions containing {placeholders}
-    parameters: List[SkillParameter] = field(default_factory=list)
+    parameters: list[SkillParameter] = field(default_factory=list)
     version: int = 1
     test_pass_rate: float = 0.0
     test_count: int = 0
     created_at: float = field(default_factory=time.time)
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     def instantiate(self, **kwargs: Any) -> str:
         """Render instructions with provided parameters."""
@@ -92,7 +92,7 @@ class Skill:
         lines.append(self.template)
         return "\n".join(lines)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "name": self.name,
             "description": self.description,

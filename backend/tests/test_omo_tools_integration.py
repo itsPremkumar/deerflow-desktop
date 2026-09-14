@@ -2,17 +2,15 @@
 
 import json
 from pathlib import Path
-from deerflow.tools.tools import BUILTIN_TOOLS
+
 from deerflow.tools.builtins import (
-    ast_grep_rewrite,
-    ast_grep_search,
     boulder_checkpoint_manage,
     hashline_edit,
     hashline_read,
     hyperplan_review_manage,
-    kibitzer_nudge_manage,
     workflow_dag_manage,
 )
+from deerflow.tools.tools import BUILTIN_TOOLS
 
 
 def test_omo_tools_registered_in_builtin_tools():

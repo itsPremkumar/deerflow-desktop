@@ -1,8 +1,9 @@
 """Tests for Epistemic Belief Engine and Bayesian Calibration."""
 
 import json
+
 from deerflow.epistemics.engine import EpistemicBeliefEngine
-from deerflow.epistemics.models import Claim, EpistemicStatus
+from deerflow.epistemics.models import EpistemicStatus
 from deerflow.tools.builtins.epistemic_belief_tool import evaluate_epistemic_claim
 
 

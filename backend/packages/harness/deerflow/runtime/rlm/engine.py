@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from .context_data import ContextHandle, ContextStore
 from .transform import ContextTransformer
@@ -16,7 +16,7 @@ class RLMEngine:
     allowing lazy retrieval, grep filtering, slicing, and chunked processing.
     """
 
-    def __init__(self, store: Optional[ContextStore] = None) -> None:
+    def __init__(self, store: ContextStore | None = None) -> None:
         self.store = store or ContextStore()
         self.transformer = ContextTransformer(self.store)
 
@@ -24,7 +24,7 @@ class RLMEngine:
         self,
         content: str,
         label: str = "",
-        metadata: Optional[Dict[str, Any]] = None,
+        metadata: dict[str, Any] | None = None,
     ) -> ContextHandle:
         """Loads large content into context storage and returns an addressable handle."""
         return self.store.register(content=content, label=label, metadata=metadata)
@@ -35,7 +35,7 @@ class RLMEngine:
         query: str,
         case_sensitive: bool = False,
         context_lines: int = 0,
-    ) -> Optional[ContextHandle]:
+    ) -> ContextHandle | None:
         """Runs programmatic grep on a context variable, returning a narrowed handle."""
         return self.transformer.grep(
             handle_id=handle_id,
@@ -49,7 +49,7 @@ class RLMEngine:
         handle_id: str,
         start_line: int,
         end_line: int,
-    ) -> Optional[ContextHandle]:
+    ) -> ContextHandle | None:
         """Slices a line range from a context variable without prompt overhead."""
         return self.transformer.slice_lines(
             handle_id=handle_id,
@@ -57,7 +57,7 @@ class RLMEngine:
             end_line=end_line,
         )
 
-    def peek(self, handle_id: str, max_lines: int = 20) -> Dict[str, Any]:
+    def peek(self, handle_id: str, max_lines: int = 20) -> dict[str, Any]:
         """Peeks at the beginning and end of a context variable without loading all text."""
         handle = self.store.get_handle(handle_id)
         content = self.store.get_content(handle_id)
@@ -75,8 +75,8 @@ class RLMEngine:
             "total_lines": len(lines),
         }
 
-    def fetch_text(self, handle_id: str) -> Optional[str]:
+    def fetch_text(self, handle_id: str) -> str | None:
         return self.store.get_content(handle_id)
 
-    def stats(self) -> Dict[str, Any]:
+    def stats(self) -> dict[str, Any]:
         return self.store.stats()

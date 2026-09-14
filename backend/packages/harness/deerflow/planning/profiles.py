@@ -8,7 +8,8 @@ an install over a live name reports ``already_exists`` and leaves it untouched.
 from __future__ import annotations
 
 import re
-from typing import Any, Dict, List, Sequence
+from collections.abc import Sequence
+from typing import Any
 
 from deerflow.persistence.managed_subagents.base import (
     ManagedSubagentDefinition,
@@ -84,7 +85,7 @@ def install_profiles(
     store: Any = None,
     enabled: bool = False,
     approve: Sequence[str] = (),
-) -> Dict[str, List[Dict[str, Any]]]:
+) -> dict[str, list[dict[str, Any]]]:
     """Install profile specs into a managed-subagent store (fail-closed).
 
     - ``store=None`` is a dry run: every spec reports ``pending_approval``.
@@ -95,7 +96,7 @@ def install_profiles(
       blocks the rest.
     """
     approved = {sanitize_profile_name(str(n)) for n in (approve or [])}
-    report: Dict[str, List[Dict[str, Any]]] = {
+    report: dict[str, list[dict[str, Any]]] = {
         "installed": [],
         "already_exists": [],
         "pending_approval": [],

@@ -1,4 +1,3 @@
-import pytest
 
 from deerflow.verification.evidence import (
     ContradictionDetector,

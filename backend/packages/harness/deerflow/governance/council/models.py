@@ -3,7 +3,7 @@ from __future__ import annotations
 import enum
 import time
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 
 class RiskTier(enum.Enum):
@@ -27,11 +27,11 @@ class DeliberatorVote:
     verdict: VoteVerdict
     confidence: float  # 0.0 to 1.0
     reasoning: str
-    concerns: List[str] = field(default_factory=list)
-    required_modifications: List[str] = field(default_factory=list)
+    concerns: list[str] = field(default_factory=list)
+    required_modifications: list[str] = field(default_factory=list)
     timestamp: float = field(default_factory=time.time)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "deliberator_name": self.deliberator_name,
             "role": self.role,
@@ -54,12 +54,12 @@ class QuorumVerdict:
     rejections_count: int
     conditional_count: int
     weighted_score: float  # Weighted confidence score 0.0 to 1.0
-    votes: List[DeliberatorVote] = field(default_factory=list)
-    dissenting_concerns: List[str] = field(default_factory=list)
+    votes: list[DeliberatorVote] = field(default_factory=list)
+    dissenting_concerns: list[str] = field(default_factory=list)
     consensus_summary: str = ""
     timestamp: float = field(default_factory=time.time)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "passed": self.passed,
             "risk_tier": self.risk_tier.value,

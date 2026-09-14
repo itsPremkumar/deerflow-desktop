@@ -1,9 +1,8 @@
-import pytest
 from deerflow.subagents.yield_handoff import (
     SubagentYieldRegistry,
-    sessions_yield,
-    sessions_settle,
     get_yield_registry,
+    sessions_settle,
+    sessions_yield,
 )
 
 

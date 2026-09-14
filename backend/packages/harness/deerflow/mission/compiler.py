@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 import re
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from deerflow.mission.models import Mission, ProofObligation, RiskTier
 
@@ -30,7 +30,7 @@ class MissionCompiler:
         "physical": ["hardware", "device", "disk space", "memory limit", "gpu"],
     }
 
-    def compile(self, raw_request: str, context: Optional[Dict[str, Any]] = None) -> Mission:
+    def compile(self, raw_request: str, context: dict[str, Any] | None = None) -> Mission:
         """Execute full compilation pipeline on raw request."""
         clean_req = raw_request.strip()
 
@@ -84,8 +84,8 @@ class MissionCompiler:
 
         return " ".join(needs) if needs else "Standard verification suite and clean code documentation."
 
-    def _extract_constraints(self, text: str) -> Dict[str, List[str]]:
-        constraints: Dict[str, List[str]] = {
+    def _extract_constraints(self, text: str) -> dict[str, list[str]]:
+        constraints: dict[str, list[str]] = {
             "hard": [], "soft": [], "forbidden": [],
             "legal": [], "ethical": [], "physical": [],
         }
@@ -102,7 +102,7 @@ class MissionCompiler:
 
         return constraints
 
-    def _assess_risk_tier(self, text: str, constraints: Dict[str, List[str]]) -> RiskTier:
+    def _assess_risk_tier(self, text: str, constraints: dict[str, list[str]]) -> RiskTier:
         t_low = text.lower()
 
         # R5: Destructive irreversible operations
@@ -132,7 +132,7 @@ class MissionCompiler:
         # Default R2: Reversible local work with git tracking
         return RiskTier.R2
 
-    def _define_acceptance_criteria(self, text: str, risk_tier: RiskTier) -> List[str]:
+    def _define_acceptance_criteria(self, text: str, risk_tier: RiskTier) -> list[str]:
         criteria = [
             f"Deliver functional implementation satisfying: '{text[:80]}'",
             "Ensure existing automated test suite passes without regressions.",
@@ -141,7 +141,7 @@ class MissionCompiler:
             criteria.append("Validate rollback mechanism and data integrity checkpoints.")
         return criteria
 
-    def _generate_proof_obligations(self, text: str, risk_tier: RiskTier) -> List[ProofObligation]:
+    def _generate_proof_obligations(self, text: str, risk_tier: RiskTier) -> list[ProofObligation]:
         obligations = [
             ProofObligation(
                 description="Workspace modifications verified via non-empty git diff.",

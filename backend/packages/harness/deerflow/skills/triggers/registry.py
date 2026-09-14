@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-from typing import Dict, List, Optional
 
 from deerflow.skills.triggers.keyword_trigger import KeywordTrigger
 from deerflow.skills.triggers.models import MicroAgent, TriggerContext
@@ -16,25 +15,25 @@ class MicroAgentRegistry:
     """Registry maintaining MicroAgents and evaluating triggers against execution context."""
 
     def __init__(self, load_defaults: bool = True):
-        self._agents: Dict[str, MicroAgent] = {}
+        self._agents: dict[str, MicroAgent] = {}
         if load_defaults:
             self._register_default_microagents()
 
     def register(self, agent: MicroAgent) -> None:
         self._agents[agent.agent_id] = agent
 
-    def unregister(self, agent_id: str) -> Optional[MicroAgent]:
+    def unregister(self, agent_id: str) -> MicroAgent | None:
         return self._agents.pop(agent_id, None)
 
-    def get(self, agent_id: str) -> Optional[MicroAgent]:
+    def get(self, agent_id: str) -> MicroAgent | None:
         return self._agents.get(agent_id)
 
-    def list_all(self) -> List[MicroAgent]:
+    def list_all(self) -> list[MicroAgent]:
         return list(self._agents.values())
 
-    def match(self, context: TriggerContext) -> List[MicroAgent]:
+    def match(self, context: TriggerContext) -> list[MicroAgent]:
         """Find all micro-agents triggered by the given context, ordered by priority descending."""
-        matched: List[MicroAgent] = []
+        matched: list[MicroAgent] = []
         for agent in self._agents.values():
             if agent.matches(context):
                 matched.append(agent)

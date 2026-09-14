@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import re
-from typing import List, Optional, Union
 
 from deerflow.skills.triggers.models import BaseTrigger, TriggerContext
 
@@ -15,8 +14,8 @@ class KeywordTrigger(BaseTrigger):
 
     def __init__(
         self,
-        keywords: Optional[List[str]] = None,
-        regex_patterns: Optional[List[str]] = None,
+        keywords: list[str] | None = None,
+        regex_patterns: list[str] | None = None,
         case_sensitive: bool = False,
     ):
         self.keywords = keywords or []

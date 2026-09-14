@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from typing import Optional
+
 from langchain.tools import tool
 
 from deerflow.runtime.selfheal.watchdog import SelfHealingWatchdog
@@ -12,7 +12,7 @@ from deerflow.runtime.selfheal.watchdog import SelfHealingWatchdog
 @tool("self_heal_diagnose", parse_docstring=True)
 def self_heal_diagnose(
     auto_remediate: bool = True,
-    workspace_dir: Optional[str] = None,
+    workspace_dir: str | None = None,
 ) -> str:
     """Diagnose runtime health anomalies, stale lock files, or hanging operations and execute self-healing actions.
 

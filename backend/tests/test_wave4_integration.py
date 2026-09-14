@@ -1,5 +1,4 @@
 import json
-import pytest
 
 from deerflow.tools.builtins import (
     audit_finish_first_evidence,

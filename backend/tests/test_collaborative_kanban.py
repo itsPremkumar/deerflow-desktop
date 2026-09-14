@@ -1,12 +1,10 @@
 """Unit tests for Collaborative Kanban Board, DAG dependency unblocking, and Group Bridge."""
 
 from pathlib import Path
-import pytest
 
 from deerflow.groups.service import GroupChatService
-from deerflow.kanban.bridge import KanbanGroupBridge
 from deerflow.kanban.dependency import DependencyGraph
-from deerflow.kanban.models import KanbanBoard, KanbanTask
+from deerflow.kanban.models import KanbanTask
 from deerflow.kanban.store import KanbanStore
 
 

@@ -7,14 +7,14 @@ import time
 import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 from .fallbacks import RecoveryFallbackTree
 from .strategy import StrategyCandidate, generate_strategy_candidates
 from .waves import ExecutionWave, partition_execution_waves, validate_task_dag
 
 
-def infer_task_dag(goal: str) -> Dict[str, List[str]]:
+def infer_task_dag(goal: str) -> dict[str, list[str]]:
     """Infer a domain-appropriate default DAG when the caller supplies none.
 
     Keeps the historical coding DAG as the fallback so existing callers are
@@ -58,7 +58,7 @@ def infer_task_dag(goal: str) -> Dict[str, List[str]]:
     }
 
 
-def default_proof_obligations(risk_tier: str) -> List[str]:
+def default_proof_obligations(risk_tier: str) -> list[str]:
     """Verifiable proof obligations expressed as checkable handles."""
     obligations = [
         "all_pre_existing_tests_must_pass [tests_passed:<suite>]",
@@ -75,7 +75,7 @@ def default_proof_obligations(risk_tier: str) -> List[str]:
     return obligations
 
 
-def plan_hash_for(goal: str, task_dag: Dict[str, List[str]], strategy_name: str) -> str:
+def plan_hash_for(goal: str, task_dag: dict[str, list[str]], strategy_name: str) -> str:
     digest = hashlib.sha256(json.dumps({"goal": goal, "dag": task_dag, "strategy": strategy_name}, sort_keys=True).encode()).hexdigest()
     return digest[:16]
 
@@ -88,17 +88,17 @@ class ExecutionPlanIR:
     goal: str
     risk_tier: str
     chosen_strategy: StrategyCandidate
-    candidate_strategies: List[StrategyCandidate]
-    execution_waves: List[ExecutionWave]
+    candidate_strategies: list[StrategyCandidate]
+    execution_waves: list[ExecutionWave]
     recovery_tree: RecoveryFallbackTree
-    proof_obligations: List[str] = field(default_factory=list)
+    proof_obligations: list[str] = field(default_factory=list)
     compiled_at: float = field(default_factory=time.time)
     plan_hash: str = ""
-    task_dag: Dict[str, List[str]] = field(default_factory=dict)
-    validation_errors: List[str] = field(default_factory=list)
+    task_dag: dict[str, list[str]] = field(default_factory=dict)
+    validation_errors: list[str] = field(default_factory=list)
     hyperplan_status: str = "not_reviewed"
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "plan_id": self.plan_id,
             "goal": self.goal,
@@ -115,7 +115,7 @@ class ExecutionPlanIR:
             "hyperplan_status": self.hyperplan_status,
         }
 
-    def to_evidence_dict(self) -> Dict[str, Any]:
+    def to_evidence_dict(self) -> dict[str, Any]:
         """Compact evidence receipt for run_events / delivery ledger."""
         return {
             "plan_id": self.plan_id,
@@ -148,9 +148,9 @@ class CognitiveCompiler:
     def compile(
         self,
         goal: str,
-        task_dag: Optional[Dict[str, List[str]]] = None,
+        task_dag: dict[str, list[str]] | None = None,
         risk_tier: str = "R1",
-        proof_obligations: Optional[List[str]] = None,
+        proof_obligations: list[str] | None = None,
         *,
         strict_validation: bool = True,
     ) -> ExecutionPlanIR:
@@ -200,12 +200,12 @@ class CognitiveCompiler:
         self,
         goal: str,
         plan_text: str,
-        task_dag: Optional[Dict[str, List[str]]] = None,
+        task_dag: dict[str, list[str]] | None = None,
         risk_tier: str = "R1",
-        proof_obligations: Optional[List[str]] = None,
+        proof_obligations: list[str] | None = None,
         *,
         enforce: bool = True,
-    ) -> Tuple[ExecutionPlanIR, Any]:
+    ) -> tuple[ExecutionPlanIR, Any]:
         """Compile then run the Hyperplan hostile gate.
 
         Returns (ir, report). When enforce=True and the gate BLOCKs, raises

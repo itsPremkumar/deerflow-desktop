@@ -256,8 +256,49 @@ export interface Translations {
     demoChats: string;
     agents: string;
     scheduledTasks: string;
+    team: string;
+    overview: string;
     agentsDisabledTooltip: string;
     channels: string;
+  };
+  overview: {
+    title: string;
+    description: string;
+    runtime: string;
+    service: string;
+    version: string;
+    uptime: string;
+    apiDocs: string;
+    enabled: string;
+    disabled: string;
+    resources: string;
+    platform: string;
+    cpu: string;
+    memory: string;
+    diskFree: string;
+    models: string;
+    manage: string;
+    noModels: string;
+    moreModels: (count: number) => string;
+    activity: string;
+    runs: string;
+    activeRuns: string;
+    threads: string;
+    tokens: string;
+    cost: string;
+    statsUnavailable: string;
+    recentRuns: string;
+    noRuns: string;
+    resume: string;
+    resuming: string;
+    resumeFailed: string;
+    scheduledTasks: string;
+    total: string;
+    enabledCount: string;
+    team: string;
+    openTeam: string;
+    rooms: string;
+    bots: string;
   };
   // Sidebar projects section
   projects: {
@@ -578,12 +619,14 @@ export interface Translations {
     contactUs: string;
     about: string;
     logout: string;
-    gatewayUnavailable: string;
-    gatewayUnavailableRetrying: string;
-    modelLoadFailed: string;
-    modelLoadRetry: string;
-    modelLoadRetrying: string;
-  };
+      gatewayUnavailable: string;
+      gatewayUnavailableRetrying: string;
+      networkOffline: string;
+      networkOfflineResume: string;
+      modelLoadFailed: string;
+      modelLoadRetry: string;
+      modelLoadRetrying: string;
+    };
 
   // Conversation
   conversation: {
@@ -821,6 +864,7 @@ export interface Translations {
       subagents: string;
       skills: string;
       notification: string;
+      desktop: string;
       about: string;
       rules: string;
     };
@@ -1171,6 +1215,15 @@ export interface Translations {
       testBody: string;
       notSupported: string;
       disableNotification: string;
+    };
+    desktop: {
+      title: string;
+      description: string;
+      autoStart: string;
+      autoStartHint: string;
+      browserOnly: string;
+      installedOnly: string;
+      updateFailed: string;
     };
     account: {
       profileTitle: string;

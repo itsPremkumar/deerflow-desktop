@@ -1,6 +1,7 @@
 """Tests for Shell AST parser, security analyzer, and confirmation policy."""
 
 import pytest
+
 from deerflow.security.shell_ast.analyzer import (
     RiskLevel,
     ShellASTSecurityAnalyzer,

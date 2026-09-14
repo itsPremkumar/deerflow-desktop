@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 import threading
 from dataclasses import dataclass
-from typing import Any, Dict, Literal, Optional
+from typing import Any, Literal
 
 ReasoningTier = Literal["fast", "balanced", "deep"]
 
@@ -18,7 +18,7 @@ class ReasoningConfig:
     timeout_seconds: float
     reason: str
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "tier": self.tier,
             "thinking_budget_tokens": self.thinking_budget_tokens,
@@ -30,10 +30,10 @@ class ReasoningConfig:
     def clamp_to_budget(
         self,
         *,
-        model_context_window: Optional[int] = None,
-        token_budget_remaining: Optional[int] = None,
+        model_context_window: int | None = None,
+        token_budget_remaining: int | None = None,
         model_supports_thinking: bool = True,
-    ) -> "ReasoningConfig":
+    ) -> ReasoningConfig:
         """Clamp thinking budget to model + run-budget reality.
 
         Never raises: clamping is fail-safe so a misconfigured budget cannot
@@ -59,7 +59,7 @@ class ReasoningConfig:
 class ReasoningGovernor:
     """Modulates thinking token allocation based on task complexity heuristics."""
 
-    TIER_PRESETS: Dict[ReasoningTier, Dict[str, float | int]] = {
+    TIER_PRESETS: dict[ReasoningTier, dict[str, float | int]] = {
         "fast": {
             "thinking_budget_tokens": 0,
             "temperature": 0.1,
@@ -154,8 +154,8 @@ class ReasoningGovernor:
         self,
         prompt: str,
         *,
-        model_context_window: Optional[int] = None,
-        token_budget_remaining: Optional[int] = None,
+        model_context_window: int | None = None,
+        token_budget_remaining: int | None = None,
         model_supports_thinking: bool = True,
     ) -> ReasoningConfig:
         """Evaluate then clamp to model context + remaining run budget."""

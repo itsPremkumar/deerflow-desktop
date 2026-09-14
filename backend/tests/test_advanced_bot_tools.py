@@ -1,9 +1,8 @@
 """Unit tests for LangChain tools: bot_roster, group_chat, and kanban_board."""
 
-from pathlib import Path
-import pytest
 
 from uuid import uuid4
+
 from deerflow.tools.builtins.bot_roster_tool import bot_roster_tool
 from deerflow.tools.builtins.group_chat_tool import group_chat_tool
 from deerflow.tools.builtins.kanban_board_tool import kanban_board_tool

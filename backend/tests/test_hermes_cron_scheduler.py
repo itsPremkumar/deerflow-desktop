@@ -1,6 +1,5 @@
-import json
 from pathlib import Path
-import pytest
+
 from deerflow.scheduler.cron_manager import CronManager
 from deerflow.tools.builtins.cronjob_manage_tool import cronjob_manage
 

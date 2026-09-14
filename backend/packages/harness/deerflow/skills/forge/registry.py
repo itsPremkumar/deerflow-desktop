@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any
 
-from .models import ForgeTestResult, Skill
+from .models import Skill
 
 logger = logging.getLogger("deerflow.skills.forge.registry")
 
@@ -13,8 +14,8 @@ class SkillRegistry:
     """Persistent in-memory & on-disk registry of forged, tested skills."""
 
     def __init__(self) -> None:
-        self.skills: Dict[str, Skill] = {}
-        self.seen_hashes: Dict[str, str] = {}  # hash -> skill_name
+        self.skills: dict[str, Skill] = {}
+        self.seen_hashes: dict[str, str] = {}  # hash -> skill_name
 
     def register(self, skill: Skill, min_pass_rate: float = 0.80) -> bool:
         """
@@ -42,8 +43,8 @@ class SkillRegistry:
     def test_skill(
         self,
         skill: Skill,
-        test_cases: List[Dict[str, Any]],
-        executor: Callable[[str, Dict[str, Any]], bool] | None = None,
+        test_cases: list[dict[str, Any]],
+        executor: Callable[[str, dict[str, Any]], bool] | None = None,
     ) -> float:
         """
         Runs synthetic test cases against a skill.
@@ -67,13 +68,13 @@ class SkillRegistry:
         skill.test_pass_rate = round(passed / len(test_cases), 3)
         return skill.test_pass_rate
 
-    def get(self, name: str) -> Optional[Skill]:
+    def get(self, name: str) -> Skill | None:
         return self.skills.get(name)
 
-    def export_to_dir(self, output_dir: str | Path) -> List[str]:
+    def export_to_dir(self, output_dir: str | Path) -> list[str]:
         out = Path(output_dir)
         out.mkdir(parents=True, exist_ok=True)
-        created_paths: List[str] = []
+        created_paths: list[str] = []
         for s in self.skills.values():
             skill_folder = out / s.name
             skill_folder.mkdir(parents=True, exist_ok=True)
@@ -82,7 +83,7 @@ class SkillRegistry:
             created_paths.append(str(skill_file))
         return created_paths
 
-    def stats(self) -> Dict[str, Any]:
+    def stats(self) -> dict[str, Any]:
         return {
             "total_skills": len(self.skills),
             "skill_names": sorted(list(self.skills.keys())),

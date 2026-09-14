@@ -1,6 +1,12 @@
 "use client";
 
-import { BotIcon, CalendarClock, MessagesSquare } from "lucide-react";
+import {
+  BotIcon,
+  CalendarClock,
+  LayoutDashboardIcon,
+  MessagesSquare,
+  Users,
+} from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
@@ -25,6 +31,17 @@ export function WorkspaceNavChatList() {
   return (
     <SidebarGroup className="pt-1">
       <SidebarMenu>
+        <SidebarMenuItem>
+          <SidebarMenuButton
+            isActive={pathname.startsWith("/workspace/overview")}
+            asChild
+          >
+            <Link className="text-muted-foreground" href="/workspace/overview">
+              <LayoutDashboardIcon />
+              <span>{t.sidebar.overview}</span>
+            </Link>
+          </SidebarMenuButton>
+        </SidebarMenuItem>
         <SidebarMenuItem>
           <SidebarMenuButton isActive={pathname === "/workspace/chats"} asChild>
             <Link className="text-muted-foreground" href="/workspace/chats">
@@ -86,6 +103,17 @@ export function WorkspaceNavChatList() {
             >
               <CalendarClock />
               <span>{t.sidebar.scheduledTasks}</span>
+            </Link>
+          </SidebarMenuButton>
+        </SidebarMenuItem>
+        <SidebarMenuItem>
+          <SidebarMenuButton
+            isActive={pathname.startsWith("/workspace/team")}
+            asChild
+          >
+            <Link className="text-muted-foreground" href="/workspace/team">
+              <Users />
+              <span>{t.sidebar.team}</span>
             </Link>
           </SidebarMenuButton>
         </SidebarMenuItem>

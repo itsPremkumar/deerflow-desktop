@@ -1,7 +1,5 @@
-import pytest
 from deerflow.models.performance_registry import (
     DynamicCostLatencyRouter,
-    ModelPerformanceMetrics,
     ModelPerformanceRegistry,
 )
 

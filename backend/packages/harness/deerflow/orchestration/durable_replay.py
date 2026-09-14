@@ -12,7 +12,7 @@ from __future__ import annotations
 import time
 import uuid
 from dataclasses import asdict, dataclass, field
-from typing import Any, Dict, List, Optional, Set
+from typing import Any
 
 
 @dataclass
@@ -20,11 +20,11 @@ class JournalEvent:
     event_id: str = field(default_factory=lambda: str(uuid.uuid4())[:8])
     task_id: str = ""
     event_type: str = ""  # TASK_STARTED, TOOL_EXECUTED, STATE_TRANSITION, CHECKPOINT_SAVED, TASK_COMPLETED
-    payload: Dict[str, Any] = field(default_factory=dict)
-    idempotency_key: Optional[str] = None
+    payload: dict[str, Any] = field(default_factory=dict)
+    idempotency_key: str | None = None
     timestamp: float = field(default_factory=time.time)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
 
@@ -34,11 +34,11 @@ class DurableTaskCheckpoint:
     task_id: str = ""
     step_index: int = 0
     state: str = "running"
-    variables: Dict[str, Any] = field(default_factory=dict)
-    completed_idempotency_keys: List[str] = field(default_factory=list)
+    variables: dict[str, Any] = field(default_factory=dict)
+    completed_idempotency_keys: list[str] = field(default_factory=list)
     timestamp: float = field(default_factory=time.time)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
 
@@ -47,18 +47,18 @@ class DurableReplayEngine:
 
     def __init__(self):
         # task_id -> list of JournalEvent
-        self._journals: Dict[str, List[JournalEvent]] = {}
+        self._journals: dict[str, list[JournalEvent]] = {}
         # task_id -> list of DurableTaskCheckpoint
-        self._checkpoints: Dict[str, List[DurableTaskCheckpoint]] = {}
+        self._checkpoints: dict[str, list[DurableTaskCheckpoint]] = {}
         # global set of executed idempotency keys
-        self._idempotency_keys: Set[str] = set()
+        self._idempotency_keys: set[str] = set()
 
     def append_event(
         self,
         task_id: str,
         event_type: str,
-        payload: Optional[Dict[str, Any]] = None,
-        idempotency_key: Optional[str] = None,
+        payload: dict[str, Any] | None = None,
+        idempotency_key: str | None = None,
     ) -> JournalEvent:
         """Record an event in the task's durable journal with idempotency enforcement."""
         if idempotency_key and idempotency_key in self._idempotency_keys:
@@ -84,7 +84,7 @@ class DurableReplayEngine:
         task_id: str,
         step_index: int,
         state: str,
-        variables: Optional[Dict[str, Any]] = None,
+        variables: dict[str, Any] | None = None,
     ) -> DurableTaskCheckpoint:
         """Create a durable snapshot of the task's memory and execution state."""
         # Collect all idempotency keys associated with this task so far
@@ -113,7 +113,7 @@ class DurableReplayEngine:
         """Check whether an action with this key has already been executed."""
         return idempotency_key in self._idempotency_keys
 
-    def recover_task(self, task_id: str) -> Dict[str, Any]:
+    def recover_task(self, task_id: str) -> dict[str, Any]:
         """Simulate crash recovery: reconstruct task state from last checkpoint + replay journal."""
         checkpoints = self._checkpoints.get(task_id, [])
         journal = self._journals.get(task_id, [])
@@ -140,7 +140,7 @@ class DurableReplayEngine:
             events_to_replay = journal
 
         # 2. Replay journal events that occurred after the checkpoint
-        replayed_events: List[Dict[str, Any]] = []
+        replayed_events: list[dict[str, Any]] = []
         for ev in events_to_replay:
             replayed_events.append(ev.to_dict())
             if ev.event_type == "STATE_TRANSITION":
@@ -161,5 +161,5 @@ class DurableReplayEngine:
             "total_journal_events": len(journal),
         }
 
-    def get_journal(self, task_id: str) -> List[Dict[str, Any]]:
+    def get_journal(self, task_id: str) -> list[dict[str, Any]]:
         return [ev.to_dict() for ev in self._journals.get(task_id, [])]

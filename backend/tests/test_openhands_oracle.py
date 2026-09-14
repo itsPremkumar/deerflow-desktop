@@ -1,6 +1,7 @@
 """Tests for Oracle Consultation Service and Tool."""
 
 import json
+
 from deerflow.agent.oracle.service import OracleResponse, OracleService
 from deerflow.tools.builtins.ask_oracle_tool import ask_oracle
 

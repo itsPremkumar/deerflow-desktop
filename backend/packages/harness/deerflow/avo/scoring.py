@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 
 @dataclass
@@ -12,9 +12,9 @@ class EvaluationVector:
     Tracks configuration-specific metrics (e.g. sequence lengths, batch sizes, level action efficiencies)
     with hard correctness gating and Pareto dominance verification.
     """
-    metrics: Dict[str, float] = field(default_factory=dict)
+    metrics: dict[str, float] = field(default_factory=dict)
     correctness: bool = False
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     def effective_metric(self, key: str) -> float:
         """Score is strictly 0.0 if correctness fails, regardless of measured throughput."""
@@ -94,7 +94,7 @@ class EvaluationVector:
 
     def matches_or_improves(
         self,
-        other: Optional[EvaluationVector],
+        other: EvaluationVector | None,
         rel_tolerance: float = 0.0,
     ) -> bool:
         """
@@ -115,7 +115,7 @@ class EvaluationVector:
         other_gm = other.geometric_mean()
         return self_gm >= (other_gm * (1.0 - rel_tolerance))
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "correctness": self.correctness,
             "metrics": self.metrics,

@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 import re
-from typing import Sequence
+from collections.abc import Sequence
 
-from deerflow.groups.room import GroupMessage, GroupRoom, OrchestrationMode
+from deerflow.groups.room import GroupMessage, GroupRoom
 
 _MENTION_PATTERN = re.compile(r"@([A-Za-z0-9_-]+)")
 

@@ -7,7 +7,6 @@ evidence-backed updates to the supplemental harness state.
 from __future__ import annotations
 
 import logging
-import re
 from typing import Any
 
 from deerflow.harness.continual.snapshots import HarnessSnapshotManager

@@ -15,7 +15,7 @@ working identically with or without it.
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, List
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -26,9 +26,9 @@ class MetacognitiveMiddleware:
     def __init__(self, confidence: float = 0.8, window: int = 5) -> None:
         self.confidence = confidence
         self.window = max(3, int(window))
-        self._history: List[Dict[str, Any]] = []
+        self._history: list[dict[str, Any]] = []
 
-    def record_tool_result(self, tool: str, success: bool) -> Dict[str, Any]:
+    def record_tool_result(self, tool: str, success: bool) -> dict[str, Any]:
         """Record one tool outcome and return the latest assessment as dict."""
         from deerflow.metacognition import CognitiveMode, MetacognitiveMonitor
 

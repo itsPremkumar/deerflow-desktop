@@ -8,12 +8,11 @@ Inspired by Chapters 21, 23, and 39 of the Master Architecture Blueprint:
 
 from __future__ import annotations
 
-import heapq
 import time
 import uuid
 from dataclasses import asdict, dataclass, field
-from enum import Enum, IntEnum
-from typing import Any, Dict, List, Optional, Set
+from enum import IntEnum
+from typing import Any
 
 from deerflow.mission.state_machine import TaskState, TaskStateMachine
 
@@ -90,7 +89,7 @@ class ExecutionBudget:
         self.current_runtime_sec += runtime_sec
         self.current_retries += retries
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
 
@@ -101,13 +100,13 @@ class QueuedTask:
     title: str = ""
     description: str = ""
     priority: TaskPriority = TaskPriority.MEDIUM
-    dependencies: List[str] = field(default_factory=list)  # task IDs that must be COMPLETED
+    dependencies: list[str] = field(default_factory=list)  # task IDs that must be COMPLETED
     assignee: str = "orchestrator"
     created_at: float = field(default_factory=time.time)
-    started_at: Optional[float] = None
-    finished_at: Optional[float] = None
-    result: Optional[Any] = None
-    error: Optional[str] = None
+    started_at: float | None = None
+    finished_at: float | None = None
+    result: Any | None = None
+    error: str | None = None
     retry_count: int = 0
     state_machine: TaskStateMachine = field(default_factory=lambda: TaskStateMachine(task_id="init"))
 
@@ -119,7 +118,7 @@ class QueuedTask:
     def state(self) -> TaskState:
         return self.state_machine.current_state
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "id": self.id,
             "title": self.title,
@@ -140,18 +139,18 @@ class QueuedTask:
 class DurableWorkQueue:
     """DAG Scheduler and Work Queue managing task execution order, dependencies, and budgets."""
 
-    def __init__(self, budget: Optional[ExecutionBudget] = None):
+    def __init__(self, budget: ExecutionBudget | None = None):
         self.budget: ExecutionBudget = budget or ExecutionBudget()
-        self._tasks: Dict[str, QueuedTask] = {}
+        self._tasks: dict[str, QueuedTask] = {}
 
     def add_task(
         self,
         title: str,
         description: str = "",
         priority: TaskPriority = TaskPriority.MEDIUM,
-        dependencies: Optional[List[str]] = None,
+        dependencies: list[str] | None = None,
         assignee: str = "orchestrator",
-        task_id: Optional[str] = None,
+        task_id: str | None = None,
     ) -> QueuedTask:
         deps = dependencies or []
         for dep in deps:
@@ -187,13 +186,13 @@ class DurableWorkQueue:
 
         return task
 
-    def get_task(self, task_id: str) -> Optional[QueuedTask]:
+    def get_task(self, task_id: str) -> QueuedTask | None:
         return self._tasks.get(task_id)
 
     def detect_cycles(self) -> bool:
         """Kahn's algorithm to detect cycles in the registered tasks."""
         in_degree = {tid: 0 for tid in self._tasks}
-        graph: Dict[str, List[str]] = {tid: [] for tid in self._tasks}
+        graph: dict[str, list[str]] = {tid: [] for tid in self._tasks}
 
         for tid, task in self._tasks.items():
             for dep in task.dependencies:
@@ -214,13 +213,13 @@ class DurableWorkQueue:
 
         return visited_count != len(self._tasks)
 
-    def topological_sort(self) -> List[str]:
+    def topological_sort(self) -> list[str]:
         """Compute legal topological execution sequence for all tasks."""
         if self.detect_cycles():
             raise CyclicDependencyError("Cannot sort tasks: Cycle detected in task DAG.")
 
         in_degree = {tid: 0 for tid in self._tasks}
-        graph: Dict[str, List[str]] = {tid: [] for tid in self._tasks}
+        graph: dict[str, list[str]] = {tid: [] for tid in self._tasks}
 
         for tid, task in self._tasks.items():
             for dep in task.dependencies:
@@ -229,7 +228,7 @@ class DurableWorkQueue:
                     in_degree[tid] += 1
 
         queue = [tid for tid, deg in in_degree.items() if deg == 0]
-        sorted_ids: List[str] = []
+        sorted_ids: list[str] = []
 
         while queue:
             node = queue.pop(0)
@@ -241,9 +240,9 @@ class DurableWorkQueue:
 
         return sorted_ids
 
-    def get_ready_tasks(self) -> List[QueuedTask]:
+    def get_ready_tasks(self) -> list[QueuedTask]:
         """Return all tasks whose dependencies are all COMPLETED and are currently READY or unblocked."""
-        ready: List[QueuedTask] = []
+        ready: list[QueuedTask] = []
         for task in self._tasks.values():
             if task.state == TaskState.COMPLETED or task.state == TaskState.RUNNING:
                 continue
@@ -265,7 +264,7 @@ class DurableWorkQueue:
         ready.sort(key=lambda t: (-int(t.priority), t.created_at))
         return ready
 
-    def dispatch_next(self) -> Optional[QueuedTask]:
+    def dispatch_next(self) -> QueuedTask | None:
         """Dispatch the highest priority ready task, transitioning it to RUNNING."""
         ready = self.get_ready_tasks()
         if not ready:
@@ -276,7 +275,7 @@ class DurableWorkQueue:
         next_task.started_at = time.time()
         return next_task
 
-    def complete_task(self, task_id: str, result: Optional[Any] = None) -> QueuedTask:
+    def complete_task(self, task_id: str, result: Any | None = None) -> QueuedTask:
         """Mark a task as verified and completed."""
         task = self._tasks.get(task_id)
         if not task:
@@ -315,9 +314,9 @@ class DurableWorkQueue:
 
         return task
 
-    def stats(self) -> Dict[str, Any]:
+    def stats(self) -> dict[str, Any]:
         """Return execution queue metrics."""
-        counts: Dict[str, int] = {}
+        counts: dict[str, int] = {}
         for task in self._tasks.values():
             st = task.state.value
             counts[st] = counts.get(st, 0) + 1

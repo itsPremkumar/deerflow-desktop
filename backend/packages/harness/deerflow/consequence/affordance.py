@@ -6,7 +6,7 @@ import os
 import shutil
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 
 @dataclass
@@ -15,12 +15,12 @@ class EnvironmentAffordances:
     workspace_dir: str
     is_writable: bool
     is_git_repo: bool
-    available_binaries: Dict[str, bool] = field(default_factory=dict)
+    available_binaries: dict[str, bool] = field(default_factory=dict)
     python_version: str = ""
     open_subprocesses: int = 0
-    environment_tags: List[str] = field(default_factory=list)
+    environment_tags: list[str] = field(default_factory=list)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
 
@@ -29,7 +29,7 @@ class AffordanceModel:
 
     PROBED_BINARIES = ["git", "python", "pytest", "docker", "npm", "cargo", "curl"]
 
-    def probe(self, workspace_path: Optional[str] = None) -> EnvironmentAffordances:
+    def probe(self, workspace_path: str | None = None) -> EnvironmentAffordances:
         ws = Path(workspace_path or os.getcwd()).resolve()
         is_writable = os.access(str(ws), os.W_OK)
         is_git = (ws / ".git").exists() or (ws.parent / ".git").exists()

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import uuid
-from typing import Dict, List, Optional
 
 from .models import CapabilityGap, Curriculum, PracticeTask
 
@@ -17,12 +16,12 @@ class CurriculumBuilder:
 
     def discover_gaps(
         self,
-        performance_map: Dict[str, float],
-        targets: Optional[Dict[str, float]] = None,
-        difficulties: Optional[Dict[str, float]] = None,
-    ) -> List[CapabilityGap]:
+        performance_map: dict[str, float],
+        targets: dict[str, float] | None = None,
+        difficulties: dict[str, float] | None = None,
+    ) -> list[CapabilityGap]:
         """Discovers capability gaps where current performance < target."""
-        gaps: List[CapabilityGap] = []
+        gaps: list[CapabilityGap] = []
         targets = targets or {}
         difficulties = difficulties or {}
 
@@ -43,7 +42,7 @@ class CurriculumBuilder:
         gaps.sort(key=lambda g: g.priority, reverse=True)
         return gaps
 
-    def generate_tasks_for_gap(self, gap: CapabilityGap) -> List[PracticeTask]:
+    def generate_tasks_for_gap(self, gap: CapabilityGap) -> list[PracticeTask]:
         """Synthesizes structured practice exercises for a given capability gap."""
         cap = gap.capability
         tasks = [
@@ -66,14 +65,14 @@ class CurriculumBuilder:
 
     def build_curriculum(
         self,
-        performance_map: Dict[str, float],
-        targets: Optional[Dict[str, float]] = None,
-        difficulties: Optional[Dict[str, float]] = None,
+        performance_map: dict[str, float],
+        targets: dict[str, float] | None = None,
+        difficulties: dict[str, float] | None = None,
     ) -> Curriculum:
         """Constructs an ordered training curriculum targeting all detected capability gaps."""
         gaps = self.discover_gaps(performance_map, targets=targets, difficulties=difficulties)
         curriculum_id = f"curr_{uuid.uuid4().hex[:10]}"
-        all_tasks: List[PracticeTask] = []
+        all_tasks: list[PracticeTask] = []
 
         for gap in gaps:
             tasks = self.generate_tasks_for_gap(gap)

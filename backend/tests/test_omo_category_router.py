@@ -1,9 +1,9 @@
 ﻿"""Tests for Intent-Driven Category Routing Matrix & Dual Fallbacks."""
 
 import pytest
+
 from deerflow.models.category_router import (
     CategoryRouter,
-    CategorySpec,
 )
 
 

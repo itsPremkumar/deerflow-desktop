@@ -5,7 +5,7 @@ Implements frontier long-horizon evolutionary search Vary(P_t) = Agent(P_t, K, f
 from __future__ import annotations
 
 import json
-from typing import Optional
+
 from langchain.tools import tool
 
 from deerflow.avo import (
@@ -26,7 +26,7 @@ def run_nvidia_avo_step(
     metrics_json: str = "{}",
     correctness: bool = True,
     query_text: str = "",
-    parent_id: Optional[str] = None,
+    parent_id: str | None = None,
 ) -> str:
     """Execute an NVIDIA Agentic Variation Operator (AVO) step.
 

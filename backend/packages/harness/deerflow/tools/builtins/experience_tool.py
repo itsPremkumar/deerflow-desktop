@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from typing import List, Optional
+
 from langchain.tools import tool
 
 from deerflow.learning.experience.models import ExperienceRecord, OutcomeType
@@ -16,8 +16,8 @@ def consult_experience(
     query: str,
     action: str = "query",
     outcome: str = "success",
-    lessons: Optional[List[str]] = None,
-    pitfalls: Optional[List[str]] = None,
+    lessons: list[str] | None = None,
+    pitfalls: list[str] | None = None,
 ) -> str:
     """Consult or update the Episodic Experience Memory to retrieve past lessons or record new ones.
 

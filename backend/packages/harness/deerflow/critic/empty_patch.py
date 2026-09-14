@@ -5,21 +5,20 @@ from __future__ import annotations
 import logging
 import os
 import subprocess
-from pathlib import Path
-from typing import Any, Dict, List, Optional, Set
+from typing import Any
 
 from deerflow.critic.base import BaseCritic, CriticResult, CriticVerdict
 
 logger = logging.getLogger(__name__)
 
 # Keywords indicating that the task entails modifying or writing files/code
-CODE_MODIFICATION_KEYWORDS: Set[str] = {
+CODE_MODIFICATION_KEYWORDS: set[str] = {
     "fix", "bug", "implement", "add", "refactor", "change", "update",
     "modify", "create", "write", "patch", "delete", "remove", "build",
     "optimize", "clean", "rewrite", "replace", "introduce", "develop",
 }
 
-READ_ONLY_KEYWORDS: Set[str] = {
+READ_ONLY_KEYWORDS: set[str] = {
     "explain", "what is", "why", "how does", "summarize", "analyze",
     "find", "search", "where is", "list", "describe", "check whether",
 }
@@ -50,8 +49,8 @@ class EmptyPatchCritic(BaseCritic):
     def evaluate(
         self,
         task_description: str,
-        execution_history: Optional[List[Dict[str, Any]]] = None,
-        workspace_dir: Optional[str] = None,
+        execution_history: list[dict[str, Any]] | None = None,
+        workspace_dir: str | None = None,
         **kwargs: Any,
     ) -> CriticResult:
         """Inspect the git status or workspace files to ensure a patch exists."""

@@ -1,7 +1,6 @@
 """Unit tests for Multi-Agent Group Chat orchestration, speaker strategies, and quorum voting."""
 
 from pathlib import Path
-import pytest
 
 from deerflow.groups.orchestration import GroupOrchestrator
 from deerflow.groups.quorum import QuorumEngine

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 import re
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from deerflow.reasoning.tom.models import (
     IntentHypothesis,
@@ -17,8 +17,8 @@ logger = logging.getLogger(__name__)
 
 def _calibrate_confidence(
     task_description: str,
-    workspace_context: Optional[str],
-    context_metadata: Optional[Dict[str, Any]],
+    workspace_context: str | None,
+    context_metadata: dict[str, Any] | None,
 ) -> float:
     """Calibrated confidence instead of a hardcoded 0.90.
 
@@ -47,14 +47,14 @@ class TheoryOfMindConsultant:
     def consult(
         self,
         task_description: str,
-        workspace_context: Optional[str] = None,
-        context_metadata: Optional[Dict[str, Any]] = None,
+        workspace_context: str | None = None,
+        context_metadata: dict[str, Any] | None = None,
     ) -> IntentHypothesis:
         text = task_description.lower()
-        priorities: List[PriorityDomain] = []
-        unstated_expectations: List[str] = []
-        pitfalls: List[str] = []
-        constraints: List[str] = []
+        priorities: list[PriorityDomain] = []
+        unstated_expectations: list[str] = []
+        pitfalls: list[str] = []
+        constraints: list[str] = []
         risk_tolerance = RiskTolerance.MEDIUM
 
         # 1. Detect Task Intent & Invariants

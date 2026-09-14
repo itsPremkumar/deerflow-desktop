@@ -11,8 +11,8 @@ Runs as a resident, lightweight background memory judge:
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Set
+from dataclasses import dataclass
+from typing import Any
 
 SECRET_PATTERNS = [
     re.compile(r"(?i)(api[_-]?key|bearer|secret|password|token)\s*[:=]\s*['\"][^'\"]+['\"]"),
@@ -33,7 +33,7 @@ def redact_secrets(text: str) -> str:
 class MemoryEntry:
     id: str
     topic: str
-    keywords: List[str]
+    keywords: list[str]
     hint: str
     details: str = ""
 
@@ -42,9 +42,9 @@ class KibitzerMemoryBank:
     """Storage of long-term project knowledge and mitigation hints."""
 
     def __init__(self):
-        self.entries: List[MemoryEntry] = []
+        self.entries: list[MemoryEntry] = []
 
-    def add_entry(self, entry_id: str, topic: str, keywords: List[str], hint: str, details: str = "") -> None:
+    def add_entry(self, entry_id: str, topic: str, keywords: list[str], hint: str, details: str = "") -> None:
         self.entries.append(MemoryEntry(
             id=entry_id,
             topic=topic,
@@ -53,7 +53,7 @@ class KibitzerMemoryBank:
             details=details,
         ))
 
-    def search_relevant(self, query_text: str) -> List[MemoryEntry]:
+    def search_relevant(self, query_text: str) -> list[MemoryEntry]:
         clean = query_text.lower()
         matches = []
         for e in self.entries:
@@ -65,26 +65,26 @@ class KibitzerMemoryBank:
 class KibitzerObserver:
     """Sidecar observer that evaluates agent activity and issues nudges."""
 
-    def __init__(self, memory_bank: Optional[KibitzerMemoryBank] = None, max_nudges_per_turn: int = 2):
+    def __init__(self, memory_bank: KibitzerMemoryBank | None = None, max_nudges_per_turn: int = 2):
         self.bank = memory_bank or KibitzerMemoryBank()
         self.max_nudges = max_nudges_per_turn
-        self.delivered_ids: Set[str] = set()
+        self.delivered_ids: set[str] = set()
         self.turn_count: int = 0
 
     def observe(
         self,
         prompt: str = "",
         tool_name: str = "",
-        tool_args: Optional[Dict[str, Any]] = None,
+        tool_args: dict[str, Any] | None = None,
         tool_result: str = "",
-    ) -> List[str]:
+    ) -> list[str]:
         """Observe step activity and return any relevant 1-line memory nudges."""
         self.turn_count += 1
         combined = f"{prompt} {tool_name} {str(tool_args or {})} {tool_result}"
         safe_text = redact_secrets(combined)
 
         matches = self.bank.search_relevant(safe_text)
-        nudges: List[str] = []
+        nudges: list[str] = []
 
         for m in matches:
             if m.id not in self.delivered_ids:

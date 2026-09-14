@@ -1,12 +1,12 @@
 import json
 from pathlib import Path
-import pytest
+
 from deerflow.memory.dreaming.phases import (
     MemorySignal,
-    run_light_sleep_phase,
-    run_rem_sleep_phase,
     run_deep_sleep_phase,
     run_dream_cycle,
+    run_light_sleep_phase,
+    run_rem_sleep_phase,
 )
 from deerflow.memory.dreaming.store import DreamStore
 from deerflow.tools.builtins.dreaming_tool import consolidate_memory_dream

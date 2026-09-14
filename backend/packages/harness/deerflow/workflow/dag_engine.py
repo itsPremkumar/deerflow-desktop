@@ -11,7 +11,6 @@ Implements dependency-ordered multi-agent execution:
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Set
 
 
 class WriteScopeCollisionError(ValueError):
@@ -29,26 +28,26 @@ class DAGNode:
     id: str
     prompt: str
     category: str = "quick"
-    depends_on: List[str] = field(default_factory=list)
-    write_scope: List[str] = field(default_factory=list)  # Files/directories this node may touch
+    depends_on: list[str] = field(default_factory=list)
+    write_scope: list[str] = field(default_factory=list)  # Files/directories this node may touch
     status: str = "pending"  # "pending", "running", "completed", "failed"
-    evidence: List[str] = field(default_factory=list)
-    output: Optional[str] = None
+    evidence: list[str] = field(default_factory=list)
+    output: str | None = None
 
 
 @dataclass
 class DAGWorkflow:
     key: str
     name: str
-    nodes: Dict[str, DAGNode] = field(default_factory=dict)
+    nodes: dict[str, DAGNode] = field(default_factory=dict)
 
     def add_node(
         self,
         node_id: str,
         prompt: str,
         category: str = "quick",
-        depends_on: Optional[List[str]] = None,
-        write_scope: Optional[List[str]] = None,
+        depends_on: list[str] | None = None,
+        write_scope: list[str] | None = None,
     ) -> DAGNode:
         if node_id in self.nodes:
             raise ValueError(f"Node '{node_id}' already exists in workflow '{self.key}'")
@@ -62,14 +61,14 @@ class DAGWorkflow:
         self.nodes[node_id] = node
         return node
 
-    def get_executable_waves(self) -> List[List[str]]:
+    def get_executable_waves(self) -> list[list[str]]:
         """Compute topological execution waves (nodes that can run concurrently).
         
         Raises ValueError if a cycle is detected.
         """
         # Calculate in-degrees
-        in_degree: Dict[str, int] = {nid: 0 for nid in self.nodes}
-        graph: Dict[str, List[str]] = {nid: [] for nid in self.nodes}
+        in_degree: dict[str, int] = {nid: 0 for nid in self.nodes}
+        graph: dict[str, list[str]] = {nid: [] for nid in self.nodes}
 
         for nid, node in self.nodes.items():
             for dep in node.depends_on:
@@ -79,7 +78,7 @@ class DAGWorkflow:
                 in_degree[nid] += 1
 
         # Kahn's algorithm wave by wave
-        waves: List[List[str]] = []
+        waves: list[list[str]] = []
         current_wave = [nid for nid, deg in in_degree.items() if deg == 0]
         processed_count = 0
 
@@ -103,7 +102,7 @@ class DAGWorkflow:
         """Verify that nodes in each parallel wave have disjoint write scopes."""
         waves = self.get_executable_waves()
         for wave_idx, wave in enumerate(waves):
-            seen_scopes: Dict[str, str] = {}
+            seen_scopes: dict[str, str] = {}
             for nid in wave:
                 for scope in self.nodes[nid].write_scope:
                     norm = scope.replace("\\", "/").rstrip("/").lower()
@@ -121,7 +120,7 @@ class DAGWorkflow:
             raise KeyError(f"Node '{node_id}' not found")
         self.nodes[node_id].evidence.append(evidence)
 
-    def mark_completed(self, node_id: str, output: Optional[str] = None) -> None:
+    def mark_completed(self, node_id: str, output: str | None = None) -> None:
         """Mark node completed, strictly requiring evidence per the OmO doctrine."""
         if node_id not in self.nodes:
             raise KeyError(f"Node '{node_id}' not found")
@@ -143,7 +142,7 @@ class DAGEngine:
     """Registry and manager for active DAG workflows."""
 
     def __init__(self):
-        self._workflows: Dict[str, DAGWorkflow] = {}
+        self._workflows: dict[str, DAGWorkflow] = {}
 
     def create_workflow(self, key: str, name: str) -> DAGWorkflow:
         if key in self._workflows:
@@ -152,8 +151,8 @@ class DAGEngine:
         self._workflows[key] = wf
         return wf
 
-    def get_workflow(self, key: str) -> Optional[DAGWorkflow]:
+    def get_workflow(self, key: str) -> DAGWorkflow | None:
         return self._workflows.get(key)
 
-    def list_workflows(self) -> List[str]:
+    def list_workflows(self) -> list[str]:
         return list(self._workflows.keys())

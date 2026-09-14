@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Callable
-from typing import Any, Dict, Optional, Tuple
+from typing import Any
 
 from .knowledge import DomainKnowledgeBase
 from .lineage import AVOLineage, VersionRecord
@@ -23,10 +23,10 @@ class AVOEngine:
 
     def __init__(
         self,
-        lineage: Optional[AVOLineage] = None,
-        supervisor: Optional[AVOSupervisor] = None,
-        knowledge_base: Optional[DomainKnowledgeBase] = None,
-        agent_loop: Optional[AgenticVariationLoop] = None,
+        lineage: AVOLineage | None = None,
+        supervisor: AVOSupervisor | None = None,
+        knowledge_base: DomainKnowledgeBase | None = None,
+        agent_loop: AgenticVariationLoop | None = None,
     ) -> None:
         self.lineage = lineage or AVOLineage()
         self.supervisor = supervisor or AVOSupervisor()
@@ -38,9 +38,9 @@ class AVOEngine:
         self,
         hypothesis: str,
         modification: str,
-        evaluate_fn: Callable[[], Dict[str, Any]],
-        parent_id: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        evaluate_fn: Callable[[], dict[str, Any]],
+        parent_id: str | None = None,
+    ) -> dict[str, Any]:
         """
         Single-step iteration for backwards compatibility.
         """
@@ -114,10 +114,10 @@ class AVOEngine:
     def run_agentic_variation(
         self,
         base_hypothesis: str,
-        edit_fn: Callable[[str, Dict[str, Any]], Tuple[str, str]],
+        edit_fn: Callable[[str, dict[str, Any]], tuple[str, str]],
         evaluate_fn: Callable[[str], EvaluationVector],
-        parent_id: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        parent_id: str | None = None,
+    ) -> dict[str, Any]:
         """
         Full autonomous variation step with internal repair loop and domain knowledge K.
         """
@@ -134,7 +134,7 @@ class AVOEngine:
         result["iteration"] = self.iteration_count
         return result
 
-    def stats(self) -> Dict[str, Any]:
+    def stats(self) -> dict[str, Any]:
         return {
             "iteration_count": self.iteration_count,
             "lineage": self.lineage.stats(),

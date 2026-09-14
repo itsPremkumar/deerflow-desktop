@@ -5,7 +5,7 @@ import json
 import logging
 import time
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 logger = logging.getLogger("deerflow.security.astra.telemetry")
 
@@ -16,13 +16,13 @@ class TelemetryEntry:
     step_index: int
     actor: str
     action: str
-    details: Dict[str, Any]
+    details: dict[str, Any]
     payload_hash: str
     previous_step_hash: str
     step_hash: str
     timestamp: float = field(default_factory=time.time)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "step_index": self.step_index,
             "actor": self.actor,
@@ -43,14 +43,14 @@ class TrajectoryFlightRecorder:
     """
 
     def __init__(self) -> None:
-        self.entries: List[TelemetryEntry] = []
+        self.entries: list[TelemetryEntry] = []
         self._genesis_hash = "0" * 32
 
     def record_step(
         self,
         actor: str,
         action: str,
-        details: Optional[Dict[str, Any]] = None,
+        details: dict[str, Any] | None = None,
     ) -> TelemetryEntry:
         step_idx = len(self.entries)
         prev_hash = self.entries[-1].step_hash if self.entries else self._genesis_hash
@@ -76,7 +76,7 @@ class TrajectoryFlightRecorder:
         self.entries.append(entry)
         return entry
 
-    def verify_integrity(self) -> Tuple[bool, Optional[int]]:
+    def verify_integrity(self) -> tuple[bool, int | None]:
         """
         Verifies the cryptographic chain across all recorded telemetry steps.
         Returns: (is_valid, corrupted_index_or_None)
@@ -95,7 +95,7 @@ class TrajectoryFlightRecorder:
 
         return True, None
 
-    def export_trajectory(self) -> List[Dict[str, Any]]:
+    def export_trajectory(self) -> list[dict[str, Any]]:
         return [e.to_dict() for e in self.entries]
 
 
@@ -110,8 +110,8 @@ class DeceptionWatchdog:
         agent_statement: str,
         tool_action: str,
         tool_output: str,
-        exit_code: Optional[int] = None,
-    ) -> Tuple[bool, str]:
+        exit_code: int | None = None,
+    ) -> tuple[bool, str]:
         """
         Audits an agent's assertion against verified output.
         Returns (is_deceptive, diagnostic_message).

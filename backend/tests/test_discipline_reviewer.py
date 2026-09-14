@@ -1,4 +1,3 @@
-import pytest
 from deerflow.orchestration.discipline.reviewer import PlanReviewer, ReviewVerdict, VerdictType
 
 

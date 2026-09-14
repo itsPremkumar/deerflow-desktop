@@ -1,6 +1,6 @@
 import json
-import pytest
-from deerflow.canvas.progress_card import ProgressCard, ProgressCardStore
+
+from deerflow.canvas.progress_card import ProgressCardStore
 from deerflow.tools.builtins.progress_card_tool import update_progress_card
 
 

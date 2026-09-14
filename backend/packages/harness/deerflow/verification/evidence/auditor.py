@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, List, Tuple
 
 from .matrix import EvidenceMatrix
 
@@ -20,13 +19,13 @@ class FinishFirstAuditor:
     def __init__(self, matrix: EvidenceMatrix) -> None:
         self.matrix = matrix
 
-    def audit_finalization(self) -> Tuple[bool, str, List[str]]:
+    def audit_finalization(self) -> tuple[bool, str, list[str]]:
         """
         Audits the matrix for task completion.
         Returns: (can_finalize, status_message, list_of_blocking_issues)
         """
         summary = self.matrix.summary()
-        blocking_issues: List[str] = []
+        blocking_issues: list[str] = []
 
         if summary["total_claims"] == 0:
             blocking_issues.append("No claims or deliverables were recorded in the evidence matrix.")

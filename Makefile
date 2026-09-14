@@ -24,6 +24,7 @@ FRONTEND_PNPM = $(PYTHON) ../scripts/pnpm.py
 help:
 	@echo "DeerFlow Development Commands:"
 	@echo "  make setup           - Interactive setup wizard (recommended for new users)"
+	@echo "                           Unattended: make setup SETUP_ARGS=--non-interactive"
 	@echo "  make doctor          - Check configuration and system requirements"
 	@echo "  make prod-check      - Production readiness pre-flight (versions, config, secrets)"
 	@echo "  make support-bundle  - Create a redacted issue summary, AI draft, and evidence bundle"
@@ -64,7 +65,7 @@ help:
 
 ## Setup & Diagnosis
 setup:
-	@$(BACKEND_UV_RUN) python ../scripts/setup_wizard.py
+	@$(BACKEND_UV_RUN) python ../scripts/setup_wizard.py $(SETUP_ARGS)
 
 doctor:
 	@$(BACKEND_UV_RUN) python ../scripts/doctor.py

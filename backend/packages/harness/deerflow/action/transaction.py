@@ -4,10 +4,10 @@ import logging
 import time
 import uuid
 from collections.abc import Callable
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from .uap import ActionPrimitive, ActionRequest
 
@@ -39,13 +39,13 @@ class ActionTransaction:
          +--- Fail ----+--- Fail ---+--- Fail -+---> ROLLBACK (Compensation)
     """
 
-    def __init__(self, transaction_id: Optional[str] = None) -> None:
+    def __init__(self, transaction_id: str | None = None) -> None:
         self.transaction_id = transaction_id or f"tx_{uuid.uuid4().hex[:10]}"
         self.stage = TransactionStage.IDLE
-        self.actions: List[ActionRequest] = []
-        self.shadow_snapshots: Dict[str, Optional[str]] = {}
-        self.compensations: List[CompensationStep] = []
-        self.error: Optional[str] = None
+        self.actions: list[ActionRequest] = []
+        self.shadow_snapshots: dict[str, str | None] = {}
+        self.compensations: list[CompensationStep] = []
+        self.error: str | None = None
         self.created_at = time.time()
         self.updated_at = self.created_at
 
@@ -77,7 +77,7 @@ class ActionTransaction:
             self.stage = TransactionStage.FAILED
             return False
 
-    def validate(self, safety_check: Optional[Callable[[List[ActionRequest]], bool]] = None) -> bool:
+    def validate(self, safety_check: Callable[[list[ActionRequest]], bool] | None = None) -> bool:
         """Stage 2: VALIDATE - evaluate safety envelopes and AST checks."""
         if self.stage != TransactionStage.PREPARED:
             self.error = f"Cannot validate from stage {self.stage}"
@@ -97,7 +97,7 @@ class ActionTransaction:
             self.stage = TransactionStage.FAILED
             return False
 
-    def commit(self, commit_fn: Optional[Callable[[List[ActionRequest]], bool]] = None) -> bool:
+    def commit(self, commit_fn: Callable[[list[ActionRequest]], bool] | None = None) -> bool:
         """Stage 3: COMMIT - apply the actual modifications."""
         if self.stage != TransactionStage.VALIDATED:
             self.error = f"Cannot commit from stage {self.stage}"
@@ -133,7 +133,7 @@ class ActionTransaction:
             self.rollback()
             return False
 
-    def verify(self, verify_fn: Optional[Callable[[], bool]] = None) -> bool:
+    def verify(self, verify_fn: Callable[[], bool] | None = None) -> bool:
         """Stage 4: VERIFY - post-action test and invariant verification."""
         if self.stage != TransactionStage.COMMITTED:
             self.error = f"Cannot verify from stage {self.stage}"
@@ -170,9 +170,9 @@ class ActionTransaction:
 
     def execute_lifecycle(
         self,
-        commit_fn: Callable[[List[ActionRequest]], bool],
-        verify_fn: Optional[Callable[[], bool]] = None,
-        safety_check: Optional[Callable[[List[ActionRequest]], bool]] = None,
+        commit_fn: Callable[[list[ActionRequest]], bool],
+        verify_fn: Callable[[], bool] | None = None,
+        safety_check: Callable[[list[ActionRequest]], bool] | None = None,
     ) -> bool:
         """Executes the full 4-stage lifecycle atomically."""
         if not self.prepare():
@@ -185,7 +185,7 @@ class ActionTransaction:
             return False
         return True
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "transaction_id": self.transaction_id,
             "stage": self.stage.value,

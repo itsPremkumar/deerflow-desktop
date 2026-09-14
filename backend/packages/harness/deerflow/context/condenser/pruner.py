@@ -3,13 +3,13 @@
 from __future__ import annotations
 
 import copy
-from typing import Any, Dict, List, Optional, Set
+from typing import Any
 
 
 class DeterministicPruner:
     """Stage 1: Prunes stale intermediate tool outputs (e.g., file reads, directory listings)."""
 
-    VERBOSE_TOOLS: Set[str] = {
+    VERBOSE_TOOLS: set[str] = {
         "view_file", "read_file", "cat", "list_dir", "ls",
         "find_by_name", "grep_search", "search_code",
     }
@@ -18,7 +18,7 @@ class DeterministicPruner:
         self.keep_last_n_observations = keep_last_n_observations
         self.max_pruned_length = max_pruned_length
 
-    def prune(self, messages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    def prune(self, messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """Return a pruned copy of messages where older verbose observations are compacted."""
         if not messages:
             return []
@@ -26,7 +26,7 @@ class DeterministicPruner:
         pruned = copy.deepcopy(messages)
 
         # Identify all tool observation messages (from end to start)
-        obs_indices: List[int] = []
+        obs_indices: list[int] = []
         for idx, msg in enumerate(pruned):
             role = msg.get("role")
             msg_type = msg.get("type")

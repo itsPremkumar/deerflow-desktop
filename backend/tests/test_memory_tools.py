@@ -532,6 +532,7 @@ class TestModeGating:
             tool_search=SimpleNamespace(enabled=False, auto_promote_top_k=0),
             database=SimpleNamespace(checkpoint_channel_mode="full"),
             authorization=AuthorizationConfig(enabled=False),
+            agent_presets=None,
         )
 
         agent_kwargs = lead_agent_module._make_lead_agent({"configurable": {"agent_name": "test-agent"}}, app_config=app_config)
@@ -567,6 +568,7 @@ class TestModeGating:
             tool_search=SimpleNamespace(enabled=False, auto_promote_top_k=0),
             database=SimpleNamespace(checkpoint_channel_mode="full"),
             authorization=AuthorizationConfig(enabled=False),
+            agent_presets=None,
         )
 
         agent_kwargs = lead_agent_module._make_lead_agent({"configurable": {"agent_name": "test-agent"}}, app_config=app_config)

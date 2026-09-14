@@ -5,8 +5,9 @@ from __future__ import annotations
 import json
 import logging
 import threading
+from collections.abc import Sequence
 from pathlib import Path
-from typing import Any, Sequence
+from typing import Any
 from uuid import uuid4
 
 from deerflow.bots.registry import get_bot_registry
@@ -16,14 +17,24 @@ from deerflow.groups.room import GroupMessage, GroupRoom, OrchestrationMode, _no
 
 logger = logging.getLogger(__name__)
 
-_DEFAULT_GROUPS_DIR = ".deerflow/groups"
+_DEFAULT_GROUPS_DIR = "groups"
+
+
+def _default_storage_path() -> Path:
+    """Resolve rooms.json under the writable runtime home (DEER_FLOW_HOME-aware)."""
+    try:
+        from deerflow.config.runtime_paths import runtime_home
+
+        return runtime_home() / _DEFAULT_GROUPS_DIR / "rooms.json"
+    except Exception:
+        return Path.cwd() / ".deerflow" / _DEFAULT_GROUPS_DIR / "rooms.json"
 
 
 class GroupChatService:
     """Manages group chat rooms, member enrollment, and multi-agent coordination."""
 
     def __init__(self, storage_path: str | Path | None = None):
-        self.storage_path = Path(storage_path).resolve() if storage_path else Path.cwd() / _DEFAULT_GROUPS_DIR / "rooms.json"
+        self.storage_path = Path(storage_path).resolve() if storage_path else _default_storage_path()
         self._rooms: dict[str, GroupRoom] = {}
         self.orchestrator = GroupOrchestrator()
         self.quorum = QuorumEngine()
@@ -34,13 +45,13 @@ class GroupChatService:
         if not self.storage_path.exists():
             return
         try:
-            with open(self.storage_path, "r", encoding="utf-8") as f:
+            with open(self.storage_path, encoding="utf-8") as f:
                 data = json.load(f)
             for item in data.get("rooms", []):
                 room = GroupRoom.from_dict(item)
                 self._rooms[room.name.lower()] = room
         except Exception:
-            pass
+            logger.warning("Group rooms load failed; starting empty", exc_info=True)
 
     def _save(self) -> None:
         try:
@@ -55,7 +66,7 @@ class GroupChatService:
                 json.dump(data, f, indent=2)
             tmp.replace(self.storage_path)
         except Exception:
-            pass
+            logger.warning("Group rooms save failed", exc_info=True)
 
     def get_or_create_room(
         self,
@@ -138,8 +149,36 @@ class GroupChatService:
         return msg, next_speakers
 
 
-_global_groups = GroupChatService()
+_global_groups: GroupChatService | None = None
+_global_groups_path: str | None = None
 
 
-def get_group_chat_service() -> GroupChatService:
+def get_group_chat_service(storage_path: str | Path | None = None) -> GroupChatService:
+    """Return the process-wide group chat service (DEER_FLOW_HOME-aware).
+
+    Same stale-path rebuild contract as get_bot_registry: an explicit path
+    wins, otherwise the live runtime_home() location is used so import-time
+    CWD never pins Gateway/Electron/Docker to the wrong directory.
+    """
+    global _global_groups, _global_groups_path
+    if storage_path is not None:
+        resolved = str(Path(storage_path).resolve())
+        if _global_groups is None or _global_groups_path != resolved:
+            _global_groups = GroupChatService(storage_path=resolved)
+            _global_groups_path = resolved
+        return _global_groups
+    if _global_groups is None:
+        _global_groups = GroupChatService()
+        try:
+            _global_groups_path = str(_global_groups.storage_path.resolve())
+        except Exception:
+            _global_groups_path = None
+        return _global_groups
+    try:
+        live = str(_default_storage_path().resolve())
+    except Exception:
+        return _global_groups
+    if _global_groups_path != live:
+        _global_groups = GroupChatService()
+        _global_groups_path = live
     return _global_groups

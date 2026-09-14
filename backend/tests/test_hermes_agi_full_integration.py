@@ -1,6 +1,5 @@
 """End-to-end integration testing: Mission Compiler, Epistemics, RSI, Consequence Simulation, and Self-Healing."""
 
-import json
 from deerflow.consequence import AffordanceModel, ConsequenceSimulator
 from deerflow.epistemics import EpistemicBeliefEngine, EpistemicStatus
 from deerflow.mission import MissionCompiler, RiskTier

@@ -1,12 +1,10 @@
 ﻿"""Tests for Boulder State Machine & Checkpointing."""
 
-import json
 from pathlib import Path
+
 from deerflow.state.boulder import (
-    BoulderState,
     append_session_id,
     clear_boulder,
-    complete_boulder,
     create_boulder,
     load_boulder,
     update_checklist_item,

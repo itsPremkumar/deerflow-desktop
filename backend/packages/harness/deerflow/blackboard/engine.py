@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import time
 import uuid
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from .models import (
     BlackboardSnapshot,
@@ -42,7 +42,7 @@ class BlackboardEngine:
 
     def __init__(
         self,
-        session_id: Optional[str] = None,
+        session_id: str | None = None,
         goal: str = "",
         goal_classification: GoalClassification = GoalClassification.COMPLEX,
     ) -> None:
@@ -58,12 +58,12 @@ class BlackboardEngine:
         self.updated_at = self.created_at
 
         # Initialize all 20 planes into default idle states
-        self.plane_states: Dict[str, PlaneState] = {
+        self.plane_states: dict[str, PlaneState] = {
             plane_id: PlaneState(plane_id=plane_id, status=PlaneStatus.IDLE)
             for plane_id in ALL_20_PLANES
         }
-        self.shared_context: Dict[str, Any] = {}
-        self.evidence_trail: List[EvidenceItem] = []
+        self.shared_context: dict[str, Any] = {}
+        self.evidence_trail: list[EvidenceItem] = []
 
     def set_phase(self, phase: CognitivePhase | str) -> None:
         self.current_phase = (
@@ -75,8 +75,8 @@ class BlackboardEngine:
         self,
         plane_id: str,
         status: PlaneStatus | str,
-        output: Optional[Dict[str, Any]] = None,
-        error: Optional[str] = None,
+        output: dict[str, Any] | None = None,
+        error: str | None = None,
     ) -> PlaneState:
         if plane_id not in self.plane_states:
             self.plane_states[plane_id] = PlaneState(plane_id=plane_id)
@@ -111,7 +111,7 @@ class BlackboardEngine:
         self,
         plane_id: str,
         evidence_type: str,
-        content: Dict[str, Any],
+        content: dict[str, Any],
         confidence: float = 1.0,
     ) -> EvidenceItem:
         clamped_conf = max(0.0, min(1.0, float(confidence)))
@@ -127,11 +127,11 @@ class BlackboardEngine:
 
     def query_evidence(
         self,
-        plane_id: Optional[str] = None,
-        evidence_type: Optional[str] = None,
+        plane_id: str | None = None,
+        evidence_type: str | None = None,
         min_confidence: float = 0.0,
-    ) -> List[EvidenceItem]:
-        results: List[EvidenceItem] = []
+    ) -> list[EvidenceItem]:
+        results: list[EvidenceItem] = []
         for item in self.evidence_trail:
             if plane_id and item.plane_id != plane_id:
                 continue
@@ -162,5 +162,5 @@ class BlackboardEngine:
             updated_at=self.updated_at,
         )
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return self.create_snapshot().to_dict()

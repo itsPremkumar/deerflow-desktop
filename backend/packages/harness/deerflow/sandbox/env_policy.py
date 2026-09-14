@@ -115,6 +115,11 @@ def build_sandbox_env(injected: dict[str, str] | None = None) -> dict[str, str]:
     the host environment).
     """
     env = {key: value for key, value in os.environ.items() if not is_blocked_env_name(key)}
+    # Guarantee the working-directory marker: ``PWD`` is normally inherited,
+    # but Windows processes do not set it, and skill scripts (POSIX-style and
+    # otherwise) rely on it to locate the thread workspace. ``PWD`` carries no
+    # credential substring, so defaulting it is safe.
+    env.setdefault("PWD", os.getcwd())
     if injected:
         env.update(injected)
     return env

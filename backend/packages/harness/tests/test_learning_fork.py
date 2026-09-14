@@ -1,15 +1,15 @@
 """Tests for the learning fork middleware."""
 
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import pytest
 from langgraph.runtime import Runtime
 
 from deerflow.agents.middlewares.learning_fork_middleware import (
+    _WHITELISTED_TOOL_NAMES,
     LearningForkMiddleware,
     LearningForkMiddlewareState,
     _build_digest,
-    _WHITELISTED_TOOL_NAMES,
     build_learning_fork_middleware,
 )
 from deerflow.config.learning_fork_config import LearningForkConfig

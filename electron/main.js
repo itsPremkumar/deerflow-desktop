@@ -116,6 +116,66 @@ const mainLogFile = path.join(logsDir, 'main.log');
 // backend venv under the writable user-data folder instead.
 const backendVenvDir = path.join(userDataRoot, 'backend-venv');
 const pythonInstallDir = path.join(userDataRoot, 'python');
+// Own preference file for "Start with Windows" (source of truth). The OS
+// login-item state is read back for display, but this file decides what boot
+// enforces — so an externally removed entry is re-registered, never silently
+// dropped.
+const autoStartPrefFile = path.join(userDataRoot, 'auto-start.json');
+
+function readAutoStartPref() {
+  try {
+    const data = JSON.parse(fs.readFileSync(autoStartPrefFile, 'utf8'));
+    return data && data.enabled === true;
+  } catch {
+    return false;
+  }
+}
+
+function writeAutoStartPref(enabled) {
+  try {
+    fs.writeFileSync(autoStartPrefFile, JSON.stringify({ enabled: Boolean(enabled) }), 'utf8');
+  } catch (error) {
+    log(`Warning: could not persist auto-start preference: ${error.message}`);
+  }
+}
+
+/**
+ * Windows always-on: register or clear the login item for this app.
+ *
+ * Installed-app only: in a source checkout the executable is the bare
+ * Electron binary, so a login entry would launch without the app. Throws in
+ * that case instead of writing a broken startup entry.
+ *
+ * @returns {boolean} the OS-reported login-item state after applying.
+ */
+function applyAutoStartSetting(enabled) {
+  if (!isPackaged) {
+    throw new Error(
+      'Start with Windows is available in the installed app. ' +
+        'Install DeerFlow (electron-builder) to use it.',
+    );
+  }
+  app.setLoginItemSettings({ openAtLogin: Boolean(enabled) });
+  writeAutoStartPref(enabled);
+  let actual = false;
+  try {
+    actual = Boolean(app.getLoginItemSettings().openAtLogin);
+  } catch {
+    actual = Boolean(enabled);
+  }
+  log(`Start with Windows ${actual ? 'enabled' : 'disabled'}`);
+  return actual;
+}
+
+function getAutoStartState() {
+  let active = false;
+  try {
+    active = Boolean(app.getLoginItemSettings().openAtLogin);
+  } catch {
+    active = false;
+  }
+  return { supported: isPackaged, enabled: readAutoStartPref(), active };
+}
 
 // ---------------------------------------------------------------------------
 // Logging (never logs environment values — they may contain API keys)
@@ -323,6 +383,39 @@ function applyDesktopAuthMode(env) {
   return env;
 }
 
+const MIN_USER_DATA_FREE_BYTES = 1 * 1024 * 1024 * 1024;
+
+/**
+ * Fail-loud install/health self-check. Runs on every boot before services
+ * spawn so a broken host (disk-full user data, missing bundled runtimes in a
+ * packaged install) surfaces one clear error instead of cascading failures.
+ * Throws on fatal conditions; logs advisory lines otherwise.
+ */
+function runStartupDiagnostics() {
+  // Writable user-data with room to breathe: the backend venv, Python,
+  // databases, logs, and artifacts all live here.
+  let freeBytes = null;
+  try {
+    if (typeof fs.statfsSync === 'function') {
+      const stats = fs.statfsSync(userDataRoot);
+      freeBytes = Number(stats.bfree) * Number(stats.bsize);
+    }
+  } catch (error) {
+    log(`Diagnostic: disk probe unavailable (${error.message}); skipping free-space gate`);
+  }
+  if (freeBytes !== null && freeBytes < MIN_USER_DATA_FREE_BYTES) {
+    throw new Error(
+      `Not enough free disk space for DeerFlow data (${Math.round(freeBytes / 1024 / 1024)} MiB free at ${userDataRoot}; ` +
+        'at least 1024 MiB is required). Free some space and restart the app.',
+    );
+  }
+  log(
+    'Self-diagnostic passed',
+    `userData=${userDataRoot} free=${freeBytes === null ? 'unknown' : `${Math.round(freeBytes / 1024 / 1024)} MiB`} ` +
+      `packaged=${isPackaged} electron=${process.versions.electron} node=${process.versions.node}`,
+  );
+}
+
 function seedFileIfMissing(source, dest) {
   try {
     if (!fs.existsSync(dest) && source && fs.existsSync(source)) {
@@ -486,10 +579,16 @@ async function warnIfNoModels(gatewayBaseUrl) {
 }
 
 function resolveUv() {
-  // Prefer the installer-bundled runtime so end-user machines need nothing
-  // pre-installed; fall back to the system `uv` for source checkouts.
+  // Packaged installs must be self-contained: use the installer-bundled
+  // runtime, never the system PATH. Source checkouts may fall back to PATH.
   const bundled = bundledToolPath('uv', process.platform === 'win32' ? 'uv.exe' : 'uv');
   if (bundled) return bundled;
+  if (isPackaged) {
+    throw new Error(
+      'Bundled `uv` runtime missing from the installed app (resources/runtime/uv). ' +
+        'Reinstall DeerFlow — the packaged app must not depend on a system PATH copy.',
+    );
+  }
   const home = os.homedir();
   return resolveTool(process.platform === 'win32' ? 'uv.exe' : 'uv', [
     path.join(home, '.cargo', 'bin', process.platform === 'win32' ? 'uv.exe' : 'uv'),
@@ -501,6 +600,12 @@ function resolveUv() {
 function resolveNode() {
   const bundled = bundledToolPath('node', process.platform === 'win32' ? 'node.exe' : 'node');
   if (bundled) return bundled;
+  if (isPackaged) {
+    throw new Error(
+      'Bundled Node.js runtime missing from the installed app (resources/runtime/node). ' +
+        'Reinstall DeerFlow — the packaged app must not depend on a system PATH copy.',
+    );
+  }
   return resolveTool(process.platform === 'win32' ? 'node.exe' : 'node', []);
 }
 
@@ -592,8 +697,11 @@ function patchStandaloneGatewayUrl(standaloneDir, gatewayBaseUrl) {
   let raw;
   try {
     raw = fs.readFileSync(manifestPath, 'utf8');
-  } catch {
-    return false;
+  } catch (error) {
+    throw new Error(
+      `Cannot point the bundled frontend at the Gateway: missing Next.js routes manifest at ${manifestPath} (${error.message}). ` +
+        'Rebuild the frontend (`npm run build:frontend` from electron/) so /api rewrites exist.',
+    );
   }
   let manifest;
   try {
@@ -615,7 +723,12 @@ function patchStandaloneGatewayUrl(standaloneDir, gatewayBaseUrl) {
       }
     }
   }
-  if (patched === 0) return false;
+  if (patched === 0) {
+    throw new Error(
+      `Cannot point the bundled frontend at the Gateway: no loopback rewrite destinations found in ${manifestPath}. ` +
+        `Expected /api rewrites to http://127.0.0.1:<port> (built with DEER_FLOW_INTERNAL_GATEWAY_BASE_URL). Rebuild the frontend.`,
+    );
+  }
   try {
     fs.writeFileSync(manifestPath, JSON.stringify(manifest), 'utf8');
   } catch (error) {
@@ -816,12 +929,28 @@ async function boot() {
   ensureDir(projectDir);
   ensureDir(deerflowHomeDir);
   ensureDir(logsDir);
+  runStartupDiagnostics();
   fileLoggingReady = true;
   rotateLogFile(mainLogFile, MAX_LOG_BYTES);
   try {
     fs.appendFileSync(mainLogFile, `--- ${APP_NAME} Desktop v${app.getVersion()} started (${new Date().toISOString()}) ---\n`, 'utf8');
   } catch {
     // Ignore.
+  }
+
+  // Self-heal the login item: if the user opted into "Start with Windows"
+  // but the OS entry is gone (cleaner tools, manual removal), re-register it.
+  // Best-effort and packaged-only; never blocks boot.
+  if (isPackaged && readAutoStartPref()) {
+    try {
+      app.setLoginItemSettings({ openAtLogin: true });
+      log('Re-applied Start with Windows login item');
+    } catch (error) {
+      log(`Warning: could not re-apply Start with Windows: ${error.message}`);
+    }
+  }
+  if (app.getLoginItemSettings().wasOpenedAtLogin) {
+    log('Opened at login (Windows startup)');
   }
 
   log(`Mode: ${args.dev ? 'development' : 'production'}${isPackaged ? ' (packaged)' : ' (from sources)'}`);
@@ -958,6 +1087,8 @@ if (!gotLock) {
 
   ipcMain.handle('deerflow:status', () => runtimeStatus);
   ipcMain.handle('deerflow:open-user-data', () => shell.openPath(userDataRoot));
+  ipcMain.handle('deerflow:get-auto-start', () => getAutoStartState());
+  ipcMain.handle('deerflow:set-auto-start', (_event, enabled) => applyAutoStartSetting(enabled));
 
   app.whenReady().then(() => {
     createSplash();

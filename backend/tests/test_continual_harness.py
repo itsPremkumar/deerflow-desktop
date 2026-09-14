@@ -1,6 +1,7 @@
 """Unit tests for Continual Harness state, snapshots, refinement, and middleware."""
 
 from pathlib import Path
+
 import pytest
 from langchain_core.messages import SystemMessage
 

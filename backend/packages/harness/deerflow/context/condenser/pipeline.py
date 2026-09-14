@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 from deerflow.context.condenser.pruner import DeterministicPruner
 from deerflow.context.condenser.summarizer import StructuredStateCondenser, WorkingState
@@ -32,9 +32,9 @@ class PipelineCondenser:
 
     def condense(
         self,
-        messages: List[Dict[str, Any]],
-        existing_state: Optional[WorkingState] = None,
-    ) -> Tuple[List[Dict[str, Any]], WorkingState]:
+        messages: list[dict[str, Any]],
+        existing_state: WorkingState | None = None,
+    ) -> tuple[list[dict[str, Any]], WorkingState]:
         """Condense message history and return (condensed_messages, updated_state)."""
         if not messages:
             return [], WorkingState()

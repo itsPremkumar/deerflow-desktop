@@ -7,7 +7,7 @@ import time
 import uuid
 from collections import Counter
 from dataclasses import asdict, dataclass, field
-from typing import Any, Sequence
+from typing import Any
 
 
 def _tokenize(text: str) -> set[str]:

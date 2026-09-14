@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from typing import Any, Dict, List, Optional
+
 from langchain.tools import tool
 
 from deerflow.models.performance_registry import (
@@ -27,8 +27,8 @@ def manage_model_performance_registry(
     cost_usd: float = 0.005,
     verification_score: float = 1.0,
     candidate_models_csv: str = "",
-    max_cost_usd: Optional[float] = None,
-    max_latency_ms: Optional[float] = None,
+    max_cost_usd: float | None = None,
+    max_latency_ms: float | None = None,
     min_success_rate: float = 0.7,
 ) -> str:
     """Manage empirical model benchmarks and dynamically route tasks to Pareto-optimal models.

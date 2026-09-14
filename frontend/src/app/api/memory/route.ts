@@ -1,7 +1,13 @@
 import type { NextRequest } from "next/server";
 
+// Server-side proxy: prefer the internal Gateway URL (honours Electron's
+// dynamic gateway port via DEER_FLOW_INTERNAL_GATEWAY_BASE_URL), fall back to
+// the public backend URL, then loopback default. Never use NEXT_PUBLIC_* alone
+// here — it is baked at build time and ignores the runtime gateway port.
 const BACKEND_BASE_URL =
-  process.env.NEXT_PUBLIC_BACKEND_BASE_URL ?? "http://127.0.0.1:8001";
+  process.env.DEER_FLOW_INTERNAL_GATEWAY_BASE_URL ??
+  process.env.NEXT_PUBLIC_BACKEND_BASE_URL ??
+  "http://127.0.0.1:8001";
 
 function buildBackendUrl(pathname: string) {
   return new URL(pathname, BACKEND_BASE_URL);

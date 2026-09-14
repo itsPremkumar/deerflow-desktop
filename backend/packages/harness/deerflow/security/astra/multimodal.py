@@ -4,7 +4,7 @@ import hashlib
 import logging
 import time
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any
 
 logger = logging.getLogger("deerflow.security.astra.multimodal")
 
@@ -16,11 +16,11 @@ class VisualEvidenceItem:
     media_type: str  # "image/png", "image/jpeg", "svg"
     sha256_hash: str
     dimensions: tuple[int, int]  # width, height
-    bounding_boxes: List[Dict[str, Any]] = field(default_factory=list)
+    bounding_boxes: list[dict[str, Any]] = field(default_factory=list)
     description: str = ""
     timestamp: float = field(default_factory=time.time)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "evidence_id": self.evidence_id,
             "media_type": self.media_type,
@@ -39,7 +39,7 @@ class MultimodalGrounding:
     """
 
     def __init__(self) -> None:
-        self.evidence_archive: Dict[str, VisualEvidenceItem] = {}
+        self.evidence_archive: dict[str, VisualEvidenceItem] = {}
 
     def register_visual_evidence(
         self,
@@ -47,7 +47,7 @@ class MultimodalGrounding:
         media_type: str = "image/png",
         dimensions: tuple[int, int] = (1920, 1080),
         description: str = "",
-        bounding_boxes: Optional[List[Dict[str, Any]]] = None,
+        bounding_boxes: list[dict[str, Any]] | None = None,
     ) -> VisualEvidenceItem:
         h = hashlib.sha256(image_bytes).hexdigest()[:16]
         ev_id = f"vis_{h[:8]}"
@@ -63,7 +63,7 @@ class MultimodalGrounding:
         self.evidence_archive[ev_id] = item
         return item
 
-    def get_evidence(self, evidence_id: str) -> Optional[VisualEvidenceItem]:
+    def get_evidence(self, evidence_id: str) -> VisualEvidenceItem | None:
         return self.evidence_archive.get(evidence_id)
 
 
@@ -83,8 +83,8 @@ class ProactiveTriggerEngine:
     """
 
     def __init__(self) -> None:
-        self.triggers: Dict[str, ProactiveTrigger] = {}
-        self.fired_events: List[Dict[str, Any]] = []
+        self.triggers: dict[str, ProactiveTrigger] = {}
+        self.fired_events: list[dict[str, Any]] = []
 
     def register_trigger(
         self,

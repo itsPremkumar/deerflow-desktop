@@ -1,4 +1,5 @@
 import pytest
+
 from deerflow.mission.state_machine import (
     InvalidStateTransitionError,
     TaskState,

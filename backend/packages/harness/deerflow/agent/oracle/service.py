@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -13,10 +12,10 @@ logger = logging.getLogger(__name__)
 class OracleResponse:
     query: str
     guidance: str
-    best_practices: List[str] = field(default_factory=list)
-    common_pitfalls: List[str] = field(default_factory=list)
+    best_practices: list[str] = field(default_factory=list)
+    common_pitfalls: list[str] = field(default_factory=list)
     confidence: float = 0.95
-    references: List[str] = field(default_factory=list)
+    references: list[str] = field(default_factory=list)
 
     def to_markdown(self) -> str:
         lines = [
@@ -46,8 +45,8 @@ class OracleService:
     def consult(
         self,
         query: str,
-        context_snippets: Optional[List[str]] = None,
-        technical_domain: Optional[str] = None,
+        context_snippets: list[str] | None = None,
+        technical_domain: str | None = None,
     ) -> OracleResponse:
         q_lower = query.lower()
         guidance = ""

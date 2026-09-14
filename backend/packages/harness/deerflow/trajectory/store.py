@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
-from deerflow.trajectory.models import StepRecord, TrajectoryTrace, _now
+from deerflow.trajectory.models import StepRecord, TrajectoryTrace
 
 logger = logging.getLogger(__name__)
 

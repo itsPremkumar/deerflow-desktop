@@ -1,4 +1,3 @@
-import pytest
 
 from deerflow.governance.council import (
     QualityCouncil,

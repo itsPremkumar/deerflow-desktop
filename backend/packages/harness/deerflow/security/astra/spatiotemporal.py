@@ -14,7 +14,7 @@ import hashlib
 import time
 import uuid
 from dataclasses import asdict, dataclass, field
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 
 @dataclass
@@ -26,7 +26,7 @@ class BoundingBox:
     height: float = 0.0
     coordinate_type: str = "normalized"  # 'normalized' or 'pixel'
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
 
@@ -37,9 +37,9 @@ class SpatialObject:
     label: str = ""
     confidence: float = 1.0
     bbox: BoundingBox = field(default_factory=BoundingBox)
-    attributes: Dict[str, Any] = field(default_factory=dict)
+    attributes: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         data = asdict(self)
         data["bbox"] = self.bbox.to_dict()
         return data
@@ -51,12 +51,12 @@ class VideoKeyframe:
     frame_id: str = field(default_factory=lambda: str(uuid.uuid4()))
     timestamp: float = field(default_factory=time.time)
     image_hash: str = ""
-    objects: List[SpatialObject] = field(default_factory=list)
+    objects: list[SpatialObject] = field(default_factory=list)
     screen_context: str = ""
     ambient_text: str = ""
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "frame_id": self.frame_id,
             "timestamp": self.timestamp,
@@ -73,19 +73,19 @@ class SpatioTemporalCache:
 
     def __init__(self, max_frames: int = 1000):
         self.max_frames: int = max_frames
-        self._frames: List[VideoKeyframe] = []
-        self._timestamps: List[float] = []
+        self._frames: list[VideoKeyframe] = []
+        self._timestamps: list[float] = []
         # Inverted index: object_label.lower() -> list of (frame_index, object_idx)
-        self._label_index: Dict[str, List[Tuple[int, int]]] = {}
+        self._label_index: dict[str, list[tuple[int, int]]] = {}
 
     def ingest_frame(
         self,
-        objects: Optional[List[SpatialObject]] = None,
+        objects: list[SpatialObject] | None = None,
         screen_context: str = "",
         ambient_text: str = "",
-        timestamp: Optional[float] = None,
-        image_bytes: Optional[bytes] = None,
-        metadata: Optional[Dict[str, Any]] = None,
+        timestamp: float | None = None,
+        image_bytes: bytes | None = None,
+        metadata: dict[str, Any] | None = None,
     ) -> VideoKeyframe:
         """Ingest a continuous stream keyframe into temporal cache."""
         t = timestamp if timestamp is not None else time.time()
@@ -128,10 +128,10 @@ class SpatioTemporalCache:
                 lbl = obj.label.strip().lower()
                 self._label_index.setdefault(lbl, []).append((f_idx, obj_idx))
 
-    def find_object_history(self, label: str) -> List[Dict[str, Any]]:
+    def find_object_history(self, label: str) -> list[dict[str, Any]]:
         """Retroactively locate an object across time ('Where did I leave my glasses?')."""
         lbl = label.strip().lower()
-        matches: List[Dict[str, Any]] = []
+        matches: list[dict[str, Any]] = []
 
         for f_idx, obj_idx in self._label_index.get(lbl, []):
             if f_idx < len(self._frames):
@@ -147,14 +147,14 @@ class SpatioTemporalCache:
 
         return matches
 
-    def get_most_recent_location(self, label: str) -> Optional[Dict[str, Any]]:
+    def get_most_recent_location(self, label: str) -> dict[str, Any] | None:
         """Return the last seen timestamp and bounding box of a named object."""
         history = self.find_object_history(label)
         if not history:
             return None
         return history[-1]
 
-    def get_recent_timeline(self, window_seconds: float = 60.0) -> List[Dict[str, Any]]:
+    def get_recent_timeline(self, window_seconds: float = 60.0) -> list[dict[str, Any]]:
         """Retrieve keyframes within the last N seconds to construct prompt context."""
         if not self._timestamps:
             return []
@@ -165,7 +165,7 @@ class SpatioTemporalCache:
 
         return [f.to_dict() for f in self._frames[start_idx:]]
 
-    def get_frame_by_id(self, frame_id: str) -> Optional[VideoKeyframe]:
+    def get_frame_by_id(self, frame_id: str) -> VideoKeyframe | None:
         for f in self._frames:
             if f.frame_id == frame_id:
                 return f

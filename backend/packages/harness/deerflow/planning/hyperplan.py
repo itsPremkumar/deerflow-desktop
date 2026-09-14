@@ -20,7 +20,7 @@ from __future__ import annotations
 import hashlib
 import re
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 
 @dataclass
@@ -28,10 +28,10 @@ class ReviewerVerdict:
     reviewer_role: str
     status: str  # "APPROVED", "REJECTED", "NEEDS_REVISION"
     critique: str
-    identified_risks: List[str] = field(default_factory=list)
-    missing_prerequisites: List[str] = field(default_factory=list)
+    identified_risks: list[str] = field(default_factory=list)
+    missing_prerequisites: list[str] = field(default_factory=list)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "reviewer_role": self.reviewer_role,
             "status": self.status,
@@ -45,7 +45,7 @@ class ReviewerVerdict:
 class HyperplanReport:
     plan_title: str
     overall_status: str  # "APPROVED", "BLOCKED"
-    verdicts: List[ReviewerVerdict]
+    verdicts: list[ReviewerVerdict]
     gatekeeper_summary: str
     plan_hash: str = ""
 
@@ -57,10 +57,10 @@ class HyperplanReport:
     def is_approved(self) -> bool:
         return self.overall_status == "APPROVED"
 
-    def blocking_verdicts(self) -> List[ReviewerVerdict]:
+    def blocking_verdicts(self) -> list[ReviewerVerdict]:
         return [v for v in self.verdicts if v.status in ("REJECTED", "NEEDS_REVISION")]
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "plan_title": self.plan_title,
             "overall_status": self.overall_status,
@@ -72,7 +72,7 @@ class HyperplanReport:
 
 def hash_plan(plan_title: str, plan_text: str) -> str:
     """Stable short hash for plan pinning (C3: execution pins plan hash)."""
-    digest = hashlib.sha256(f"{plan_title}\n{plan_text}".encode("utf-8")).hexdigest()
+    digest = hashlib.sha256(f"{plan_title}\n{plan_text}".encode()).hexdigest()
     return digest[:16]
 
 
@@ -177,9 +177,9 @@ class HyperplanPipeline:
         self,
         plan_title: str,
         plan_text: str,
-        strict_acceptance_required: Optional[bool] = None,
+        strict_acceptance_required: bool | None = None,
     ) -> HyperplanReport:
-        verdicts: List[ReviewerVerdict] = []
+        verdicts: list[ReviewerVerdict] = []
 
         # Lens 1: Gap Analysis (plan-consultant)
         v1 = self._review_gaps(plan_text)
@@ -218,8 +218,8 @@ class HyperplanPipeline:
         )
 
     def _review_gaps(self, text: str) -> ReviewerVerdict:
-        risks: List[str] = []
-        missing: List[str] = []
+        risks: list[str] = []
+        missing: list[str] = []
         stripped = text.strip()
         has_prereq = bool(
             re.search(
@@ -254,7 +254,7 @@ class HyperplanPipeline:
         )
 
     def _review_architecture(self, text: str) -> ReviewerVerdict:
-        risks: List[str] = []
+        risks: list[str] = []
         worst = "APPROVED"
 
         for pattern, label in _ARCH_RISKS:
@@ -278,7 +278,7 @@ class HyperplanPipeline:
         )
 
     def _review_security(self, text: str) -> ReviewerVerdict:
-        risks: List[str] = []
+        risks: list[str] = []
         for pattern, label in _DANGEROUS_COMMAND_RES:
             if pattern.search(text):
                 # Production-delete needs a backup mention to be acceptable.
@@ -302,7 +302,7 @@ class HyperplanPipeline:
         )
 
     def _review_testability(self, text: str) -> ReviewerVerdict:
-        risks: List[str] = []
+        risks: list[str] = []
         # Check for genuine testing / evidence verification commands
         has_test_spec = bool(_TEST_SPEC_RE.search(text))
         has_negation = bool(_TEST_NEGATION_RE.search(text))

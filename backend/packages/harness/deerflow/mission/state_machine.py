@@ -13,9 +13,9 @@ CREATED -> ANALYZING -> PLANNING -> READY -> RUNNING
 from __future__ import annotations
 
 import time
-from dataclasses import asdict, dataclass, field
+from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional, Set
+from typing import Any
 
 
 class TaskState(str, Enum):
@@ -42,7 +42,7 @@ class InvalidStateTransitionError(ValueError):
 
 
 # Legal state transition graph mapping source_state -> set of valid target_states
-VALID_TRANSITIONS: Dict[TaskState, Set[TaskState]] = {
+VALID_TRANSITIONS: dict[TaskState, set[TaskState]] = {
     TaskState.CREATED: {
         TaskState.ANALYZING,
         TaskState.CANCELLED,
@@ -138,7 +138,7 @@ class StateTransitionRecord:
     reason: str = ""
     actor: str = "orchestrator"
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "from_state": self.from_state.value,
             "to_state": self.to_state.value,
@@ -154,7 +154,7 @@ class TaskStateMachine:
     def __init__(self, task_id: str, initial_state: TaskState = TaskState.CREATED):
         self.task_id: str = task_id
         self._current_state: TaskState = initial_state
-        self._history: List[StateTransitionRecord] = [
+        self._history: list[StateTransitionRecord] = [
             StateTransitionRecord(
                 from_state=initial_state,
                 to_state=initial_state,
@@ -168,7 +168,7 @@ class TaskStateMachine:
         return self._current_state
 
     @property
-    def history(self) -> List[StateTransitionRecord]:
+    def history(self) -> list[StateTransitionRecord]:
         return list(self._history)
 
     @property
@@ -229,7 +229,7 @@ class TaskStateMachine:
         self._current_state = TaskState.READY
         return self._current_state
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "task_id": self.task_id,
             "current_state": self._current_state.value,

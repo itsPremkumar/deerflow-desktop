@@ -10,7 +10,7 @@ from __future__ import annotations
 import uuid
 from dataclasses import asdict, dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 
 class HierarchyLevel(str, Enum):
@@ -38,14 +38,14 @@ class HierarchyNode:
     level: HierarchyLevel = HierarchyLevel.GOAL
     name: str = ""
     description: str = ""
-    parent_id: Optional[str] = None
-    children_ids: List[str] = field(default_factory=list)
+    parent_id: str | None = None
+    children_ids: list[str] = field(default_factory=list)
     status: ExecutionStatus = ExecutionStatus.PENDING
-    result: Optional[Any] = None
-    error: Optional[str] = None
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    result: Any | None = None
+    error: str | None = None
+    metadata: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         data = asdict(self)
         data["level"] = self.level.value
         data["status"] = self.status.value
@@ -62,7 +62,7 @@ class GoalNode(HierarchyNode):
 @dataclass
 class MissionNode(HierarchyNode):
     """Level 2: Scoped operational mission with constraints and desired outcome."""
-    constraints: List[str] = field(default_factory=list)
+    constraints: list[str] = field(default_factory=list)
     desired_outcome: str = ""
 
     def __post_init__(self):
@@ -74,7 +74,7 @@ class TaskNode(HierarchyNode):
     """Level 3: Discrete unit of work with assignees, dependencies, and priority."""
     assignee_role: str = ""
     priority: str = "medium"  # low, medium, high, critical
-    dependencies: List[str] = field(default_factory=list)  # list of task IDs that must finish first
+    dependencies: list[str] = field(default_factory=list)  # list of task IDs that must finish first
 
     def __post_init__(self):
         self.level = HierarchyLevel.TASK
@@ -100,8 +100,8 @@ class ActionNode(HierarchyNode):
 class ToolCallNode(HierarchyNode):
     """Level 6: Lowest level tool invocation with specific arguments and tool output."""
     tool_name: str = ""
-    tool_input: Dict[str, Any] = field(default_factory=dict)
-    tool_output: Optional[str] = None
+    tool_input: dict[str, Any] = field(default_factory=dict)
+    tool_output: str | None = None
     exit_code: int = 0
 
     def __post_init__(self):
@@ -111,9 +111,9 @@ class ToolCallNode(HierarchyNode):
 class MissionHierarchyTree:
     """Manages the hierarchical tree of Goals, Missions, Tasks, Subtasks, Actions, and ToolCalls."""
 
-    def __init__(self, root_goal_id: Optional[str] = None):
-        self._nodes: Dict[str, HierarchyNode] = {}
-        self.root_goal_id: Optional[str] = root_goal_id
+    def __init__(self, root_goal_id: str | None = None):
+        self._nodes: dict[str, HierarchyNode] = {}
+        self.root_goal_id: str | None = root_goal_id
 
     def add_node(self, node: HierarchyNode) -> HierarchyNode:
         """Register a node and link it to its parent."""
@@ -126,7 +126,7 @@ class MissionHierarchyTree:
             self.root_goal_id = node.id
         return node
 
-    def create_goal(self, name: str, description: str = "", metadata: Optional[Dict[str, Any]] = None) -> GoalNode:
+    def create_goal(self, name: str, description: str = "", metadata: dict[str, Any] | None = None) -> GoalNode:
         goal = GoalNode(
             name=name,
             description=description,
@@ -141,8 +141,8 @@ class MissionHierarchyTree:
         name: str,
         description: str = "",
         desired_outcome: str = "",
-        constraints: Optional[List[str]] = None,
-        metadata: Optional[Dict[str, Any]] = None,
+        constraints: list[str] | None = None,
+        metadata: dict[str, Any] | None = None,
     ) -> MissionNode:
         if parent_goal_id not in self._nodes:
             raise KeyError(f"Parent Goal ID {parent_goal_id} not found in tree.")
@@ -164,8 +164,8 @@ class MissionHierarchyTree:
         description: str = "",
         assignee_role: str = "general_agent",
         priority: str = "medium",
-        dependencies: Optional[List[str]] = None,
-        metadata: Optional[Dict[str, Any]] = None,
+        dependencies: list[str] | None = None,
+        metadata: dict[str, Any] | None = None,
     ) -> TaskNode:
         if parent_mission_id not in self._nodes:
             raise KeyError(f"Parent Mission ID {parent_mission_id} not found in tree.")
@@ -186,7 +186,7 @@ class MissionHierarchyTree:
         parent_task_id: str,
         name: str,
         description: str = "",
-        metadata: Optional[Dict[str, Any]] = None,
+        metadata: dict[str, Any] | None = None,
     ) -> SubtaskNode:
         if parent_task_id not in self._nodes:
             raise KeyError(f"Parent Task ID {parent_task_id} not found in tree.")
@@ -205,7 +205,7 @@ class MissionHierarchyTree:
         name: str,
         action_type: str = "code_exec",
         description: str = "",
-        metadata: Optional[Dict[str, Any]] = None,
+        metadata: dict[str, Any] | None = None,
     ) -> ActionNode:
         if parent_subtask_id not in self._nodes:
             raise KeyError(f"Parent Subtask ID {parent_subtask_id} not found in tree.")
@@ -223,9 +223,9 @@ class MissionHierarchyTree:
         self,
         parent_action_id: str,
         tool_name: str,
-        tool_input: Dict[str, Any],
+        tool_input: dict[str, Any],
         description: str = "",
-        metadata: Optional[Dict[str, Any]] = None,
+        metadata: dict[str, Any] | None = None,
     ) -> ToolCallNode:
         if parent_action_id not in self._nodes:
             raise KeyError(f"Parent Action ID {parent_action_id} not found in tree.")
@@ -240,10 +240,10 @@ class MissionHierarchyTree:
         self.add_node(tc)
         return tc
 
-    def get_node(self, node_id: str) -> Optional[HierarchyNode]:
+    def get_node(self, node_id: str) -> HierarchyNode | None:
         return self._nodes.get(node_id)
 
-    def list_nodes(self, level: Optional[HierarchyLevel] = None) -> List[HierarchyNode]:
+    def list_nodes(self, level: HierarchyLevel | None = None) -> list[HierarchyNode]:
         if level is None:
             return list(self._nodes.values())
         return [n for n in self._nodes.values() if n.level == level]
@@ -252,8 +252,8 @@ class MissionHierarchyTree:
         self,
         node_id: str,
         status: ExecutionStatus,
-        result: Optional[Any] = None,
-        error: Optional[str] = None,
+        result: Any | None = None,
+        error: str | None = None,
     ) -> HierarchyNode:
         """Update node status and propagate progress upwards if all children are completed."""
         node = self.get_node(node_id)
@@ -313,7 +313,7 @@ class MissionHierarchyTree:
 
         return sum(child_progresses) / len(child_progresses)
 
-    def to_tree_dict(self, node_id: Optional[str] = None) -> Dict[str, Any]:
+    def to_tree_dict(self, node_id: str | None = None) -> dict[str, Any]:
         """Convert tree starting from node_id (or root) to nested dictionary."""
         target_id = node_id or self.root_goal_id
         if not target_id or target_id not in self._nodes:
@@ -327,7 +327,7 @@ class MissionHierarchyTree:
         ]
         return data
 
-    def to_markdown_tree(self, node_id: Optional[str] = None, indent: int = 0) -> str:
+    def to_markdown_tree(self, node_id: str | None = None, indent: int = 0) -> str:
         """Render a clean ASCII/markdown outline of the hierarchy."""
         target_id = node_id or self.root_goal_id
         if not target_id or target_id not in self._nodes:

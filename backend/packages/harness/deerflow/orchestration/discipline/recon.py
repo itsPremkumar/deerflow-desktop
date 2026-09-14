@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import time
 from dataclasses import asdict, dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 
 @dataclass
@@ -18,12 +18,12 @@ class ReconResult:
     """Lightweight reconnaissance telemetry and discovered references."""
     query: str
     recon_type: str  # "explore" (codebase) or "librarian" (documentation)
-    matches: List[Dict[str, Any]] = field(default_factory=list)
+    matches: list[dict[str, Any]] = field(default_factory=list)
     latency_ms: float = 0.0
     model_family: str = "openai/gpt-5.6-luna-fast"
     timestamp: float = field(default_factory=time.time)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
 
@@ -36,11 +36,11 @@ class FastReconWorker:
     def search_codebase_symbols(
         self,
         symbol_query: str,
-        file_tree: Optional[List[str]] = None,
+        file_tree: list[str] | None = None,
     ) -> ReconResult:
         """Fast grep and symbol pattern matching across codebase."""
         t_start = time.time()
-        matches: List[Dict[str, Any]] = []
+        matches: list[dict[str, Any]] = []
 
         q = symbol_query.lower()
         if file_tree:
@@ -61,11 +61,11 @@ class FastReconWorker:
     def search_documentation(
         self,
         topic: str,
-        available_docs: Optional[Dict[str, str]] = None,
+        available_docs: dict[str, str] | None = None,
     ) -> ReconResult:
         """Fast documentation lookup and API pattern retrieval."""
         t_start = time.time()
-        matches: List[Dict[str, Any]] = []
+        matches: list[dict[str, Any]] = []
 
         q = topic.lower()
         if available_docs:

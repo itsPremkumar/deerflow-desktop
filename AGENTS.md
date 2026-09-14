@@ -118,7 +118,7 @@ Scheduled-task note:
 **Root `make` targets drive the whole stack** (run from the repo root):
 
 ```bash
-make setup       # Interactive setup wizard (recommended for new users)
+make setup       # Interactive setup wizard (recommended for new users); unattended: make setup SETUP_ARGS=--non-interactive (DEER_FLOW_SETUP_* env)
 make doctor      # Check configuration and system requirements
 make prod-check  # Production readiness pre-flight (versions, config files, secrets)
 make support-bundle  # Generate redacted troubleshooting summary, AI issue draft, and optional zip

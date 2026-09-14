@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from .calibration import ConfidenceCalibrator
 from .models import BiasFlag, CognitiveMode, MetacognitiveAssessment
@@ -15,17 +15,17 @@ class MetacognitiveMonitor:
     healthy histories stay clean.
     """
 
-    def __init__(self, calibrator: Optional[ConfidenceCalibrator] = None) -> None:
+    def __init__(self, calibrator: ConfidenceCalibrator | None = None) -> None:
         self.calibrator = calibrator or ConfidenceCalibrator()
 
     def assess_state(
         self,
-        action_history: List[Dict[str, Any]],
+        action_history: list[dict[str, Any]],
         current_confidence: float,
         mode: CognitiveMode = CognitiveMode.DELIBERATIVE,
         task_type: str = "general",
     ) -> MetacognitiveAssessment:
-        detected_biases: List[BiasFlag] = []
+        detected_biases: list[BiasFlag] = []
         should_switch = False
         stagnation_score = 0.0
 
@@ -102,9 +102,9 @@ class MetacognitiveMonitor:
 
     def record_and_assess(
         self,
-        action_history: List[Dict[str, Any]],
+        action_history: list[dict[str, Any]],
         current_confidence: float,
-        actual_success: Optional[bool] = None,
+        actual_success: bool | None = None,
         mode: CognitiveMode = CognitiveMode.DELIBERATIVE,
         task_type: str = "general",
     ) -> MetacognitiveAssessment:

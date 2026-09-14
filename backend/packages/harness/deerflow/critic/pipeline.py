@@ -3,12 +3,11 @@
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from deerflow.critic.agent_finished import AgentFinishedCritic
 from deerflow.critic.base import BaseCritic, CriticResult, CriticVerdict
 from deerflow.critic.empty_patch import EmptyPatchCritic
-from deerflow.critic.rubric import RubricEvaluator
 
 logger = logging.getLogger(__name__)
 
@@ -16,7 +15,7 @@ logger = logging.getLogger(__name__)
 class CriticPipeline:
     """Manages a sequence of completion critics and generates unified verdicts."""
 
-    def __init__(self, critics: Optional[List[BaseCritic]] = None):
+    def __init__(self, critics: list[BaseCritic] | None = None):
         if critics is not None:
             self.critics = critics
         else:
@@ -31,14 +30,14 @@ class CriticPipeline:
     def evaluate(
         self,
         task_description: str,
-        execution_history: Optional[List[Dict[str, Any]]] = None,
-        workspace_dir: Optional[str] = None,
+        execution_history: list[dict[str, Any]] | None = None,
+        workspace_dir: str | None = None,
         **kwargs: Any,
     ) -> CriticResult:
         """Run all critics. If any rejects, return a rejected verdict."""
-        rejections: List[CriticResult] = []
-        warnings: List[CriticResult] = []
-        all_results: List[Dict[str, Any]] = []
+        rejections: list[CriticResult] = []
+        warnings: list[CriticResult] = []
+        all_results: list[dict[str, Any]] = []
 
         for critic in self.critics:
             res = critic.evaluate(

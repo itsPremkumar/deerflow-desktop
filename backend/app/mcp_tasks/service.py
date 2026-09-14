@@ -537,7 +537,7 @@ class McpTaskService:
                 driver_name,
                 exc_info=True,
             )
-            await self._release_after_error(record, now=polled_at, error=str(exc) or type(exc).__name__)
+            await self._release_after_error(record, now=polled_at, error=str(exc) or type(exc).__name__, count_current_failure=True)
             return
 
         polled_at = datetime.now(UTC)
@@ -578,8 +578,15 @@ class McpTaskService:
         interval = min(interval, MCP_TASK_POLL_AFTER_MAX_SECONDS)
         return now + timedelta(seconds=interval)
 
-    async def _release_after_error(self, record: dict, *, now: datetime, error: str) -> None:
+    async def _release_after_error(self, record: dict, *, now: datetime, error: str, count_current_failure: bool = False) -> None:
         consecutive_errors = max(0, int(record.get("consecutive_poll_error_count") or 0))
+        if count_current_failure:
+            # The repository increments the persisted counter when this release
+            # commits, so schedule against the post-increment value: a failed
+            # poll attempt backs off immediately instead of retrying once at
+            # the base interval before the growth starts. A missing driver
+            # never attempted a poll, so it keeps the base interval.
+            consecutive_errors += 1
         retry_seconds = min(
             self._poll_interval_seconds * (2 ** min(consecutive_errors, 16)),
             self._max_poll_backoff_seconds,

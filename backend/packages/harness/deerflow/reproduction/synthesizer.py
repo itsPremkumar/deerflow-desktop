@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import Optional
 
 from deerflow.reproduction.models import ReproductionScript
 
@@ -18,7 +17,7 @@ class ReproductionSynthesizer:
         self,
         issue_description: str,
         test_body: str,
-        target_module: Optional[str] = None,
+        target_module: str | None = None,
         script_name: str = "reproduce_issue.py",
     ) -> ReproductionScript:
         """Create a standalone reproduction script string with deterministic exit codes."""

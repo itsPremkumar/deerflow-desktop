@@ -1,4 +1,3 @@
-import pytest
 from deerflow.context.micro_compaction import apply_micro_compaction, compact_tool_output
 
 

@@ -96,6 +96,11 @@ export async function fetch(
   });
 
   if (res.status === 401) {
+    // SSR-safe: server components / route handlers have no window. Throw so
+    // callers can handle auth (redirect/middleware) instead of ReferenceError.
+    if (typeof window === "undefined") {
+      throw new UnauthorizedError();
+    }
     // Include the search string: routes that carry their target in the query
     // (e.g. the standalone artifact viewer) are otherwise unrecoverable after
     // login, which lands on the default workspace instead.

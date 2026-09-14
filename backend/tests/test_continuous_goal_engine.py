@@ -2,7 +2,6 @@
 
 from pathlib import Path
 from uuid import uuid4
-import pytest
 
 from deerflow.harness.continuous.runner import ContinuousGoalRunner
 from deerflow.harness.continuous.store import GoalStore

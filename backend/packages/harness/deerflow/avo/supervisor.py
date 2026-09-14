@@ -3,7 +3,7 @@ from __future__ import annotations
 import collections
 import logging
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 logger = logging.getLogger("deerflow.avo.supervisor")
 
@@ -16,11 +16,11 @@ class StrategicPivotDirective:
     """
     directive_type: str  # "STAGNATION_PIVOT", "OSCILLATION_BREAK", "CORRECTNESS_BLOCKED"
     reason: str
-    recommended_directions: List[str] = field(default_factory=list)
-    taboo_patterns: List[str] = field(default_factory=list)
-    suggested_backtrack_target: Optional[str] = None
+    recommended_directions: list[str] = field(default_factory=list)
+    taboo_patterns: list[str] = field(default_factory=list)
+    suggested_backtrack_target: str | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "directive_type": self.directive_type,
             "reason": self.reason,
@@ -53,9 +53,9 @@ class AVOSupervisor:
 
         # Sliding history of candidate signatures for cycle detection
         self.signature_history: collections.deque[str] = collections.deque(maxlen=cycle_window_size)
-        self.last_directive: Optional[StrategicPivotDirective] = None
+        self.last_directive: StrategicPivotDirective | None = None
 
-    def observe(self, improved: bool) -> Tuple[bool, str]:
+    def observe(self, improved: bool) -> tuple[bool, str]:
         """
         Legacy/Simple observation interface:
         Returns (is_stagnated, diagnostic_message).
@@ -66,9 +66,9 @@ class AVOSupervisor:
     def observe_step(
         self,
         improved: bool,
-        signature: Optional[str] = None,
-        backtrack_candidate: Optional[str] = None,
-    ) -> Tuple[bool, Optional[StrategicPivotDirective], str]:
+        signature: str | None = None,
+        backtrack_candidate: str | None = None,
+    ) -> tuple[bool, StrategicPivotDirective | None, str]:
         """
         Advanced observation interface detecting both Stalls and Oscillation Cycles.
         Returns: (needs_intervention, directive, diagnostic_message)
@@ -143,7 +143,7 @@ class AVOSupervisor:
             f"MONITORING: Stagnation count at {self.consecutive_stagnation}/{self.max_no_improve}.",
         )
 
-    def stats(self) -> Dict[str, Any]:
+    def stats(self) -> dict[str, Any]:
         return {
             "max_no_improve": self.max_no_improve,
             "consecutive_stagnation": self.consecutive_stagnation,

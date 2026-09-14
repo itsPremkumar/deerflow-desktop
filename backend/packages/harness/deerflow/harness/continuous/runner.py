@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 import logging
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 from deerflow.harness.continuous.loop_detector import ToolLoopDetector
-from deerflow.harness.continuous.models import Goal, Milestone, _now
+from deerflow.harness.continuous.models import Goal, Milestone
 from deerflow.harness.continuous.store import GoalStore, get_goal_store
 from deerflow.safety.guard import get_safety_guard
 from deerflow.trajectory.store import get_trajectory_store

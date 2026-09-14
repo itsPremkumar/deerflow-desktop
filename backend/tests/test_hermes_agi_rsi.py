@@ -1,6 +1,7 @@
 """Tests for Recursive Self-Improvement (RSI) Engine."""
 
 import json
+
 from deerflow.rsi.engine import RSIEngine
 from deerflow.rsi.models import RSIStage
 from deerflow.tools.builtins.rsi_engine_tool import run_rsi_cycle

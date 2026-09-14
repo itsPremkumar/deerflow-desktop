@@ -1,7 +1,5 @@
 """Tests for Typed EventStream and Action-Observation Audit Ledger."""
 
-import tempfile
-from pathlib import Path
 from deerflow.events.stream.actions import (
     ActionType,
     AgentFinishAction,

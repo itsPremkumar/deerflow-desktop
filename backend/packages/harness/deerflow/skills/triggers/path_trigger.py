@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import fnmatch
 from pathlib import PurePath
-from typing import List, Union
 
 from deerflow.skills.triggers.models import BaseTrigger, TriggerContext
 
@@ -14,7 +13,7 @@ class PathTrigger(BaseTrigger):
 
     trigger_type: str = "path"
 
-    def __init__(self, patterns: Union[str, List[str]]):
+    def __init__(self, patterns: str | list[str]):
         if isinstance(patterns, str):
             self.patterns = [patterns]
         else:

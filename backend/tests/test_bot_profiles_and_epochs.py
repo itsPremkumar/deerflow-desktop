@@ -1,10 +1,9 @@
 """Unit tests for Bot Profiles, Capability Epochs, and Auto-Provisioning."""
 
 from pathlib import Path
-import pytest
 
 from deerflow.bots.epoch import CapabilityEpochManager
-from deerflow.bots.profile import BotProfile, generate_default_soul
+from deerflow.bots.profile import BotProfile
 from deerflow.bots.registry import BotRegistry
 
 

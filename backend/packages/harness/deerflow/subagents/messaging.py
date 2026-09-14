@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import asdict, dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any, Literal
 from uuid import uuid4
 
@@ -19,9 +19,31 @@ DeliveryMode = Literal["auto", "steer", "follow_up"]
 AgentStatus = Literal["idle", "busy", "completed"]
 MessageStatus = Literal["queued", "delivered", "read"]
 
+#: Structured message kinds (inventory #12). Machine-operable types so agents
+#: can route on intent instead of parsing prose. ``message`` is the default
+#: free-form kind; the rest label the envelope, never the content schema.
+MESSAGE_KINDS: tuple[str, ...] = (
+    "message",
+    "request",
+    "task_assignment",
+    "task_handoff",
+    "question",
+    "answer",
+    "status",
+    "progress",
+    "warning",
+    "incident",
+    "recovery",
+    "decision",
+    "approval",
+    "escalation",
+    "result",
+    "review",
+)
+
 
 def _now() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 @dataclass
@@ -49,6 +71,7 @@ class InterAgentMessage:
     content: str
     mode: DeliveryMode = "auto"
     status: MessageStatus = "queued"
+    kind: str = "message"
     created_at: str = field(default_factory=_now)
     delivered_at: str | None = None
 
@@ -102,8 +125,15 @@ class AgentRoster:
         receiver_name: str,
         content: str,
         mode: DeliveryMode = "auto",
+        kind: str = "message",
     ) -> dict[str, Any]:
         """Send a direct message to a peer agent or broadcast to 'all'."""
+        if kind not in MESSAGE_KINDS:
+            return {
+                "status": "error",
+                "error": f"Unknown message kind '{kind}'. Expected one of {list(MESSAGE_KINDS)}.",
+                "available_kinds": list(MESSAGE_KINDS),
+            }
         msg_id = f"msg_{uuid4().hex[:8]}"
 
         targets: list[str] = []
@@ -137,6 +167,7 @@ class AgentRoster:
                 content=content,
                 mode=mode,
                 status=delivery_status,
+                kind=kind,
                 delivered_at=_now() if delivery_status == "delivered" else None,
             )
 
@@ -144,12 +175,14 @@ class AgentRoster:
                 self._mailboxes[target] = []
             self._mailboxes[target].append(msg)
 
-            receipts.append({
-                "message_id": msg.id,
-                "receiver": target,
-                "delivery_status": delivery_status,
-                "mode": mode,
-            })
+            receipts.append(
+                {
+                    "message_id": msg.id,
+                    "receiver": target,
+                    "delivery_status": delivery_status,
+                    "mode": mode,
+                }
+            )
 
         return {
             "status": "ok",

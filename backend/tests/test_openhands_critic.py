@@ -1,7 +1,5 @@
 """Tests for OpenHands Critic & Completion Verification subsystem."""
 
-import os
-from pathlib import Path
 from deerflow.critic.agent_finished import AgentFinishedCritic
 from deerflow.critic.base import CriticResult, CriticVerdict
 from deerflow.critic.empty_patch import EmptyPatchCritic

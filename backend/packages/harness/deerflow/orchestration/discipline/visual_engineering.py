@@ -11,7 +11,7 @@ from __future__ import annotations
 import time
 import uuid
 from dataclasses import asdict, dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 
 @dataclass
@@ -22,12 +22,12 @@ class VisualWidgetSpec:
     html_markup: str = ""
     css_styles: str = ""
     interactive_js: str = ""
-    design_tokens: Dict[str, str] = field(default_factory=dict)
-    responsive_breakpoints: Dict[str, str] = field(default_factory=dict)
+    design_tokens: dict[str, str] = field(default_factory=dict)
+    responsive_breakpoints: dict[str, str] = field(default_factory=dict)
     model_family: str = "anthropic/claude-fable-5-1"
     timestamp: float = field(default_factory=time.time)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
     def render_standalone_html(self) -> str:
@@ -85,9 +85,9 @@ class VisualEngineeringWorker:
             "--font-sans": "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
         }
 
-        css = f"""
-* {{ box-sizing: border-box; margin: 0; padding: 0; }}
-body {{
+        css = """
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
   background-color: var(--bg-surface);
   color: var(--text-main);
   font-family: var(--font-sans);
@@ -96,8 +96,8 @@ body {{
   align-items: center;
   min-height: 100vh;
   padding: 16px;
-}}
-.widget-card {{
+}
+.widget-card {
   background-color: var(--bg-card);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
@@ -106,11 +106,11 @@ body {{
   max-width: 480px;
   box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3);
   transition: transform 0.2s ease;
-}}
-.widget-card:hover {{
+}
+.widget-card:hover {
   transform: translateY(-2px);
-}}
-.widget-btn {{
+}
+.widget-btn {
   background-color: var(--primary);
   color: #FFFFFF;
   border: none;
@@ -120,13 +120,13 @@ body {{
   cursor: pointer;
   margin-top: 16px;
   width: 100%;
-}}
-.widget-btn:hover {{
+}
+.widget-btn:hover {
   filter: brightness(1.1);
-}}
-@media (max-width: 640px) {{
-  .widget-card {{ padding: 16px; }}
-}}
+}
+@media (max-width: 640px) {
+  .widget-card { padding: 16px; }
+}
 """
 
         markup = f"""

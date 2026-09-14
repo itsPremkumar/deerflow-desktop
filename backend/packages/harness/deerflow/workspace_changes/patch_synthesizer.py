@@ -9,7 +9,7 @@ import subprocess
 import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -18,9 +18,9 @@ logger = logging.getLogger(__name__)
 class PatchValidationResult:
     """Outcome of patch hygiene and applicability validation."""
     is_valid: bool
-    errors: List[str] = field(default_factory=list)
-    warnings: List[str] = field(default_factory=list)
-    stats: Dict[str, Any] = field(default_factory=dict)
+    errors: list[str] = field(default_factory=list)
+    warnings: list[str] = field(default_factory=list)
+    stats: dict[str, Any] = field(default_factory=dict)
 
     @property
     def has_errors(self) -> bool:
@@ -41,7 +41,7 @@ class PatchSynthesizer:
     def generate_unified_patch(
         self,
         repo_dir: str,
-        base_ref: Optional[str] = None,
+        base_ref: str | None = None,
         include_untracked: bool = True,
     ) -> str:
         """Compile a standard git unified diff against HEAD or a base ref."""
@@ -80,8 +80,8 @@ class PatchSynthesizer:
 
     def validate_patch_hygiene(self, patch_content: str) -> PatchValidationResult:
         """Scan patch content for exposed secrets, unwanted binary extensions, and hygiene issues."""
-        errors: List[str] = []
-        warnings: List[str] = []
+        errors: list[str] = []
+        warnings: list[str] = []
         stats = self.compute_diff_stats(patch_content)
 
         if not patch_content.strip():
@@ -137,7 +137,7 @@ class PatchSynthesizer:
             except OSError:
                 pass
 
-    def compute_diff_stats(self, patch_content: str) -> Dict[str, Any]:
+    def compute_diff_stats(self, patch_content: str) -> dict[str, Any]:
         """Parse unified diff to calculate modified files, additions, and deletions."""
         files_changed = set()
         insertions = 0

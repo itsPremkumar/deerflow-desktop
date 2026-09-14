@@ -6,7 +6,7 @@ import time
 import uuid
 from dataclasses import asdict, dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 
 class OutcomeType(str, Enum):
@@ -20,22 +20,22 @@ class ExperienceRecord:
     """Episodic memory record capturing lessons, pitfalls, and solutions from past trajectories."""
     task_goal: str
     outcome: OutcomeType
-    lessons_learned: List[str] = field(default_factory=list)
-    pitfalls_to_avoid: List[str] = field(default_factory=list)
-    modified_files: List[str] = field(default_factory=list)
-    error_types: List[str] = field(default_factory=list)
-    tags: List[str] = field(default_factory=list)
+    lessons_learned: list[str] = field(default_factory=list)
+    pitfalls_to_avoid: list[str] = field(default_factory=list)
+    modified_files: list[str] = field(default_factory=list)
+    error_types: list[str] = field(default_factory=list)
+    tags: list[str] = field(default_factory=list)
     experience_id: str = field(default_factory=lambda: str(uuid.uuid4()))
     timestamp: float = field(default_factory=time.time)
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         data = asdict(self)
         data["outcome"] = self.outcome.value
         return data
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> ExperienceRecord:
+    def from_dict(cls, data: dict[str, Any]) -> ExperienceRecord:
         payload = dict(data)
         if "outcome" in payload and isinstance(payload["outcome"], str):
             payload["outcome"] = OutcomeType(payload["outcome"])

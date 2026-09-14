@@ -2,10 +2,9 @@
 
 from __future__ import annotations
 
-import re
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from deerflow.security.shell_ast.ast_nodes import (
     ASTNode,
@@ -13,7 +12,6 @@ from deerflow.security.shell_ast.ast_nodes import (
     CompoundNode,
     NodeType,
     PipelineNode,
-    RedirectionNode,
     SubshellNode,
 )
 
@@ -31,14 +29,14 @@ class SecurityViolation:
     risk_level: RiskLevel
     message: str
     command_snippet: str
-    remediation: Optional[str] = None
+    remediation: str | None = None
 
 
 @dataclass
 class AnalysisReport:
     risk_level: RiskLevel
-    violations: List[SecurityViolation] = field(default_factory=list)
-    ast_summary: Dict[str, Any] = field(default_factory=dict)
+    violations: list[SecurityViolation] = field(default_factory=list)
+    ast_summary: dict[str, Any] = field(default_factory=dict)
 
     @property
     def is_safe(self) -> bool:
@@ -57,7 +55,7 @@ class ShellASTSecurityAnalyzer:
     DESTRUCTIVE_ROOT_PATHS = {"/", "/*", "~", "~/*", "/etc", "/usr", "/var", "/bin", "/sbin", "C:\\", "C:\\Windows"}
 
     def analyze(self, root_node: ASTNode) -> AnalysisReport:
-        violations: List[SecurityViolation] = []
+        violations: list[SecurityViolation] = []
         self._traverse(root_node, violations)
 
         # Global pattern checks across reconstructed tree
@@ -101,7 +99,7 @@ class ShellASTSecurityAnalyzer:
             return f"$({self._node_to_string(node.body)})"
         return ""
 
-    def _traverse(self, node: ASTNode, violations: List[SecurityViolation]) -> None:
+    def _traverse(self, node: ASTNode, violations: list[SecurityViolation]) -> None:
         if node.node_type == NodeType.COMMAND:
             cmd_node = node
             assert isinstance(cmd_node, CommandNode)
@@ -127,7 +125,7 @@ class ShellASTSecurityAnalyzer:
             self._traverse(comp_node.left, violations)
             self._traverse(comp_node.right, violations)
 
-    def _check_command(self, node: CommandNode, violations: List[SecurityViolation]) -> None:
+    def _check_command(self, node: CommandNode, violations: list[SecurityViolation]) -> None:
         cmd = node.command.lower()
         args = [a.lower() for a in node.args]
         full_line = f"{node.command} {' '.join(node.args)}".strip()
@@ -219,7 +217,7 @@ class ShellASTSecurityAnalyzer:
                 )
             )
 
-    def _check_pipeline(self, node: PipelineNode, violations: List[SecurityViolation]) -> None:
+    def _check_pipeline(self, node: PipelineNode, violations: list[SecurityViolation]) -> None:
         """Inspect pipeline connections, specifically remote execution patterns (curl ... | bash)."""
         stage_cmds = []
         for stage in node.stages:

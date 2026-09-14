@@ -9,12 +9,12 @@ from __future__ import annotations
 import hashlib
 import json
 from dataclasses import asdict, dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 
 def _now() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 @dataclass
@@ -28,6 +28,34 @@ class BotProfile:
     model: str | None = None
     toolsets: list[str] = field(default_factory=list)
     skills: list[str] = field(default_factory=list)
+    # Inventory #1/#25: avatar label plus lifecycle status. Both are display /
+    # scheduling metadata and intentionally excluded from the capability
+    # fingerprint so status flips never churn the epoch.
+    avatar: str = ""
+    status: str = "active"
+    # match API & runtime tracking
+    last_active: str | None = None
+    version: int = 1
+    # Organizational hierarchy & responsibility (Master Inventory #17-#20)
+    department: str = "engineering"
+    reports_to: str | None = None
+    responsibilities: list[str] = field(default_factory=list)
+    capabilities: list[str] = field(default_factory=list)
+    # Liveness & succession (Master Inventory #27-#35)
+    heartbeat: str | None = None
+    succession_fallback: str | None = None
+    # Performance & reputation metrics (Master Inventory #51-#52)
+    reputation_score: float = 1.0
+    task_stats: dict[str, Any] = field(
+        default_factory=lambda: {
+            "completed": 0,
+            "failed": 0,
+            "total_runs": 0,
+            "avg_duration_sec": 0.0,
+        }
+    )
+    # Bot-owned routines (Master Inventory #9)
+    routines: list[dict[str, Any]] = field(default_factory=list)
     metadata: dict[str, Any] = field(default_factory=dict)
     created_at: str = field(default_factory=_now)
     updated_at: str = field(default_factory=_now)

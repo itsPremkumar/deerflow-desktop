@@ -12,7 +12,7 @@ import re
 import time
 from dataclasses import asdict, dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 
 class VerdictType(str, Enum):
@@ -25,13 +25,13 @@ class VerdictType(str, Enum):
 class ReviewVerdict:
     approved: bool
     verdict_type: VerdictType
-    invariant_violations: List[str] = field(default_factory=list)
-    counterexamples: List[str] = field(default_factory=list)
+    invariant_violations: list[str] = field(default_factory=list)
+    counterexamples: list[str] = field(default_factory=list)
     reasoning_trace: str = ""
     model_family: str = "openai/gpt-6-astra"
     timestamp: float = field(default_factory=time.time)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         data = asdict(self)
         data["verdict_type"] = self.verdict_type.value
         return data
@@ -46,13 +46,13 @@ class PlanReviewer:
     def review_plan(
         self,
         task_goal: str,
-        constraints: List[str],
-        proposed_steps: List[str],
+        constraints: list[str],
+        proposed_steps: list[str],
         budget_cap_usd: float = 10.0,
     ) -> ReviewVerdict:
         """Stress-test proposed steps against goal, constraints, and safety invariants."""
-        violations: List[str] = []
-        counterexamples: List[str] = []
+        violations: list[str] = []
+        counterexamples: list[str] = []
 
         combined_steps = " ".join(proposed_steps).lower()
 

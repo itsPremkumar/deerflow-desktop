@@ -10,7 +10,7 @@ from __future__ import annotations
 import json
 import os
 from dataclasses import asdict, dataclass, field, fields
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Literal
 from uuid import uuid4
@@ -24,7 +24,7 @@ _KINDS: tuple[HarnessKind, ...] = ("prompt", "memory", "skill", "subagent")
 
 
 def _now() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 def _slug(raw: str, fallback: str) -> str:
@@ -133,7 +133,7 @@ class HarnessState:
         if self.file_path is None or not self.file_path.exists():
             return
         try:
-            with open(self.file_path, "r", encoding="utf-8") as f:
+            with open(self.file_path, encoding="utf-8") as f:
                 data = json.load(f)
 
             self.entries = {kind: {} for kind in _KINDS}

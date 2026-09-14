@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import re
-from typing import Optional
 
 from .profiles import ActionRiskLevel
 
@@ -45,7 +44,7 @@ class ActionRiskClassifier:
         "ast_grep_rewrite",
     }
 
-    def classify_tool_call(self, tool_name: str, args: Optional[dict] = None) -> ActionRiskLevel:
+    def classify_tool_call(self, tool_name: str, args: dict | None = None) -> ActionRiskLevel:
         if tool_name in self.READ_ONLY_TOOLS:
             return ActionRiskLevel.LOW_SAFE
 

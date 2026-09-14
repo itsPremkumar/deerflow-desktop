@@ -2,12 +2,10 @@
 
 from __future__ import annotations
 
-from typing import Any
-
 from langchain.tools import tool
 from langgraph.runtime import Runtime
 
-from deerflow.tools.code_mode.bridge import ToolBridge, execute_code_mode
+from deerflow.tools.code_mode.bridge import execute_code_mode
 from deerflow.tools.code_mode.tool import get_default_bridge
 
 

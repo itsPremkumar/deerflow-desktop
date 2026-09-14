@@ -1,9 +1,8 @@
 from __future__ import annotations
 
 import time
-import uuid
 from dataclasses import asdict, dataclass, field
-from typing import Any, Dict, List
+from typing import Any
 
 
 @dataclass
@@ -13,7 +12,7 @@ class CapabilityGap:
     current_score: float  # 0.0 to 1.0
     target_score: float = 0.90  # 0.0 to 1.0
     difficulty: float = 0.5    # 0.1 to 1.0
-    evidence: List[str] = field(default_factory=list)
+    evidence: list[str] = field(default_factory=list)
 
     @property
     def gap_size(self) -> float:
@@ -25,7 +24,7 @@ class CapabilityGap:
         diff = max(0.05, self.difficulty)
         return round(self.gap_size / diff, 4)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         d = asdict(self)
         d["gap_size"] = self.gap_size
         d["priority"] = self.priority
@@ -41,9 +40,9 @@ class PracticeTask:
     difficulty: float
     expected_outcome: str = ""
     max_attempts: int = 3
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
 
@@ -51,11 +50,11 @@ class PracticeTask:
 class Curriculum:
     """Ordered sequence of practice tasks targeting agent capability gaps."""
     curriculum_id: str
-    gaps: List[CapabilityGap] = field(default_factory=list)
-    tasks: List[PracticeTask] = field(default_factory=list)
+    gaps: list[CapabilityGap] = field(default_factory=list)
+    tasks: list[PracticeTask] = field(default_factory=list)
     created_at: float = field(default_factory=time.time)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "curriculum_id": self.curriculum_id,
             "total_gaps": len(self.gaps),

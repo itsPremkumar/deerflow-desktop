@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from .models import DeliberatorVote, VoteVerdict
 
@@ -13,9 +13,9 @@ class IndependentCritic:
     name = "IndependentCritic"
     role = "Critic"
 
-    def evaluate(self, artifact_name: str, content: str, metadata: Dict[str, Any]) -> DeliberatorVote:
-        concerns: List[str] = []
-        modifications: List[str] = []
+    def evaluate(self, artifact_name: str, content: str, metadata: dict[str, Any]) -> DeliberatorVote:
+        concerns: list[str] = []
+        modifications: list[str] = []
 
         # Check for unhandled edge cases or missing recovery
         content_lower = content.lower()
@@ -57,9 +57,9 @@ class InvariantVerifier:
     name = "InvariantVerifier"
     role = "InvariantVerifier"
 
-    def evaluate(self, artifact_name: str, content: str, metadata: Dict[str, Any]) -> DeliberatorVote:
-        concerns: List[str] = []
-        modifications: List[str] = []
+    def evaluate(self, artifact_name: str, content: str, metadata: dict[str, Any]) -> DeliberatorVote:
+        concerns: list[str] = []
+        modifications: list[str] = []
 
         test_passed = metadata.get("test_passed", True)
         exit_code = metadata.get("exit_code", 0)
@@ -98,9 +98,9 @@ class SecurityReviewer:
     name = "SecurityReviewer"
     role = "SecurityReviewer"
 
-    def evaluate(self, artifact_name: str, content: str, metadata: Dict[str, Any]) -> DeliberatorVote:
-        concerns: List[str] = []
-        modifications: List[str] = []
+    def evaluate(self, artifact_name: str, content: str, metadata: dict[str, Any]) -> DeliberatorVote:
+        concerns: list[str] = []
+        modifications: list[str] = []
 
         dangerous_patterns = [
             ("rm -rf", "Destructive recursive delete command detected."),
@@ -141,9 +141,9 @@ class QualityReviewer:
     name = "QualityReviewer"
     role = "QualityReviewer"
 
-    def evaluate(self, artifact_name: str, content: str, metadata: Dict[str, Any]) -> DeliberatorVote:
-        concerns: List[str] = []
-        modifications: List[str] = []
+    def evaluate(self, artifact_name: str, content: str, metadata: dict[str, Any]) -> DeliberatorVote:
+        concerns: list[str] = []
+        modifications: list[str] = []
 
         if len(content.strip()) < 30:
             concerns.append("Artifact is too brief or incomplete to evaluate meaningfully.")
@@ -188,14 +188,14 @@ class PresidingJudge:
         self,
         artifact_name: str,
         content: str,
-        specialist_votes: List[DeliberatorVote],
+        specialist_votes: list[DeliberatorVote],
     ) -> DeliberatorVote:
         reject_count = sum(1 for v in specialist_votes if v.verdict == VoteVerdict.REJECT)
         security_veto = any(v.role == "SecurityReviewer" and v.verdict == VoteVerdict.REJECT for v in specialist_votes)
         invariant_veto = any(v.role == "InvariantVerifier" and v.verdict == VoteVerdict.REJECT for v in specialist_votes)
 
-        concerns: List[str] = []
-        modifications: List[str] = []
+        concerns: list[str] = []
+        modifications: list[str] = []
 
         if security_veto:
             concerns.append("Security veto upheld: unsafe operation cannot be approved.")

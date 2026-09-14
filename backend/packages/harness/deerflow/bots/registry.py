@@ -8,16 +8,31 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 import threading
 from pathlib import Path
 from typing import Any
 
 from deerflow.bots.profile import BotProfile, _now, generate_default_soul
+from deerflow.bots.templates import BOT_STATUSES, get_template
 
 logger = logging.getLogger(__name__)
 
-_DEFAULT_BOT_DIR = ".deerflow/bots"
+_DEFAULT_BOT_DIR = "bots"
+
+
+def _default_storage_path() -> Path:
+    """Resolve the bot roster file under the writable runtime home.
+
+    Uses DEER_FLOW_HOME (via runtime_home()) so Gateway, Electron, Docker,
+    and embedded clients share one location instead of CWD at import time.
+    Falls back to CWD only when runtime_home() is unusable.
+    """
+    try:
+        from deerflow.config.runtime_paths import runtime_home
+
+        return runtime_home() / _DEFAULT_BOT_DIR / "roster.json"
+    except Exception:
+        return Path.cwd() / ".deerflow" / _DEFAULT_BOT_DIR / "roster.json"
 
 
 def _infer_role_from_name(name: str) -> str:
@@ -48,7 +63,7 @@ class BotRegistry:
     """Thread-safe registry for autonomous Bot profiles with auto-provisioning."""
 
     def __init__(self, storage_path: str | Path | None = None):
-        self.storage_path = Path(storage_path).resolve() if storage_path else Path.cwd() / _DEFAULT_BOT_DIR / "roster.json"
+        self.storage_path = Path(storage_path).resolve() if storage_path else _default_storage_path()
         self._bots: dict[str, BotProfile] = {}
         self._lock = threading.Lock()
         self._load()
@@ -58,14 +73,14 @@ class BotRegistry:
 
     def _ensure_default_roster(self) -> None:
         defaults = [
-            ("architect", "Architect", "System Architect & Technical Lead"),
-            ("coder", "Coder", "Software Engineer & Backend Developer"),
-            ("reviewer", "Reviewer", "Code & Quality Reviewer"),
-            ("tester", "Tester", "QA & Automated Verification Specialist"),
-            ("researcher", "Researcher", "Deep Researcher & Synthesis Specialist"),
+            ("architect", "Architect", "System Architect & Technical Lead", "engineering", "cto", ["System design", "Architecture review"], ["system_design", "refactoring"]),
+            ("coder", "Coder", "Software Engineer & Backend Developer", "engineering", "architect", ["Backend development", "Feature delivery"], ["python", "coding"]),
+            ("reviewer", "Reviewer", "Code & Quality Reviewer", "qa", "architect", ["Code review", "Standards enforcement"], ["code_audit", "style_enforcement"]),
+            ("tester", "Tester", "QA & Automated Verification Specialist", "qa", "reviewer", ["Automated testing", "Quality gates"], ["pytest", "test_automation"]),
+            ("researcher", "Researcher", "Deep Researcher & Synthesis Specialist", "product", "architect", ["Deep research", "Knowledge synthesis"], ["web_search", "fact_checking"]),
         ]
         with self._lock:
-            for name, display, role in defaults:
+            for name, display, role, dept, reports, resps, caps in defaults:
                 if name not in self._bots:
                     soul = generate_default_soul(name, role)
                     bot = BotProfile(
@@ -74,6 +89,10 @@ class BotRegistry:
                         role=role,
                         soul=soul,
                         toolsets=["all"],
+                        department=dept,
+                        reports_to=reports,
+                        responsibilities=resps,
+                        capabilities=caps,
                     )
                     self._bots[name] = bot
             self._save()
@@ -82,13 +101,13 @@ class BotRegistry:
         if not self.storage_path.exists():
             return
         try:
-            with open(self.storage_path, "r", encoding="utf-8") as f:
+            with open(self.storage_path, encoding="utf-8") as f:
                 data = json.load(f)
             for item in data.get("bots", []):
                 profile = BotProfile.from_dict(item)
                 self._bots[profile.name.lower()] = profile
         except Exception:
-            pass
+            logger.warning("Bot roster load failed; starting from defaults", exc_info=True)
 
     def _save(self) -> None:
         try:
@@ -103,7 +122,7 @@ class BotRegistry:
                 json.dump(data, f, indent=2)
             tmp.replace(self.storage_path)
         except Exception:
-            pass
+            logger.warning("Bot roster save failed", exc_info=True)
 
     def get_bot(self, name: str) -> BotProfile | None:
         with self._lock:
@@ -115,17 +134,38 @@ class BotRegistry:
         display_name: str | None = None,
         role: str | None = None,
         soul: str | None = None,
+        *,
+        template: str | None = None,
+        avatar: str | None = None,
+        department: str | None = None,
+        reports_to: str | None = None,
+        responsibilities: list[str] | None = None,
+        capabilities: list[str] | None = None,
+        succession_fallback: str | None = None,
     ) -> BotProfile:
-        """Fetch an existing bot or instantly auto-provision a new one."""
+        """Fetch an existing bot or instantly auto-provision a new one.
+
+        A ``template`` slug (see :mod:`deerflow.bots.templates`) supplies the
+        role/display/avatar/department/reports_to defaults for brand-new bots; explicit arguments
+        always win over the template. Existing bots are returned untouched.
+        """
         key = name.lower().strip()
+        spec = get_template(template) if template else None
+        if template and spec is None:
+            raise ValueError(f"Unknown bot template '{template}'.")
         with self._lock:
             if key in self._bots:
                 return self._bots[key]
 
             # Auto-provision new bot on demand
-            assigned_role = role or _infer_role_from_name(key)
-            assigned_display = display_name or key.capitalize()
+            assigned_role = role or (spec["role"] if spec else None) or _infer_role_from_name(key)
+            assigned_display = display_name or (spec["display"] if spec else None) or key.capitalize()
             assigned_soul = soul or generate_default_soul(key, assigned_role)
+            assigned_avatar = avatar if avatar is not None else (spec["avatar"] if spec else "")
+            assigned_dept = department or (spec.get("department") if spec else "engineering")
+            assigned_reports = reports_to or (spec.get("reports_to") if spec else None)
+            assigned_resps = responsibilities or (list(spec.get("responsibilities", [])) if spec else [])
+            assigned_caps = capabilities or (list(spec.get("capabilities", [])) if spec else [])
 
             bot = BotProfile(
                 name=key,
@@ -133,6 +173,56 @@ class BotRegistry:
                 role=assigned_role,
                 soul=assigned_soul,
                 toolsets=["all"],
+                avatar=assigned_avatar,
+                department=assigned_dept,
+                reports_to=assigned_reports,
+                responsibilities=assigned_resps,
+                capabilities=assigned_caps,
+                succession_fallback=succession_fallback,
+            )
+            self._bots[key] = bot
+            self._save()
+            return bot
+
+    def clone_bot(
+        self,
+        source: str,
+        name: str,
+        *,
+        display_name: str | None = None,
+        role: str | None = None,
+        model: str | None = None,
+        department: str | None = None,
+        reports_to: str | None = None,
+    ) -> BotProfile:
+        """Create a bot from another profile (inventory #24).
+
+        Copies configuration, skills, SOUL, and avatar — but never memory:
+        clones start with a fresh identity. Raises ``KeyError`` when the
+        source is missing and ``ValueError`` when the target name is taken.
+        """
+        source_key = source.lower().strip()
+        key = name.lower().strip()
+        with self._lock:
+            template = self._bots.get(source_key)
+            if template is None:
+                raise KeyError(f"Bot '{source_key}' not found")
+            if key in self._bots:
+                raise ValueError(f"Bot '{key}' already exists")
+            bot = BotProfile(
+                name=key,
+                display_name=display_name or f"{template.display_name} copy",
+                role=role or template.role,
+                soul=template.soul,
+                model=model if model is not None else template.model,
+                toolsets=list(template.toolsets),
+                skills=list(template.skills),
+                avatar=template.avatar,
+                department=department or template.department,
+                reports_to=reports_to or template.reports_to,
+                responsibilities=list(template.responsibilities),
+                capabilities=list(template.capabilities),
+                succession_fallback=template.succession_fallback,
             )
             self._bots[key] = bot
             self._save()
@@ -148,8 +238,23 @@ class BotRegistry:
         model: str | None = None,
         toolsets: list[str] | None = None,
         skills: list[str] | None = None,
+        avatar: str | None = None,
+        status: str | None = None,
+        last_active: str | None = None,
+        department: str | None = None,
+        reports_to: str | None = None,
+        responsibilities: list[str] | None = None,
+        capabilities: list[str] | None = None,
+        heartbeat: str | None = None,
+        succession_fallback: str | None = None,
+        reputation_score: float | None = None,
+        task_stats: dict[str, Any] | None = None,
+        routines: list[dict[str, Any]] | None = None,
+        bump_version: bool = True,
     ) -> BotProfile | None:
         key = name.lower().strip()
+        if status is not None and status not in BOT_STATUSES:
+            raise ValueError(f"Invalid bot status '{status}'. Expected one of {list(BOT_STATUSES)}.")
         with self._lock:
             bot = self._bots.get(key)
             if not bot:
@@ -166,17 +271,87 @@ class BotRegistry:
                 bot.toolsets = toolsets
             if skills is not None:
                 bot.skills = skills
+            if avatar is not None:
+                bot.avatar = avatar
+            if status is not None:
+                bot.status = status
+            if last_active is not None:
+                bot.last_active = last_active
+            if department is not None:
+                bot.department = department
+            if reports_to is not None:
+                bot.reports_to = reports_to
+            if responsibilities is not None:
+                bot.responsibilities = responsibilities
+            if capabilities is not None:
+                bot.capabilities = capabilities
+            if heartbeat is not None:
+                bot.heartbeat = heartbeat
+            if succession_fallback is not None:
+                bot.succession_fallback = succession_fallback
+            if reputation_score is not None:
+                bot.reputation_score = max(0.0, min(1.0, float(reputation_score)))
+            if task_stats is not None:
+                bot.task_stats = task_stats
+            if routines is not None:
+                bot.routines = routines
+            if bump_version:
+                bot.version += 1
             bot.updated_at = _now()
             self._save()
             return bot
 
-    def list_bots(self) -> list[BotProfile]:
+    def list_bots(self, *, status: str | None = None, department: str | None = None) -> list[BotProfile]:
         with self._lock:
-            return list(self._bots.values())
+            bots = list(self._bots.values())
+        if status is not None:
+            bots = [b for b in bots if b.status == status]
+        if department is not None:
+            bots = [b for b in bots if b.department.lower() == department.lower()]
+        return bots
+
+    def get_by_department(self, department: str) -> list[BotProfile]:
+        return self.list_bots(department=department)
+
+    def get_subordinates(self, manager_name: str) -> list[BotProfile]:
+        m = manager_name.lower().strip()
+        with self._lock:
+            return [b for b in self._bots.values() if (b.reports_to or "").lower() == m]
 
 
-_global_registry = BotRegistry()
+_global_registry: BotRegistry | None = None
+_global_registry_path: str | None = None
 
 
-def get_bot_registry() -> BotRegistry:
+def get_bot_registry(storage_path: str | Path | None = None) -> BotRegistry:
+    """Return the process-wide bot registry.
+
+    When an explicit storage_path is given and differs from the cached
+    singleton's path, a fresh instance bound to that path is returned so
+    Gateway requests (DEER_FLOW_HOME-aware) never reuse a stale CWD-bound
+    registry created at import time.
+    """
+    global _global_registry, _global_registry_path
+    if storage_path is not None:
+        resolved = str(Path(storage_path).resolve())
+        if _global_registry is None or _global_registry_path != resolved:
+            _global_registry = BotRegistry(storage_path=resolved)
+            _global_registry_path = resolved
+        return _global_registry
+    if _global_registry is None:
+        _global_registry = BotRegistry()
+        try:
+            _global_registry_path = str(_global_registry.storage_path.resolve())
+        except Exception:
+            _global_registry_path = None
+        return _global_registry
+    # Re-resolve the default location: env (DEER_FLOW_HOME) may have been set
+    # after import. If it moved, rebuild so we read/write the live location.
+    try:
+        live = str(_default_storage_path().resolve())
+    except Exception:
+        return _global_registry
+    if _global_registry_path != live:
+        _global_registry = BotRegistry()
+        _global_registry_path = live
     return _global_registry

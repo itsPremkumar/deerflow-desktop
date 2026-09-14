@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from typing import Optional
+
 from langchain.tools import tool
 
 from deerflow.epistemics.engine import EpistemicBeliefEngine
@@ -17,7 +17,7 @@ _GLOBAL_BELIEF_ENGINE = EpistemicBeliefEngine()
 def evaluate_epistemic_claim(
     action: str,
     claim_text: str = "",
-    claim_id: Optional[str] = None,
+    claim_id: str | None = None,
     evidence: str = "",
     is_supporting: bool = True,
     falsification_test: str = "",

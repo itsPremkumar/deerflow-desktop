@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from deerflow.critic.base import BaseCritic, CriticResult, CriticVerdict
 
@@ -22,8 +22,8 @@ class AgentFinishedCritic(BaseCritic):
     def evaluate(
         self,
         task_description: str,
-        execution_history: Optional[List[Dict[str, Any]]] = None,
-        workspace_dir: Optional[str] = None,
+        execution_history: list[dict[str, Any]] | None = None,
+        workspace_dir: str | None = None,
         **kwargs: Any,
     ) -> CriticResult:
         history = execution_history or []

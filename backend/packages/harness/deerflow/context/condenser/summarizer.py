@@ -4,16 +4,16 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Set
+from typing import Any
 
 
 @dataclass
 class WorkingState:
     goal: str = ""
     hypothesis: str = ""
-    modified_files: List[str] = field(default_factory=list)
-    encountered_errors: List[str] = field(default_factory=list)
-    completed_milestones: List[str] = field(default_factory=list)
+    modified_files: list[str] = field(default_factory=list)
+    encountered_errors: list[str] = field(default_factory=list)
+    completed_milestones: list[str] = field(default_factory=list)
     next_action_focus: str = ""
 
     def to_markdown(self) -> str:
@@ -44,8 +44,8 @@ class StructuredStateCondenser:
 
     def condense(
         self,
-        messages: List[Dict[str, Any]],
-        existing_state: Optional[WorkingState] = None,
+        messages: list[dict[str, Any]],
+        existing_state: WorkingState | None = None,
     ) -> WorkingState:
         state = existing_state or WorkingState()
 

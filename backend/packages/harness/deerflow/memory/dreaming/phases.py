@@ -6,8 +6,8 @@ import datetime
 import hashlib
 import re
 import uuid
+from collections.abc import Sequence
 from dataclasses import dataclass, field
-from typing import Any, Sequence
 
 from deerflow.memory.dreaming.store import DreamStore, get_dream_store
 
@@ -150,7 +150,7 @@ def run_dream_cycle(
     """Execute complete 3-phase dreaming consolidation cycle."""
     store = store or get_dream_store()
     cycle_id = uuid.uuid4().hex[:8]
-    now_str = datetime.datetime.now(datetime.timezone.utc).isoformat()
+    now_str = datetime.datetime.now(datetime.UTC).isoformat()
 
     # 1. Light Sleep
     cleaned_signals = run_light_sleep_phase(signals)

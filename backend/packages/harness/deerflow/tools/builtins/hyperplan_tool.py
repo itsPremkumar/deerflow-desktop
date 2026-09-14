@@ -6,8 +6,9 @@ Exposes hostile multi-perspective plan evaluation to the agent before coding sta
 from __future__ import annotations
 
 import json
-from typing import Any, Dict, Optional
+
 from langchain.tools import tool
+
 from deerflow.planning.hyperplan import HyperplanPipeline
 
 _GLOBAL_PIPELINE = HyperplanPipeline()

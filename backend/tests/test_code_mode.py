@@ -1,6 +1,7 @@
 import pytest
-from deerflow.tools.code_mode.bridge import ToolBridge, execute_code_mode
+
 from deerflow.tools.builtins.code_mode_tool import code_mode_tool
+from deerflow.tools.code_mode.bridge import ToolBridge, execute_code_mode
 
 
 def test_tool_bridge_register_and_call():

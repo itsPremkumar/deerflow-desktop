@@ -1,8 +1,5 @@
-import pytest
 from deerflow.evaluation.benchmark import (
     STANDARD_BENCHMARKS,
-    BenchmarkTaskCategory,
-    BenchmarkTaskSpec,
     EvaluationRunner,
     TaskEvaluationResult,
 )

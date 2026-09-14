@@ -6,7 +6,6 @@ import json
 import logging
 import os
 from pathlib import Path
-from typing import Dict, List, Optional, Union
 
 from deerflow.learning.experience.models import ExperienceRecord, OutcomeType
 
@@ -16,9 +15,9 @@ logger = logging.getLogger(__name__)
 class ExperienceStore:
     """Persistent storage repository managing episodic experience memory records."""
 
-    def __init__(self, storage_path: Optional[Union[str, Path]] = None, load_defaults: bool = True):
+    def __init__(self, storage_path: str | Path | None = None, load_defaults: bool = True):
         self.storage_path = Path(storage_path) if storage_path else None
-        self._records: Dict[str, ExperienceRecord] = {}
+        self._records: dict[str, ExperienceRecord] = {}
 
         if self.storage_path and self.storage_path.exists():
             self._load_from_disk()
@@ -31,10 +30,10 @@ class ExperienceStore:
         if self.storage_path:
             self._save_to_disk()
 
-    def get(self, experience_id: str) -> Optional[ExperienceRecord]:
+    def get(self, experience_id: str) -> ExperienceRecord | None:
         return self._records.get(experience_id)
 
-    def list_all(self) -> List[ExperienceRecord]:
+    def list_all(self) -> list[ExperienceRecord]:
         return list(self._records.values())
 
     def clear(self) -> None:
@@ -57,7 +56,7 @@ class ExperienceStore:
         if not self.storage_path or not self.storage_path.exists():
             return
         try:
-            with open(self.storage_path, "r", encoding="utf-8") as f:
+            with open(self.storage_path, encoding="utf-8") as f:
                 data = json.load(f)
                 for item in data:
                     rec = ExperienceRecord.from_dict(item)

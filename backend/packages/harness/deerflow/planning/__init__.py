@@ -10,10 +10,21 @@ from deerflow.planning.autonomous import (
     detect_domains,
     review_wave,
 )
+from deerflow.planning.bridge import (
+    AutonomousDispatchBridge,
+    DispatchResult,
+)
 from deerflow.planning.hyperplan import (
     HyperplanPipeline,
     HyperplanReport,
     ReviewerVerdict,
+)
+from deerflow.planning.meta_planner import (
+    CognitiveMetaPlanner,
+    ExecutionParadigm,
+    MetaPlan,
+    MetaPlanDecision,
+    MetaPlanTask,
 )
 from deerflow.planning.profiles import (
     install_profiles,
@@ -21,6 +32,11 @@ from deerflow.planning.profiles import (
     profile_spec_to_subagent_config,
     profile_spec_to_system_prompt,
     sanitize_profile_name,
+)
+
+from deerflow.planning.integrity import (
+    GoalIntegrityEngine,
+    GoalIntegrityReport,
 )
 
 __all__ = [
@@ -38,4 +54,14 @@ __all__ = [
     "profile_spec_to_subagent_config",
     "profile_spec_to_system_prompt",
     "sanitize_profile_name",
+    "CognitiveMetaPlanner",
+    "AutonomousDispatchBridge",
+    "DispatchResult",
+    "ExecutionParadigm",
+    "MetaPlan",
+    "MetaPlanDecision",
+    "MetaPlanTask",
+    "GoalIntegrityEngine",
+    "GoalIntegrityReport",
 ]
+

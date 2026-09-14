@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-from typing import Optional, Tuple
 
 from .models import ClaimItem, VerificationProof
 
@@ -18,7 +17,7 @@ class ContradictionDetector:
     def audit_claim_against_proof(
         claim: ClaimItem,
         proof: VerificationProof,
-    ) -> Tuple[bool, str]:
+    ) -> tuple[bool, str]:
         """
         Returns (is_contradicted, diagnostic_message).
         True indicates physical reality contradicts the claim.

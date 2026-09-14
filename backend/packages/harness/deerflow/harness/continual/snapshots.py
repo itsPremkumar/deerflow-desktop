@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import shutil
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 from uuid import uuid4
@@ -13,7 +13,7 @@ from deerflow.harness.continual.state import HarnessState
 
 
 def _now() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 class HarnessSnapshotManager:
@@ -42,7 +42,7 @@ class HarnessSnapshotManager:
             return None
         s_dir.mkdir(parents=True, exist_ok=True)
 
-        snapshot_id = f"snap_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}_{uuid4().hex[:6]}"
+        snapshot_id = f"snap_{datetime.now(UTC).strftime('%Y%m%d_%H%M%S')}_{uuid4().hex[:6]}"
         target_path = s_dir / f"{snapshot_id}.json"
 
         shutil.copy2(self.state.file_path, target_path)
@@ -51,7 +51,7 @@ class HarnessSnapshotManager:
         manifest: list[dict[str, Any]] = []
         if manifest_file.exists():
             try:
-                with open(manifest_file, "r", encoding="utf-8") as f:
+                with open(manifest_file, encoding="utf-8") as f:
                     manifest = json.load(f)
             except Exception:
                 manifest = []
@@ -78,7 +78,7 @@ class HarnessSnapshotManager:
         if not manifest_file.exists():
             return []
         try:
-            with open(manifest_file, "r", encoding="utf-8") as f:
+            with open(manifest_file, encoding="utf-8") as f:
                 return json.load(f)
         except Exception:
             return []

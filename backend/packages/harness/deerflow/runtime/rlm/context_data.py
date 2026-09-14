@@ -4,7 +4,7 @@ import hashlib
 import time
 import uuid
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 
 @dataclass
@@ -19,11 +19,11 @@ class ContextHandle:
     byte_size: int = 0
     estimated_tokens: int = 0
     line_count: int = 0
-    parent_handle_id: Optional[str] = None
+    parent_handle_id: str | None = None
     created_at: float = field(default_factory=time.time)
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "handle_id": self.handle_id,
             "label": self.label,
@@ -45,15 +45,15 @@ class ContextStore:
     """
 
     def __init__(self) -> None:
-        self._data: Dict[str, str] = {}
-        self._handles: Dict[str, ContextHandle] = {}
+        self._data: dict[str, str] = {}
+        self._handles: dict[str, ContextHandle] = {}
 
     def register(
         self,
         content: str,
         label: str = "",
-        metadata: Optional[Dict[str, Any]] = None,
-        parent_handle_id: Optional[str] = None,
+        metadata: dict[str, Any] | None = None,
+        parent_handle_id: str | None = None,
     ) -> ContextHandle:
         content_hash = hashlib.sha256(content.encode("utf-8")).hexdigest()[:16]
         byte_size = len(content.encode("utf-8"))
@@ -75,10 +75,10 @@ class ContextStore:
         self._handles[handle.handle_id] = handle
         return handle
 
-    def get_handle(self, handle_id: str) -> Optional[ContextHandle]:
+    def get_handle(self, handle_id: str) -> ContextHandle | None:
         return self._handles.get(handle_id)
 
-    def get_content(self, handle_id: str) -> Optional[str]:
+    def get_content(self, handle_id: str) -> str | None:
         return self._data.get(handle_id)
 
     def delete(self, handle_id: str) -> bool:
@@ -88,10 +88,10 @@ class ContextStore:
             return True
         return False
 
-    def list_handles(self) -> List[ContextHandle]:
+    def list_handles(self) -> list[ContextHandle]:
         return sorted(self._handles.values(), key=lambda h: h.created_at)
 
-    def stats(self) -> Dict[str, Any]:
+    def stats(self) -> dict[str, Any]:
         return {
             "total_handles": len(self._handles),
             "total_bytes": sum(h.byte_size for h in self._handles.values()),

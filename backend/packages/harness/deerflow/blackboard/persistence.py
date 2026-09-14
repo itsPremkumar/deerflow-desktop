@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any
 
 from .models import BlackboardSnapshot
 
@@ -21,8 +21,8 @@ class BlackboardPersistence:
     @staticmethod
     def load_json(source_path: str | Path) -> BlackboardSnapshot:
         path = Path(source_path)
-        with open(path, "r", encoding="utf-8") as f:
-            data: Dict[str, Any] = json.load(f)
+        with open(path, encoding="utf-8") as f:
+            data: dict[str, Any] = json.load(f)
         return BlackboardSnapshot(
             session_id=data["session_id"],
             goal=data["goal"],

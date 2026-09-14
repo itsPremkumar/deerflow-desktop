@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import Optional
 
 from deerflow.reproduction.gates import (
     PostFixVerificationGate,
@@ -14,7 +13,6 @@ from deerflow.reproduction.gates import (
 from deerflow.reproduction.models import (
     GateResult,
     ReproductionReport,
-    ReproductionScript,
     ReproductionStatus,
 )
 from deerflow.reproduction.synthesizer import ReproductionSynthesizer
@@ -27,7 +25,7 @@ class ReproductionEngine:
 
     def __init__(
         self,
-        python_executable: Optional[str] = None,
+        python_executable: str | None = None,
     ):
         self.python_executable = python_executable
         self.synthesizer = ReproductionSynthesizer()
@@ -77,8 +75,8 @@ class ReproductionEngine:
         self,
         reproduction_script_path: Path,
         workspace_dir: Path,
-        pre_fix_result: Optional[GateResult] = None,
-        regression_command: Optional[str] = None,
+        pre_fix_result: GateResult | None = None,
+        regression_command: str | None = None,
         timeout: int = 30,
     ) -> ReproductionReport:
         """Step 2: Verify that reproduction script passes cleanly and no regressions occurred."""
@@ -99,7 +97,7 @@ class ReproductionEngine:
             )
 
         # Optional Step 3: Run adjacent regression tests
-        reg_res: Optional[GateResult] = None
+        reg_res: GateResult | None = None
         if regression_command:
             reg_res = self.regression_guard.evaluate(
                 test_command=regression_command,

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Callable
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 from .knowledge import DomainKnowledgeBase
 from .lineage import AVOLineage, VersionRecord
@@ -32,13 +32,13 @@ class AgenticVariationLoop:
     def run_variation_step(
         self,
         base_hypothesis: str,
-        edit_fn: Callable[[str, Dict[str, Any]], Tuple[str, str]],
+        edit_fn: Callable[[str, dict[str, Any]], tuple[str, str]],
         evaluate_fn: Callable[[str], EvaluationVector],
         lineage: AVOLineage,
         knowledge_base: DomainKnowledgeBase,
         supervisor: AVOSupervisor,
-        parent_id: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        parent_id: str | None = None,
+    ) -> dict[str, Any]:
         """
         Executes a complete AVO variation step.
         edit_fn takes (current_code, context_dict) -> (new_code, modification_summary)
@@ -48,9 +48,9 @@ class AgenticVariationLoop:
         parent_record = lineage.get_version(effective_parent_id) if effective_parent_id else None
         current_code = parent_record.metadata.get("code", "") if parent_record else ""
 
-        internal_trials: List[Dict[str, Any]] = []
-        committed_record: Optional[VersionRecord] = None
-        directive: Optional[StrategicPivotDirective] = supervisor.last_directive
+        internal_trials: list[dict[str, Any]] = []
+        committed_record: VersionRecord | None = None
+        directive: StrategicPivotDirective | None = supervisor.last_directive
         current_hypothesis = base_hypothesis
 
         for trial_idx in range(1, self.max_internal_trials + 1):

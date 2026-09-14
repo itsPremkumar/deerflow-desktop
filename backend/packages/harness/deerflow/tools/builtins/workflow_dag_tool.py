@@ -6,8 +6,9 @@ Allows the agent to construct, plan, and verify multi-agent dependency DAGs.
 from __future__ import annotations
 
 import json
-from typing import Any, Dict, List, Optional
+
 from langchain.tools import tool
+
 from deerflow.workflow.dag_engine import DAGEngine, UnverifiedNodeCompletionError
 
 _GLOBAL_DAG_ENGINE = DAGEngine()
@@ -17,14 +18,14 @@ _GLOBAL_DAG_ENGINE = DAGEngine()
 def workflow_dag_manage(
     action: str,
     key: str,
-    name: Optional[str] = None,
-    node_id: Optional[str] = None,
-    prompt: Optional[str] = None,
+    name: str | None = None,
+    node_id: str | None = None,
+    prompt: str | None = None,
     category: str = "quick",
-    depends_on: Optional[List[str]] = None,
-    write_scope: Optional[List[str]] = None,
-    evidence: Optional[str] = None,
-    output: Optional[str] = None,
+    depends_on: list[str] | None = None,
+    write_scope: list[str] | None = None,
+    evidence: str | None = None,
+    output: str | None = None,
 ) -> str:
     """Manage dependency-ordered task graphs (mass-ulw / DAG). Actions: 'create', 'add_node', 'plan_waves', 'record_evidence', 'mark_completed', 'status'."""
     engine = _GLOBAL_DAG_ENGINE

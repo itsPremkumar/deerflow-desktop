@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 
 class ReplanDecision(str, Enum):
@@ -22,9 +22,9 @@ class PlanValidityReport:
     diagnostic: str
     should_replan: bool = False
     next_action: str = "continue"
-    failed_task_ids: List[str] = field(default_factory=list)
+    failed_task_ids: list[str] = field(default_factory=list)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "validity_score": self.validity_score,
             "decision": self.decision.value,
@@ -61,7 +61,7 @@ class PlanValidityMonitor:
         *,
         tool_error_rate: float = 0.0,
         stalled: bool = False,
-        failed_task_ids: Optional[List[str]] = None,
+        failed_task_ids: list[str] | None = None,
     ) -> PlanValidityReport:
         if total_tasks <= 0:
             total_tasks = 1
@@ -120,7 +120,7 @@ class PlanValidityMonitor:
 
     @staticmethod
     def evaluate_wave(
-        wave_task_results: Dict[str, bool],
+        wave_task_results: dict[str, bool],
         cumulative_passed: int,
         cumulative_failed: int,
         total_tasks: int,

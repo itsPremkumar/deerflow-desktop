@@ -4,7 +4,7 @@ import json
 import time
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 
 @dataclass
@@ -25,7 +25,7 @@ class ConfidenceCalibrator:
     """
 
     def __init__(self, max_records: int = 1000) -> None:
-        self.records: List[CalibrationRecord] = []
+        self.records: list[CalibrationRecord] = []
         self.max_records = max(10, int(max_records))
 
     def record_outcome(
@@ -45,7 +45,7 @@ class ConfidenceCalibrator:
         if len(self.records) > self.max_records:
             del self.records[: len(self.records) - self.max_records]
 
-    def compute_brier_score(self, task_type: Optional[str] = None) -> float:
+    def compute_brier_score(self, task_type: str | None = None) -> float:
         """Lower is better (0.0 = perfect probabilistic calibration)."""
         recs = [r for r in self.records if task_type is None or r.task_type == task_type]
         if not recs:
@@ -53,7 +53,7 @@ class ConfidenceCalibrator:
         total_sq_err = sum((r.predicted_confidence - (1.0 if r.actual_success else 0.0)) ** 2 for r in recs)
         return round(total_sq_err / len(recs), 4)
 
-    def calibrate(self, raw_confidence: float, task_type: Optional[str] = None) -> float:
+    def calibrate(self, raw_confidence: float, task_type: str | None = None) -> float:
         """Calibrates raw confidence based on historical empirical accuracy."""
         raw = max(0.0, min(1.0, float(raw_confidence)))
         recs = [r for r in self.records if task_type is None or r.task_type == task_type]
@@ -74,8 +74,8 @@ class ConfidenceCalibrator:
 
         return raw
 
-    def stats(self) -> Dict[str, Any]:
-        by_type: Dict[str, int] = {}
+    def stats(self) -> dict[str, Any]:
+        by_type: dict[str, int] = {}
         for r in self.records:
             by_type[r.task_type] = by_type.get(r.task_type, 0) + 1
         return {
@@ -84,11 +84,11 @@ class ConfidenceCalibrator:
             "by_task_type": by_type,
         }
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {"records": [asdict(r) for r in self.records], "max_records": self.max_records}
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "ConfidenceCalibrator":
+    def from_dict(cls, data: dict[str, Any]) -> ConfidenceCalibrator:
         cal = cls(max_records=int(data.get("max_records", 1000)))
         for item in data.get("records", []):
             try:
@@ -111,7 +111,7 @@ class ConfidenceCalibrator:
         return dest
 
     @classmethod
-    def load(cls, path: str | Path) -> "ConfidenceCalibrator":
+    def load(cls, path: str | Path) -> ConfidenceCalibrator:
         dest = Path(path)
         data = json.loads(dest.read_text(encoding="utf-8"))
         return cls.from_dict(data)

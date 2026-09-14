@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from typing import Optional
+
 from langchain.tools import tool
 
 from deerflow.verification.evidence import (
@@ -21,10 +21,10 @@ _AUDITOR = FinishFirstAuditor(_MATRIX)
 def audit_finish_first_evidence(
     action: str,
     claim_statement: str = "",
-    target_path: Optional[str] = None,
+    target_path: str | None = None,
     claim_id: str = "",
     proof_type: str = "test_execution",
-    command_run: Optional[str] = None,
+    command_run: str | None = None,
     exit_code: int = 0,
     output_snippet: str = "",
     verified: bool = True,

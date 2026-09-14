@@ -10,7 +10,8 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional
+from typing import Any
+
 from langchain.tools import tool
 
 
@@ -18,7 +19,7 @@ from langchain.tools import tool
 class ASTMatchResult:
     line_number: int
     matched_text: str
-    metavars: Dict[str, str]
+    metavars: dict[str, str]
 
 
 class StructuralPatternMatcher:
@@ -36,7 +37,7 @@ class StructuralPatternMatcher:
         regex_str = re.sub(r"\\\s+", r"\\s+", regex_str)
         self.regex = re.compile(regex_str, re.DOTALL | re.MULTILINE)
 
-    def find_matches(self, source_code: str) -> List[ASTMatchResult]:
+    def find_matches(self, source_code: str) -> list[ASTMatchResult]:
         results = []
         for m in self.regex.finditer(source_code):
             start = m.start()
@@ -64,7 +65,7 @@ def ast_grep_search(
     source_code: str,
     pattern: str,
     language: str = "python",
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     """Search code using structural pattern matching."""
     matcher = StructuralPatternMatcher(pattern)
     matches = matcher.find_matches(source_code)

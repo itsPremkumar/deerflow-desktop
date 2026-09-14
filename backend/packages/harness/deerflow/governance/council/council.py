@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any
 
-from .models import DeliberatorVote, QuorumVerdict, RiskTier, VoteVerdict
+from .models import QuorumVerdict, RiskTier, VoteVerdict
 from .roles import (
     IndependentCritic,
     InvariantVerifier,
@@ -34,7 +34,7 @@ class QualityCouncil:
         artifact_name: str,
         content: str,
         risk_tier: RiskTier = RiskTier.TIER_2_STANDARD,
-        metadata: Optional[Dict[str, Any]] = None,
+        metadata: dict[str, Any] | None = None,
     ) -> QuorumVerdict:
         meta = metadata or {}
 
@@ -75,7 +75,7 @@ class QualityCouncil:
         weighted_score = (approved_conf + cond_conf) / max(1.0, total_conf)
 
         # 5. Collate dissenting concerns
-        all_concerns: List[str] = []
+        all_concerns: list[str] = []
         for v in all_votes:
             for c in v.concerns:
                 all_concerns.append(f"[{v.role}] {c}")

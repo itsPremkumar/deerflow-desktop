@@ -17,21 +17,20 @@ Provides dual fallback:
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Set
+from dataclasses import dataclass
 
 
 @dataclass
 class CategorySpec:
     name: str
-    models: List[str]
+    models: list[str]
     reasoning_effort: str = "medium"
     temperature: float = 0.5
     prompt_append: str = ""
     description: str = ""
 
 
-DEFAULT_CATEGORY_SPECS: Dict[str, CategorySpec] = {
+DEFAULT_CATEGORY_SPECS: dict[str, CategorySpec] = {
     "ultrabrain": CategorySpec(
         name="ultrabrain",
         models=["gpt-6-astra", "claude-opus-5", "gpt-5.6-sol"],
@@ -94,15 +93,15 @@ DEFAULT_CATEGORY_SPECS: Dict[str, CategorySpec] = {
 class CategoryRouter:
     """Routes agent intent categories to models and manages dual fallbacks."""
 
-    def __init__(self, custom_specs: Optional[Dict[str, CategorySpec]] = None):
-        self._categories: Dict[str, CategorySpec] = dict(DEFAULT_CATEGORY_SPECS)
+    def __init__(self, custom_specs: dict[str, CategorySpec] | None = None):
+        self._categories: dict[str, CategorySpec] = dict(DEFAULT_CATEGORY_SPECS)
         if custom_specs:
             self._categories.update(custom_specs)
 
     def resolve_category(
         self,
         category: str,
-        available_models: Optional[Set[str]] = None,
+        available_models: set[str] | None = None,
     ) -> CategorySpec:
         """Resolve category with proactive provider availability checking."""
         spec = self._categories.get(category.lower())
@@ -129,7 +128,7 @@ class CategoryRouter:
             description=spec.description,
         )
 
-    def get_reactive_fallback(self, category: str, failed_model: str) -> Optional[str]:
+    def get_reactive_fallback(self, category: str, failed_model: str) -> str | None:
         """Reactive recovery: return next model in chain when current model fails."""
         spec = self._categories.get(category.lower())
         if not spec or failed_model not in spec.models:

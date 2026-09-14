@@ -11,7 +11,7 @@ from __future__ import annotations
 import time
 from dataclasses import asdict, dataclass, field
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any
 
 
 class BenchmarkTaskCategory(str, Enum):
@@ -31,12 +31,12 @@ class BenchmarkTaskSpec:
     name: str
     category: BenchmarkTaskCategory
     prompt: str
-    expected_output_keywords: List[str] = field(default_factory=list)
-    required_tool_patterns: List[str] = field(default_factory=list)
+    expected_output_keywords: list[str] = field(default_factory=list)
+    required_tool_patterns: list[str] = field(default_factory=list)
     max_budget_usd: float = 1.0
     max_time_sec: float = 120.0
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         data = asdict(self)
         data["category"] = self.category.value
         return data
@@ -55,7 +55,7 @@ class TaskEvaluationResult:
     notes: str = ""
     timestamp: float = field(default_factory=time.time)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "task_id": self.task_id,
             "success": self.success,
@@ -70,7 +70,7 @@ class TaskEvaluationResult:
 
 
 # Standard Benchmark Suite Catalog (Chapter 37)
-STANDARD_BENCHMARKS: List[BenchmarkTaskSpec] = [
+STANDARD_BENCHMARKS: list[BenchmarkTaskSpec] = [
     BenchmarkTaskSpec(
         task_id="research_001",
         name="Deep Competitor Technical Analysis",
@@ -141,7 +141,7 @@ class EvaluationRunner:
     def evaluate_task(
         spec: BenchmarkTaskSpec,
         agent_response: str,
-        tool_calls_log: Optional[List[Dict[str, Any]]] = None,
+        tool_calls_log: list[dict[str, Any]] | None = None,
         elapsed_time_sec: float = 1.0,
         cost_usd: float = 0.01,
         exit_code: int = 0,
@@ -196,7 +196,7 @@ class EvaluationRunner:
         )
 
     @classmethod
-    def run_benchmark_summary(cls, results: List[TaskEvaluationResult]) -> Dict[str, Any]:
+    def run_benchmark_summary(cls, results: list[TaskEvaluationResult]) -> dict[str, Any]:
         """Aggregate multiple task results into a consolidated leaderboard scorecard."""
         if not results:
             return {"total_tasks": 0, "pass_rate": 0.0}

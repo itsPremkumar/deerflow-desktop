@@ -4,13 +4,13 @@ from __future__ import annotations
 
 import contextlib
 import logging
-import os
 import shutil
 import subprocess
 import time
+from collections.abc import Generator
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Generator
+from typing import Any
 
 logger = logging.getLogger(__name__)
 

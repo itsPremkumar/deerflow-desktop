@@ -2,7 +2,7 @@
 
 import pytest
 
-from deerflow.sandbox.repl.session import ReplSession, get_repl_session
+from deerflow.sandbox.repl.session import ReplSession
 from deerflow.tools.builtins.python_repl_tool import python_repl_tool
 
 

@@ -1,6 +1,5 @@
 """Unit tests for Tool Call Repair and Stream Normalizer."""
 
-import pytest
 from deerflow.tools.repair.normalizer import ToolCallNormalizer, repair_json_payload
 from deerflow.tools.repair.promoter import ToolCallPromoter
 

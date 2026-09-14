@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, List
+from typing import Any
 
 
 @dataclass
@@ -15,7 +15,7 @@ class RecoveryFallbackTree:
     fallback_b: str  # Second fallback: graceful degradation, reduced scope, or simplification
     escalation_threshold: int = 2
     escalation_directive: str = "Escalate to Human Operator or Senior Supervisor Agent"
-    failure_history: List[str] = field(default_factory=list)
+    failure_history: list[str] = field(default_factory=list)
 
     def resolve_action(self, failure_count: int) -> str:
         """Determines the exact pre-computed action based on failure count."""
@@ -31,7 +31,7 @@ class RecoveryFallbackTree:
     def record_failure(self, reason: str) -> None:
         self.failure_history.append(reason)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "primary_strategy": self.primary_strategy,
             "fallback_a": self.fallback_a,

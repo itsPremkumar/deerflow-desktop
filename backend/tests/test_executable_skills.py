@@ -5,7 +5,6 @@ import pytest
 from deerflow.skills.executable import (
     ExecutableSkillReference,
     ExecutableSkillRunner,
-    get_skill_runner,
 )
 from deerflow.tools.builtins.executable_skill_tool import invoke_python_skill_tool
 

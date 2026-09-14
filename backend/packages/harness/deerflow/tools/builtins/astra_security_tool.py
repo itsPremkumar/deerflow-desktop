@@ -3,11 +3,10 @@
 from __future__ import annotations
 
 import json
-from typing import Any, Dict, List, Optional
+
 from langchain.tools import tool
 
 from deerflow.security.astra import (
-    AgentHighlight,
     AstraGoalHarness,
     BoundaryViolationError,
     BoundingBox,
@@ -15,7 +14,6 @@ from deerflow.security.astra import (
     CheckpointIntegrityError,
     CredentialRedactor,
     DeceptionWatchdog,
-    Milestone,
     ScopedCredentialVault,
     SpatialObject,
     SpatioTemporalCache,
@@ -29,7 +27,7 @@ _FLIGHT_RECORDER = TrajectoryFlightRecorder()
 _CREDENTIAL_VAULT = ScopedCredentialVault()
 _REDACTOR = CredentialRedactor()
 _SPATIAL_CACHE = SpatioTemporalCache()
-_ACTIVE_GOAL_HARNESS: Optional[AstraGoalHarness] = None
+_ACTIVE_GOAL_HARNESS: AstraGoalHarness | None = None
 
 
 @tool("astra_security_manage", parse_docstring=True)
@@ -144,7 +142,7 @@ def astra_security_manage(
         }, indent=2)
 
     elif action == "ingest_frame":
-        objects: List[SpatialObject] = []
+        objects: list[SpatialObject] = []
         if object_label:
             bbox = BoundingBox()
             if bbox_json:
@@ -201,7 +199,7 @@ def astra_security_manage(
             )
             _ACTIVE_GOAL_HARNESS.add_milestone(title=telemetry_action or "Execute Step", description="Step execution")
 
-        objects: List[SpatialObject] = []
+        objects: list[SpatialObject] = []
         if object_label:
             bbox = BoundingBox()
             if bbox_json:

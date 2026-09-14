@@ -4,7 +4,7 @@ import hashlib
 import json
 import time
 from dataclasses import asdict, dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 
 @dataclass
@@ -15,7 +15,7 @@ class CuriosityScore:
     prediction_error: float
     timestamp: float = field(default_factory=time.time)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
 
@@ -26,14 +26,14 @@ class CuriosityScorer:
     """
 
     def __init__(self) -> None:
-        self.known_situations: Dict[str, float] = {}  # hash -> familiarity count
-        self.history: List[CuriosityScore] = []
+        self.known_situations: dict[str, float] = {}  # hash -> familiarity count
+        self.history: list[CuriosityScore] = []
 
     def score(
         self,
-        situation: Dict[str, Any],
-        predicted_outcome: Optional[float] = None,
-        actual_outcome: Optional[float] = None,
+        situation: dict[str, Any],
+        predicted_outcome: float | None = None,
+        actual_outcome: float | None = None,
     ) -> CuriosityScore:
         sit_hash = self._hash_situation(situation)
 
@@ -62,6 +62,6 @@ class CuriosityScorer:
         self.history.append(result)
         return result
 
-    def _hash_situation(self, situation: Dict[str, Any]) -> str:
+    def _hash_situation(self, situation: dict[str, Any]) -> str:
         s = json.dumps(situation, sort_keys=True, default=str)
         return hashlib.md5(s.encode("utf-8")).hexdigest()[:12]

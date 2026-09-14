@@ -23,8 +23,9 @@ from __future__ import annotations
 
 import re
 import uuid
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any
 
 from deerflow.kanban.models import KanbanBoard, KanbanTask
 from deerflow.mission.compiler import MissionCompiler
@@ -36,7 +37,7 @@ from deerflow.planning.hyperplan import HyperplanPipeline
 from deerflow.reasoning.governor import ReasoningGovernor
 from deerflow.reasoning.tom.consultant import TheoryOfMindConsultant
 
-_DOMAIN_PATTERNS: Dict[str, re.Pattern] = {
+_DOMAIN_PATTERNS: dict[str, re.Pattern] = {
     "research": re.compile(r"\b(research|survey|compare|investigat|literature|landscape|deep dive|state of|vendors?|pricing|options)\b", re.IGNORECASE),
     "coding": re.compile(r"\b(build|implement|refactor|fix|bug|code|coding|api|endpoint|function|class|feature|rewrite|debug|sdk)\b", re.IGNORECASE),
     "browser": re.compile(r"\b(browser|login|scrap|crawl|form fill|web flow|webpage|website interaction)\b", re.IGNORECASE),
@@ -50,7 +51,7 @@ _DOMAIN_PATTERNS: Dict[str, re.Pattern] = {
 
 _DOMAIN_ORDER = ["research", "design", "coding", "data", "browser", "security", "deploy", "docs", "media"]
 
-_DOMAIN_SKILLS: Dict[str, List[str]] = {
+_DOMAIN_SKILLS: dict[str, list[str]] = {
     "research": ["deep-research"],
     "coding": ["project-cartographer"],
     "design": ["frontend-design", "web-design-guidelines"],
@@ -62,7 +63,7 @@ _DOMAIN_SKILLS: Dict[str, List[str]] = {
     "security": [],
 }
 
-_DOMAIN_TOOL_GROUPS: Dict[str, List[str]] = {
+_DOMAIN_TOOL_GROUPS: dict[str, list[str]] = {
     "research": ["web"],
     "coding": ["file:read", "file:write", "bash"],
     "browser": ["browser", "web"],
@@ -74,7 +75,7 @@ _DOMAIN_TOOL_GROUPS: Dict[str, List[str]] = {
     "security": ["file:read", "bash"],
 }
 
-_SPECIALIST_PROFILES: Dict[str, Dict[str, Any]] = {
+_SPECIALIST_PROFILES: dict[str, dict[str, Any]] = {
     "frontend": {
         "name": "frontend-specialist",
         "description": "Builds UI surfaces with design-system fidelity; owns disjoint frontend scopes.",
@@ -123,7 +124,7 @@ _HUGE_HINT_RE = re.compile(r"\b(platform|system|end.to.end|full|complete|entire|
 # Heuristic per-card cost table (tokens + wall-clock). Documented estimates, not
 # measurements: base tokens by domain, x1.25 for high/critical priority, ~45s
 # per card turn-equivalent. Totals are checked against the run token budget.
-_DOMAIN_TOKEN_BASE: Dict[str, int] = {
+_DOMAIN_TOKEN_BASE: dict[str, int] = {
     "research": 12000,
     "coding": 15000,
     "design": 12000,
@@ -134,7 +135,7 @@ _DOMAIN_TOKEN_BASE: Dict[str, int] = {
     "media": 8000,
     "general": 6000,
 }
-_DOMAIN_SECONDS_BASE: Dict[str, int] = {
+_DOMAIN_SECONDS_BASE: dict[str, int] = {
     "research": 600,
     "coding": 900,
     "design": 600,
@@ -181,7 +182,7 @@ def request_hash_for(raw_prompt: str) -> str:
     return hashlib.sha256(normalized.encode()).hexdigest()[:16]
 
 
-def detect_domains(prompt: str) -> List[str]:
+def detect_domains(prompt: str) -> list[str]:
     """Ordered domain hits for a raw prompt (may be empty for pure Q&A)."""
     return [d for d in _DOMAIN_ORDER if _DOMAIN_PATTERNS[d].search(prompt)]
 
@@ -195,12 +196,12 @@ class AutoSubtask:
     category: str
     assignee: str
     needs_new_profile: bool = False
-    profile_name: Optional[str] = None
-    skills: List[str] = field(default_factory=list)
-    tool_groups: List[str] = field(default_factory=list)
-    acceptance_criteria: List[str] = field(default_factory=list)
+    profile_name: str | None = None
+    skills: list[str] = field(default_factory=list)
+    tool_groups: list[str] = field(default_factory=list)
+    acceptance_criteria: list[str] = field(default_factory=list)
     priority: str = "medium"
-    dependencies: List[str] = field(default_factory=list)
+    dependencies: list[str] = field(default_factory=list)
     wave_index: int = 1
     tokens_estimate: int = 0
     seconds_estimate: int = 0
@@ -211,7 +212,7 @@ class AutoSubtask:
         self.description = safe_text(self.description, 500)
         self.acceptance_criteria = [safe_text(a, 200) for a in (self.acceptance_criteria or [])]
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "subtask_id": self.subtask_id,
             "title": self.title,
@@ -236,17 +237,17 @@ class AutoSubtask:
 class NewProfileSpec:
     name: str
     description: str
-    system_prompt_outline: List[str] = field(default_factory=list)
-    tools: Optional[List[str]] = None
-    disallowed_tools: List[str] = field(default_factory=lambda: ["task"])
-    skills: List[str] = field(default_factory=list)
+    system_prompt_outline: list[str] = field(default_factory=list)
+    tools: list[str] | None = None
+    disallowed_tools: list[str] = field(default_factory=lambda: ["task"])
+    skills: list[str] = field(default_factory=list)
     model: str = "inherit"
     max_turns: int = 80
     timeout_seconds: int = 900
     category: str = "general"
     rationale: str = ""
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "name": self.name,
             "description": self.description,
@@ -274,32 +275,32 @@ class AutonomousPlan:
     research_rationale: str
     needs_subagents: bool
     delegation_rationale: str
-    subtasks: List[AutoSubtask] = field(default_factory=list)
-    new_profiles: List[NewProfileSpec] = field(default_factory=list)
-    kanban_board: Dict[str, Any] = field(default_factory=dict)
-    skills_to_use: List[str] = field(default_factory=list)
-    tool_groups: List[str] = field(default_factory=list)
-    execution_waves: List[Dict[str, Any]] = field(default_factory=list)
-    proof_obligations: List[str] = field(default_factory=list)
-    acceptance_criteria: List[str] = field(default_factory=list)
-    execution_config: Dict[str, Any] = field(default_factory=dict)
+    subtasks: list[AutoSubtask] = field(default_factory=list)
+    new_profiles: list[NewProfileSpec] = field(default_factory=list)
+    kanban_board: dict[str, Any] = field(default_factory=dict)
+    skills_to_use: list[str] = field(default_factory=list)
+    tool_groups: list[str] = field(default_factory=list)
+    execution_waves: list[dict[str, Any]] = field(default_factory=list)
+    proof_obligations: list[str] = field(default_factory=list)
+    acceptance_criteria: list[str] = field(default_factory=list)
+    execution_config: dict[str, Any] = field(default_factory=dict)
     hyperplan_status: str = "not_reviewed"
     hyperplan_summary: str = ""
     autonomy: str = "full"
-    assumptions: List[str] = field(default_factory=list)
-    unknowns: List[str] = field(default_factory=list)
-    cost_estimate: Dict[str, Any] = field(default_factory=dict)
-    capability_notes: List[str] = field(default_factory=list)
-    llm_review: Dict[str, Any] = field(default_factory=dict)
+    assumptions: list[str] = field(default_factory=list)
+    unknowns: list[str] = field(default_factory=list)
+    cost_estimate: dict[str, Any] = field(default_factory=dict)
+    capability_notes: list[str] = field(default_factory=list)
+    llm_review: dict[str, Any] = field(default_factory=dict)
     kanban_persisted: bool = False
     revision: int = 1
     supersedes: str = ""
     request_hash: str = ""
-    duplicate_of_board: Optional[str] = None
-    approval_request: Dict[str, Any] = field(default_factory=dict)
+    duplicate_of_board: str | None = None
+    approval_request: dict[str, Any] = field(default_factory=dict)
     user_summary_markdown: str = ""
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "plan_id": self.plan_id,
             "plan_hash": self.plan_hash,
@@ -338,7 +339,7 @@ class AutonomousPlan:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "AutonomousPlan":
+    def from_dict(cls, data: dict[str, Any]) -> AutonomousPlan:
         subtasks = [AutoSubtask(**{k: v for k, v in s.items() if k in AutoSubtask.__dataclass_fields__}) for s in data.get("subtasks", [])]
         profiles = [NewProfileSpec(**{k: v for k, v in p.items() if k in NewProfileSpec.__dataclass_fields__}) for p in data.get("new_profiles", [])]
         known = set(cls.__dataclass_fields__)
@@ -358,7 +359,7 @@ class AutonomousPlan:
         return dest
 
     @classmethod
-    def load(cls, path: Any) -> "AutonomousPlan":
+    def load(cls, path: Any) -> AutonomousPlan:
         import json
         from pathlib import Path
 
@@ -374,14 +375,14 @@ class AutonomousPlanner:
     def plan(
         self,
         raw_prompt: str,
-        workspace_context: Optional[str] = None,
-        context_metadata: Optional[Dict[str, Any]] = None,
-        max_subtasks: Optional[int] = None,
-        capabilities: Optional[Dict[str, Any]] = None,
+        workspace_context: str | None = None,
+        context_metadata: dict[str, Any] | None = None,
+        max_subtasks: int | None = None,
+        capabilities: dict[str, Any] | None = None,
         kanban_store: Any = None,
-        token_budget: Optional[int] = None,
-        llm_reviewer: Optional[Callable[[str], str]] = None,
-        known_requests: Optional[Dict[str, str]] = None,
+        token_budget: int | None = None,
+        llm_reviewer: Callable[[str], str] | None = None,
+        known_requests: dict[str, str] | None = None,
     ) -> AutonomousPlan:
         """Build the full autonomous plan.
 
@@ -431,7 +432,7 @@ class AutonomousPlanner:
                 sub.assignee = sub.profile_name
 
         dag = {s.subtask_id: list(s.dependencies) for s in subtasks}
-        waves: List[ExecutionWave] = partition_execution_waves(dag)
+        waves: list[ExecutionWave] = partition_execution_waves(dag)
         wave_of = {tid: w.wave_index for w in waves for tid in w.task_ids}
         for sub in subtasks:
             sub.wave_index = wave_of.get(sub.subtask_id, 1)
@@ -540,7 +541,7 @@ class AutonomousPlanner:
 
     # -- understanding ----------------------------------------------------
 
-    def _is_huge(self, prompt: str, domains: List[str]) -> bool:
+    def _is_huge(self, prompt: str, domains: list[str]) -> bool:
         score = 0
         if len(prompt) > 280:
             score += 1
@@ -555,13 +556,13 @@ class AutonomousPlanner:
             score += 1
         return score >= 3
 
-    def _is_trivial(self, prompt: str, domains: List[str], mission: Mission) -> bool:
+    def _is_trivial(self, prompt: str, domains: list[str], mission: Mission) -> bool:
         if mission.risk_tier in (RiskTier.R5, RiskTier.R6):
             return False
         markers = len(_MULTI_PART_RE.findall(prompt)) + prompt.count(",") + prompt.count(";")
         return len(prompt) < 120 and len(domains) <= 1 and markers == 0
 
-    def _decide_research(self, prompt: str, domains: List[str], huge: bool):
+    def _decide_research(self, prompt: str, domains: list[str], huge: bool):
         if "research" in domains:
             return True, "Prompt explicitly asks for research/investigation."
         if _RESEARCH_SIGNAL_RE.search(prompt):
@@ -588,8 +589,8 @@ class AutonomousPlanner:
             dependencies=[],
         )
 
-    def _decompose(self, prompt: str, domains: List[str], mission: Mission, needs_research: bool, huge: bool) -> List[AutoSubtask]:
-        tasks: List[AutoSubtask] = []
+    def _decompose(self, prompt: str, domains: list[str], mission: Mission, needs_research: bool, huge: bool) -> list[AutoSubtask]:
+        tasks: list[AutoSubtask] = []
 
         def add(
             sid: str,
@@ -598,13 +599,13 @@ class AutonomousPlanner:
             domain: str,
             category: str,
             assignee: str,
-            skills: List[str],
-            groups: List[str],
-            acceptance: List[str],
+            skills: list[str],
+            groups: list[str],
+            acceptance: list[str],
             priority: str,
-            deps: List[str],
+            deps: list[str],
             new_profile: bool = False,
-            profile_key: Optional[str] = None,
+            profile_key: str | None = None,
         ) -> None:
             tasks.append(
                 AutoSubtask(
@@ -656,7 +657,7 @@ class AutonomousPlanner:
             )
         design_dep = ["repo_map_design"] if any(t.subtask_id == "repo_map_design" for t in tasks) else research_dep
 
-        build_ids: List[str] = []
+        build_ids: list[str] = []
         if "design" in domains and "coding" in domains and huge:
             add(
                 "build_frontend",
@@ -787,7 +788,7 @@ class AutonomousPlanner:
             tasks.append(self._single_quick_task(prompt, mission))
         return tasks
 
-    def _fit_budget(self, tasks: List[AutoSubtask], budget: int) -> List[AutoSubtask]:
+    def _fit_budget(self, tasks: list[AutoSubtask], budget: int) -> list[AutoSubtask]:
         if len(tasks) <= budget:
             return tasks
         # Merge order: fold design into first build, fold security into tests.
@@ -812,8 +813,8 @@ class AutonomousPlanner:
 
     # -- assignment, resources, goal --------------------------------------
 
-    def _draft_profiles(self, subtasks: List[AutoSubtask], huge: bool, mission: Mission) -> List[NewProfileSpec]:
-        seen: Dict[str, NewProfileSpec] = {}
+    def _draft_profiles(self, subtasks: list[AutoSubtask], huge: bool, mission: Mission) -> list[NewProfileSpec]:
+        seen: dict[str, NewProfileSpec] = {}
         for sub in subtasks:
             if not sub.needs_new_profile or not sub.profile_name:
                 continue
@@ -839,7 +840,7 @@ class AutonomousPlanner:
             )
         return list(seen.values())
 
-    def _skills_for(self, domain: str, prompt: str) -> List[str]:
+    def _skills_for(self, domain: str, prompt: str) -> list[str]:
         skills = list(_DOMAIN_SKILLS.get(domain, []))
         low = prompt.lower()
         if domain == "research":
@@ -860,7 +861,7 @@ class AutonomousPlanner:
                 skills = ["podcast-generation"]
             elif "music" in low:
                 skills = ["music-generation"]
-        out: List[str] = []
+        out: list[str] = []
         for s in skills:
             if s not in out:
                 out.append(s)
@@ -869,16 +870,16 @@ class AutonomousPlanner:
     def _select_skills(
         self,
         prompt: str,
-        domains: List[str],
-        subtasks: List[AutoSubtask],
-        allowed: Optional[set] = None,
-    ) -> List[str]:
-        def keep(candidates: List[str]) -> List[str]:
+        domains: list[str],
+        subtasks: list[AutoSubtask],
+        allowed: set | None = None,
+    ) -> list[str]:
+        def keep(candidates: list[str]) -> list[str]:
             if allowed is None:
                 return list(candidates)
             return [s for s in candidates if s in allowed]
 
-        ordered: List[str] = []
+        ordered: list[str] = []
         for sub in subtasks:
             for s in keep(sub.skills or self._skills_for(sub.domain, prompt)):
                 if s not in ordered:
@@ -889,15 +890,15 @@ class AutonomousPlanner:
                     ordered.append(s)
         return ordered
 
-    def _select_tool_groups(self, subtasks: List[AutoSubtask]) -> List[str]:
-        ordered: List[str] = []
+    def _select_tool_groups(self, subtasks: list[AutoSubtask]) -> list[str]:
+        ordered: list[str] = []
         for sub in subtasks:
             for g in sub.tool_groups or _DOMAIN_TOOL_GROUPS.get(sub.domain, ["file:read"]):
                 if g not in ordered:
                     ordered.append(g)
         return ordered or ["file:read"]
 
-    def _decide_delegation(self, subtasks: List[AutoSubtask], waves: List[ExecutionWave], huge: bool):
+    def _decide_delegation(self, subtasks: list[AutoSubtask], waves: list[ExecutionWave], huge: bool):
         if len(subtasks) == 1:
             return False, "Single bounded item — direct execution beats delegation overhead."
         parallel = any(len(w.task_ids) > 1 for w in waves)
@@ -907,7 +908,7 @@ class AutonomousPlanner:
             return True, "Huge task split for context isolation and bounded scopes."
         return True, "Multi-step work with clear handoff boundaries — delegating per item."
 
-    def _acceptance(self, mission: Mission, subtasks: List[AutoSubtask]) -> List[str]:
+    def _acceptance(self, mission: Mission, subtasks: list[AutoSubtask]) -> list[str]:
         criteria = list(mission.acceptance_criteria)
         for sub in subtasks:
             for ac in sub.acceptance_criteria:
@@ -915,15 +916,15 @@ class AutonomousPlanner:
                     criteria.append(f"[{sub.subtask_id}] {ac}")
         return criteria
 
-    def _apply_capabilities(self, subtasks: List[AutoSubtask], capabilities: Optional[Dict[str, Any]]) -> tuple:
+    def _apply_capabilities(self, subtasks: list[AutoSubtask], capabilities: dict[str, Any] | None) -> tuple:
         """Validate planned skills/tools against real deployment capabilities.
 
         Unknown (None) capability values skip that check and are recorded —
         never blocking. Returns (notes, allowed_skills) where allowed_skills is
         None when skill availability is unknown (no filtering downstream).
         """
-        notes: List[str] = []
-        allowed: Optional[set] = None
+        notes: list[str] = []
+        allowed: set | None = None
         if not capabilities:
             notes.append("Capabilities unvalidated (no deployment snapshot provided).")
             return notes, allowed
@@ -961,7 +962,7 @@ class AutonomousPlanner:
             notes.append("All planned skills and tool groups validated against deployment capabilities.")
         return notes, allowed
 
-    def _estimate_cost(self, subtasks: List[AutoSubtask], token_budget: Optional[int]) -> Dict[str, Any]:
+    def _estimate_cost(self, subtasks: list[AutoSubtask], token_budget: int | None) -> dict[str, Any]:
         """Heuristic per-card cost roll-up with an optional budget verdict."""
         per_card = []
         total_tokens = 0
@@ -976,7 +977,7 @@ class AutonomousPlanner:
             total_tokens += tokens
             total_seconds += seconds
             per_card.append({"subtask_id": sub.subtask_id, "tokens": tokens, "seconds": seconds})
-        estimate: Dict[str, Any] = {
+        estimate: dict[str, Any] = {
             "per_card": per_card,
             "total_tokens": total_tokens,
             "total_seconds": total_seconds,
@@ -992,10 +993,10 @@ class AutonomousPlanner:
                 estimate["budget_note"] = f"Estimated {total_tokens} tokens exceed budget {token_budget} — cut scope, lower max_subtasks, or raise the budget before executing."
         return estimate
 
-    def _derive_assumptions(self, prompt: str, domains: List[str], mission: Mission, intent: Any) -> tuple:
+    def _derive_assumptions(self, prompt: str, domains: list[str], mission: Mission, intent: Any) -> tuple:
         """Explicit assumptions + open unknowns so the user can correct in one shot."""
-        assumptions: List[str] = []
-        unknowns: List[str] = []
+        assumptions: list[str] = []
+        unknowns: list[str] = []
         if "deadline" not in prompt.lower() and "asap" not in prompt.lower():
             assumptions.append("No deadline mentioned — steady, verification-first pace assumed.")
         if mission.risk_tier in (RiskTier.R4, RiskTier.R5, RiskTier.R6):
@@ -1014,10 +1015,10 @@ class AutonomousPlanner:
     def _run_llm_review(
         self,
         mission: Mission,
-        acceptance: List[str],
-        subtasks: List[AutoSubtask],
-        llm_reviewer: Optional[Callable[[str], str]],
-    ) -> Dict[str, Any]:
+        acceptance: list[str],
+        subtasks: list[AutoSubtask],
+        llm_reviewer: Callable[[str], str] | None,
+    ) -> dict[str, Any]:
         """Optional LLM reviewer pass for load-bearing plans (P2 hook).
 
         Contract: ``fn(plan_markdown) -> "VERDICT\\nnote"`` with VERDICT in
@@ -1041,7 +1042,7 @@ class AutonomousPlanner:
             return {"configured": True, "verdict": "UNKNOWN", "note": raw[:500]}
         return {"configured": True, "verdict": verdict, "note": rest.strip()[:1000]}
 
-    def _approval_policy(self, mission: Mission) -> Dict[str, str]:
+    def _approval_policy(self, mission: Mission) -> dict[str, str]:
         tier = mission.risk_tier
         if tier in (RiskTier.R0, RiskTier.R1):
             return {"default": "auto-approve", "note": "read-only work, no side effects"}
@@ -1053,7 +1054,7 @@ class AutonomousPlanner:
             return {"default": "proof-required", "note": "side effects need verification evidence first"}
         return {"default": "human-gate", "note": "destructive/strategic work waits for explicit approval"}
 
-    def _parse_schedule(self, prompt: str) -> Dict[str, Any]:
+    def _parse_schedule(self, prompt: str) -> dict[str, Any]:
         """Deterministic schedule hints: explicit due phrase + urgency flag."""
         due = _DUE_PHRASE_RE.search(prompt)
         return {
@@ -1069,7 +1070,7 @@ class AutonomousPlanner:
         goal: str,
         plan_hash: str,
         gate_summary: str,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Structured approval request the runtime can actually block on.
 
         Empty gate (``required: False``) for fully autonomous plans; otherwise
@@ -1090,14 +1091,14 @@ class AutonomousPlanner:
         self,
         plan: AutonomousPlan,
         *,
-        done_ids: List[str] = (),
-        failed_ids: List[str] = (),
+        done_ids: list[str] = (),
+        failed_ids: list[str] = (),
         feedback: str = "",
-        max_subtasks: Optional[int] = None,
-        capabilities: Optional[Dict[str, Any]] = None,
+        max_subtasks: int | None = None,
+        capabilities: dict[str, Any] | None = None,
         kanban_store: Any = None,
-        token_budget: Optional[int] = None,
-        llm_reviewer: Optional[Callable[[str], str]] = None,
+        token_budget: int | None = None,
+        llm_reviewer: Callable[[str], str] | None = None,
     ) -> AutonomousPlan:
         """Recompile after execution feedback, preserving completed work.
 
@@ -1196,7 +1197,7 @@ class AutonomousPlanner:
         self,
         plan_id: str,
         mission: Mission,
-        subtasks: List[AutoSubtask],
+        subtasks: list[AutoSubtask],
         done_ids: Any = (),
     ) -> KanbanBoard:
         board = KanbanBoard(
@@ -1224,15 +1225,15 @@ class AutonomousPlanner:
             )
         return board
 
-    def _goal_statement(self, mission: Mission, subtasks: List[AutoSubtask], profiles: List[NewProfileSpec], autonomy: str) -> str:
+    def _goal_statement(self, mission: Mission, subtasks: list[AutoSubtask], profiles: list[NewProfileSpec], autonomy: str) -> str:
         return f"{mission.desired_outcome} Done means {len(mission.acceptance_criteria)} mission criteria plus {len(subtasks)} work items complete ({len(profiles)} new specialist profiles), autonomy={autonomy}."
 
     def _render_plan_text(
         self,
         mission: Mission,
-        subtasks: List[AutoSubtask],
-        profiles: List[NewProfileSpec],
-        acceptance: List[str],
+        subtasks: list[AutoSubtask],
+        profiles: list[NewProfileSpec],
+        acceptance: list[str],
     ) -> str:
         lines = [
             f"# Autonomous plan: {mission.interpreted_intent}",
@@ -1322,13 +1323,13 @@ class AutonomousPlanner:
 
 def review_wave(
     plan: AutonomousPlan,
-    wave_task_results: Dict[str, bool],
+    wave_task_results: dict[str, bool],
     cumulative_passed: int,
     cumulative_failed: int,
     total_tasks: int,
     consecutive_failures: int = 0,
     invariant_breach: bool = False,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Wave-boundary hook: fold one wave's results into plan health.
 
     Returns the validity report plus executor-ready next steps: which cards to

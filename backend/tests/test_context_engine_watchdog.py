@@ -1,6 +1,5 @@
 """Unit tests for Context Engine and Prefix-Preserving Compaction Watchdog."""
 
-import pytest
 from deerflow.context.engine import ContextEngine
 from deerflow.context.projection import ContextProjection
 from deerflow.context.watchdog import CompactionWatchdog

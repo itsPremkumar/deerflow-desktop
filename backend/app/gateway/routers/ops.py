@@ -11,10 +11,17 @@ deploy verification, dashboards, and monitoring gates beyond ``/health`` and
 * ``GET /api/ops/status`` - liveness plus process uptime, current UTC time,
   and whether the OpenAPI docs endpoints are enabled (expected ``false`` in
   production via ``GATEWAY_ENABLE_DOCS=false``).
+* ``GET /api/ops/resources`` - stdlib-only host resource snapshot (CPU, memory,
+  disk, load) for resource-aware autonomy and dashboards. Best-effort: fields
+  the OS does not expose come back ``null`` instead of failing the probe.
 """
 
 from __future__ import annotations
 
+import logging
+import os
+import shutil
+import sys
 import time
 from datetime import UTC, datetime
 from importlib import metadata
@@ -23,6 +30,8 @@ from fastapi import APIRouter
 from pydantic import BaseModel, Field
 
 from app.gateway.config import get_gateway_config
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api", tags=["ops"])
 
@@ -79,4 +88,101 @@ async def ops_status() -> StatusResponse:
         uptime_seconds=int(time.monotonic() - _PROCESS_START_MONOTONIC),
         time_utc=datetime.now(UTC).isoformat(),
         docs_enabled=get_gateway_config().enable_docs,
+    )
+
+
+class MemorySnapshot(BaseModel):
+    """Host physical memory in MiB (null when the OS does not expose it)."""
+
+    total_mb: int | None = Field(default=None, description="Total physical memory in MiB")
+    available_mb: int | None = Field(default=None, description="Available physical memory in MiB")
+
+
+class DiskSnapshot(BaseModel):
+    """Filesystem capacity in MiB for the runtime data directory."""
+
+    path: str = Field(..., description="Directory the disk figures were taken for")
+    total_mb: int = Field(..., description="Total filesystem size in MiB")
+    free_mb: int = Field(..., description="Free filesystem space in MiB")
+
+
+class ResourcesResponse(BaseModel):
+    """Best-effort host resource snapshot for autonomy and dashboards."""
+
+    platform: str = Field(..., description="sys.platform of the Gateway host")
+    cpu_count: int | None = Field(default=None, description="os.cpu_count() (null when indeterminable)")
+    memory: MemorySnapshot = Field(default_factory=MemorySnapshot)
+    disk: DiskSnapshot | None = Field(default=None, description="Null when disk figures are unavailable")
+    load_average: list[float] | None = Field(default=None, description="1/5/15-minute load (Unix only, else null)")
+
+
+def _memory_mb() -> MemorySnapshot:
+    snapshot = MemorySnapshot()
+    try:
+        if os.name == "nt":
+            import ctypes
+
+            class MemoryStatusEx(ctypes.Structure):
+                _fields_ = [
+                    ("dwLength", ctypes.c_ulong),
+                    ("dwMemoryLoad", ctypes.c_ulong),
+                    ("ullTotalPhys", ctypes.c_ulonglong),
+                    ("ullAvailPhys", ctypes.c_ulonglong),
+                    ("ullTotalPageFile", ctypes.c_ulonglong),
+                    ("ullAvailPageFile", ctypes.c_ulonglong),
+                    ("ullTotalVirtual", ctypes.c_ulonglong),
+                    ("ullAvailVirtual", ctypes.c_ulonglong),
+                    ("ullAvailExtendedVirtual", ctypes.c_ulonglong),
+                ]
+
+            status = MemoryStatusEx()
+            status.dwLength = ctypes.sizeof(MemoryStatusEx)
+            if ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(status)):
+                snapshot.total_mb = int(status.ullTotalPhys // (1024 * 1024))
+                snapshot.available_mb = int(status.ullAvailPhys // (1024 * 1024))
+        else:
+            page_size = os.sysconf("SC_PAGE_SIZE")
+            pages = os.sysconf("SC_PHYS_PAGES")
+            avail_pages = os.sysconf("SC_AVPHYS_PAGES")
+            snapshot.total_mb = int(page_size * pages // (1024 * 1024))
+            snapshot.available_mb = int(page_size * avail_pages // (1024 * 1024))
+    except Exception:
+        logger.debug("Host memory probe failed; reporting nulls", exc_info=True)
+    return snapshot
+
+
+def _disk_snapshot() -> DiskSnapshot | None:
+    try:
+        from deerflow.config.runtime_paths import runtime_home
+
+        target = str(runtime_home())
+        usage = shutil.disk_usage(target)
+        return DiskSnapshot(
+            path=target,
+            total_mb=int(usage.total // (1024 * 1024)),
+            free_mb=int(usage.free // (1024 * 1024)),
+        )
+    except Exception:
+        logger.debug("Disk probe failed; reporting null", exc_info=True)
+        return None
+
+
+@router.get(
+    "/ops/resources",
+    response_model=ResourcesResponse,
+    summary="Host resource snapshot",
+    description="Return CPU, memory, disk, and load figures for resource-aware autonomy. Unavailable fields are null; the probe never fails the request.",
+)
+async def ops_resources() -> ResourcesResponse:
+    """Return a best-effort host resource snapshot."""
+    try:
+        load_average: list[float] | None = [float(v) for v in os.getloadavg()]
+    except (AttributeError, OSError):
+        load_average = None
+    return ResourcesResponse(
+        platform=sys.platform,
+        cpu_count=os.cpu_count(),
+        memory=_memory_mb(),
+        disk=_disk_snapshot(),
+        load_average=load_average,
     )

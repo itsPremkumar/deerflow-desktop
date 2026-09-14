@@ -1,6 +1,5 @@
 """Unit tests for direct agent-to-agent messaging and family roster."""
 
-import pytest
 
 from deerflow.subagents.messaging import AgentRoster, get_agent_roster
 from deerflow.tools.builtins.agent_message_tool import agent_message_tool, agent_observe_tool

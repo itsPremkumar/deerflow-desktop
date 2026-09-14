@@ -4,8 +4,7 @@ import logging
 import os
 import urllib.parse
 from dataclasses import dataclass, field
-from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 logger = logging.getLogger("deerflow.security.astra.boundary")
 
@@ -24,9 +23,9 @@ class TaskBoundaryPolicy:
       - Outbound network whitelists (blocks cloud metadata endpoints like 169.254.169.254)
       - Execution budget caps (subagent recursion depth, mutation counters)
     """
-    allowed_root_paths: List[str] = field(default_factory=list)
-    allowed_domains: List[str] = field(default_factory=list)
-    blocked_hosts: List[str] = field(
+    allowed_root_paths: list[str] = field(default_factory=list)
+    allowed_domains: list[str] = field(default_factory=list)
+    blocked_hosts: list[str] = field(
         default_factory=lambda: [
             "169.254.169.254",       # AWS/GCP/Azure instance metadata
             "metadata.google.internal",
@@ -120,7 +119,7 @@ class TaskBoundaryPolicy:
             raise BoundaryViolationError(msg)
         return True
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "allowed_root_paths": self.allowed_root_paths,
             "allowed_domains": self.allowed_domains,

@@ -13,13 +13,12 @@ import time
 import uuid
 from dataclasses import asdict, dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from deerflow.security.astra.spatiotemporal import (
     BoundingBox,
     SpatialObject,
     SpatioTemporalCache,
-    VideoKeyframe,
 )
 
 
@@ -38,7 +37,7 @@ class Milestone:
     description: str = ""
     required_evidence_type: str = "general"  # "test_pass", "file_created", "object_located", "command_success"
     status: MilestoneStatus = MilestoneStatus.PENDING
-    satisfied_at: Optional[float] = None
+    satisfied_at: float | None = None
     proof_evidence: str = ""
 
     def mark_satisfied(self, evidence: str) -> None:
@@ -46,7 +45,7 @@ class Milestone:
         self.satisfied_at = time.time()
         self.proof_evidence = evidence
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         data = asdict(self)
         data["status"] = self.status.value
         return data
@@ -63,7 +62,7 @@ class AgentHighlight:
     created_at: float = field(default_factory=time.time)
     active: bool = True
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         data = asdict(self)
         data["bbox"] = self.bbox.to_dict()
         return data
@@ -75,19 +74,19 @@ class AstraGoalHarness:
     def __init__(
         self,
         goal_statement: str,
-        constraints: Optional[List[str]] = None,
-        goal_id: Optional[str] = None,
-        spatial_cache: Optional[SpatioTemporalCache] = None,
+        constraints: list[str] | None = None,
+        goal_id: str | None = None,
+        spatial_cache: SpatioTemporalCache | None = None,
     ):
         self.goal_id: str = goal_id or str(uuid.uuid4())[:12]
         self.goal_statement: str = goal_statement
-        self.constraints: List[str] = constraints or []
+        self.constraints: list[str] = constraints or []
         self.spatial_cache: SpatioTemporalCache = spatial_cache or SpatioTemporalCache()
-        self.milestones: List[Milestone] = []
-        self.highlights: List[AgentHighlight] = []
+        self.milestones: list[Milestone] = []
+        self.highlights: list[AgentHighlight] = []
         self.state: str = "formulating"  # formulating -> pursuing -> verifying -> achieved -> failed
         self.created_at: float = time.time()
-        self.completed_at: Optional[float] = None
+        self.completed_at: float | None = None
 
     def add_milestone(
         self,
@@ -123,7 +122,7 @@ class AstraGoalHarness:
     def clear_highlights(self) -> None:
         self.highlights.clear()
 
-    def evaluate_discrepancy(self) -> Dict[str, Any]:
+    def evaluate_discrepancy(self) -> dict[str, Any]:
         """Measure current gap between perceived reality and target goal state."""
         total = len(self.milestones)
         if total == 0:
@@ -160,11 +159,11 @@ class AstraGoalHarness:
     def pursue_step(
         self,
         action_name: str,
-        step_input: Dict[str, Any],
-        tool_result: Optional[str] = None,
-        observed_objects: Optional[List[SpatialObject]] = None,
+        step_input: dict[str, Any],
+        tool_result: str | None = None,
+        observed_objects: list[SpatialObject] | None = None,
         screen_context: str = "",
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Execute one goal pursuit step with perception ingestion and milestone verification."""
         if self.state == "formulating":
             self.state = "pursuing"
@@ -220,7 +219,7 @@ class AstraGoalHarness:
             "highlights": [h.to_dict() for h in self.highlights if h.active],
         }
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "goal_id": self.goal_id,
             "goal_statement": self.goal_statement,

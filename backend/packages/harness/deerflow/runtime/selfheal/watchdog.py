@@ -6,7 +6,6 @@ import logging
 import os
 import time
 from pathlib import Path
-from typing import List, Optional
 
 from deerflow.runtime.selfheal.models import (
     FaultType,
@@ -28,13 +27,13 @@ class SelfHealingWatchdog:
 
     def scan_and_heal(
         self,
-        workspace_dir: Optional[str] = None,
+        workspace_dir: str | None = None,
         auto_remediate: bool = True,
     ) -> HealthReport:
         start_t = time.time()
         target_path = Path(workspace_dir or os.getcwd()).resolve()
-        faults: List[HealthFault] = []
-        remediations: List[str] = []
+        faults: list[HealthFault] = []
+        remediations: list[str] = []
 
         # 1. Scan for stale locks
         for rel_lock in self.KNOWN_LOCK_PATTERNS:

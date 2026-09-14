@@ -5,9 +5,9 @@ import hashlib
 import json
 import time
 import uuid
-from dataclasses import asdict, dataclass, field
+from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 
 class CheckpointStrategy(str, Enum):
@@ -22,8 +22,8 @@ class WorkflowCheckpoint:
     checkpoint_id: str
     workflow_id: str
     step: int
-    state_payload: Dict[str, Any]
-    parent_id: Optional[str] = None
+    state_payload: dict[str, Any]
+    parent_id: str | None = None
     strategy: CheckpointStrategy = CheckpointStrategy.FULL
     checksum: str = ""
     created_at: float = field(default_factory=time.time)
@@ -39,7 +39,7 @@ class WorkflowCheckpoint:
     def verify_integrity(self) -> bool:
         return self.checksum == self.compute_checksum()
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "checkpoint_id": self.checkpoint_id,
             "workflow_id": self.workflow_id,
@@ -59,16 +59,16 @@ class CheckpointEngine:
     """
 
     def __init__(self) -> None:
-        self.checkpoints: Dict[str, WorkflowCheckpoint] = {}
-        self.workflow_index: Dict[str, List[str]] = {}  # workflow_id -> [checkpoint_ids]
+        self.checkpoints: dict[str, WorkflowCheckpoint] = {}
+        self.workflow_index: dict[str, list[str]] = {}  # workflow_id -> [checkpoint_ids]
 
     def create_checkpoint(
         self,
         workflow_id: str,
         step: int,
-        state: Dict[str, Any],
+        state: dict[str, Any],
         strategy: CheckpointStrategy = CheckpointStrategy.FULL,
-        parent_id: Optional[str] = None,
+        parent_id: str | None = None,
     ) -> WorkflowCheckpoint:
         cid = f"chk_{uuid.uuid4().hex[:10]}"
         payload = copy.deepcopy(state)
@@ -97,7 +97,7 @@ class CheckpointEngine:
         self.workflow_index[workflow_id].append(cid)
         return cp
 
-    def restore_checkpoint(self, checkpoint_id: str) -> Optional[Dict[str, Any]]:
+    def restore_checkpoint(self, checkpoint_id: str) -> dict[str, Any] | None:
         """Restores state. If delta encoded, traverses parent chain to reconstruct."""
         cp = self.checkpoints.get(checkpoint_id)
         if not cp or not cp.verify_integrity():
@@ -108,17 +108,17 @@ class CheckpointEngine:
 
         # Delta reconstruction: collect path from root to target
         chain = []
-        curr: Optional[WorkflowCheckpoint] = cp
+        curr: WorkflowCheckpoint | None = cp
         while curr:
             chain.append(curr)
             curr = self.checkpoints.get(curr.parent_id) if curr.parent_id else None
 
-        reconstructed: Dict[str, Any] = {}
+        reconstructed: dict[str, Any] = {}
         for node in reversed(chain):
             reconstructed.update(node.state_payload)
 
         return reconstructed
 
-    def get_history(self, workflow_id: str) -> List[WorkflowCheckpoint]:
+    def get_history(self, workflow_id: str) -> list[WorkflowCheckpoint]:
         cids = self.workflow_index.get(workflow_id, [])
         return [self.checkpoints[cid] for cid in cids if cid in self.checkpoints]

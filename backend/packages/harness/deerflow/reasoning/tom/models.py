@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional
 
 
 class RiskTolerance(str, Enum):
@@ -32,10 +31,10 @@ class IntentHypothesis:
     stated_goal: str
     inferred_intent: str
     risk_tolerance: RiskTolerance
-    top_priorities: List[PriorityDomain] = field(default_factory=list)
-    unstated_expectations: List[str] = field(default_factory=list)
-    pitfalls_to_avoid: List[str] = field(default_factory=list)
-    recommended_constraints: List[str] = field(default_factory=list)
+    top_priorities: list[PriorityDomain] = field(default_factory=list)
+    unstated_expectations: list[str] = field(default_factory=list)
+    pitfalls_to_avoid: list[str] = field(default_factory=list)
+    recommended_constraints: list[str] = field(default_factory=list)
     confidence_score: float = 0.85
 
     def to_markdown(self) -> str:

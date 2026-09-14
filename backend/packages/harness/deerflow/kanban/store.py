@@ -5,8 +5,9 @@ from __future__ import annotations
 import json
 import logging
 import threading
+from collections.abc import Sequence
 from pathlib import Path
-from typing import Any, Sequence
+from typing import Any
 from uuid import uuid4
 
 from deerflow.kanban.bridge import KanbanGroupBridge
@@ -37,7 +38,7 @@ class KanbanStore:
         if not self.storage_path.exists():
             return
         try:
-            with open(self.storage_path, "r", encoding="utf-8") as f:
+            with open(self.storage_path, encoding="utf-8") as f:
                 data = json.load(f)
             for item in data.get("boards", []):
                 board = KanbanBoard.from_dict(item)

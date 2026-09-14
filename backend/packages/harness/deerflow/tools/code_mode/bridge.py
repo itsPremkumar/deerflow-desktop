@@ -4,12 +4,13 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
-import io
 import inspect
+import io
 import time
 import traceback
-from dataclasses import dataclass, field
-from typing import Any, Callable
+from collections.abc import Callable
+from dataclasses import dataclass
+from typing import Any
 
 
 @dataclass
@@ -171,7 +172,7 @@ def execute_code_mode(
             # Capture last variable or explicit `result` variable if present
             if "result" in exec_globals and exec_globals["result"] is not None:
                 result_val = exec_globals["result"]
-        except Exception as e:
+        except Exception:
             success = False
             error_str = traceback.format_exc()
 

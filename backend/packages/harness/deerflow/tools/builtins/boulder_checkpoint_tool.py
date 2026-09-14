@@ -7,8 +7,9 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+
 from langchain.tools import tool
+
 from deerflow.state.boulder import (
     append_session_id,
     clear_boulder,
@@ -22,13 +23,13 @@ from deerflow.state.boulder import (
 @tool
 def boulder_checkpoint_manage(
     action: str,
-    task: Optional[str] = None,
-    checklist: Optional[List[str]] = None,
-    step_index: Optional[int] = None,
+    task: str | None = None,
+    checklist: list[str] | None = None,
+    step_index: int | None = None,
     completed: bool = True,
-    evidence: Optional[str] = None,
-    session_id: Optional[str] = None,
-    custom_path: Optional[str] = None,
+    evidence: str | None = None,
+    session_id: str | None = None,
+    custom_path: str | None = None,
 ) -> str:
     """Manage persistent Sisyphus task checkpoints. Actions: 'create', 'status', 'update_step', 'append_session', 'complete', 'clear'."""
     path = Path(custom_path) if custom_path else None

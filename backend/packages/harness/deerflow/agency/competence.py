@@ -3,7 +3,7 @@ from __future__ import annotations
 import math
 import time
 from dataclasses import dataclass, field
-from typing import Any, Dict
+from typing import Any
 
 
 @dataclass
@@ -24,7 +24,7 @@ class CompetenceTracker:
 
     def __init__(self, z: float = 1.96) -> None:
         self.z = z  # 1.96 corresponds to 95% confidence
-        self.records: Dict[str, CompetenceRecord] = {}
+        self.records: dict[str, CompetenceRecord] = {}
 
     def record_attempt(self, domain: str, success: bool) -> float:
         if domain not in self.records:
@@ -60,10 +60,10 @@ class CompetenceTracker:
         lower_bound = (centre - spread) / denominator
         return round(max(0.0, min(1.0, lower_bound)), 4)
 
-    def get_all_competences(self) -> Dict[str, float]:
+    def get_all_competences(self) -> dict[str, float]:
         return {d: r.wilson_score for d, r in self.records.items()}
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             d: {
                 "successes": r.successes,

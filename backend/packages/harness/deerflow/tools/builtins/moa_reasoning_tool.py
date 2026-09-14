@@ -2,10 +2,9 @@
 
 from __future__ import annotations
 
-import json
 from langchain.tools import tool
 
-from deerflow.models.moa.orchestrator import MoACandidate, get_moa_orchestrator
+from deerflow.models.moa.orchestrator import get_moa_orchestrator
 
 
 @tool("moa_multi_model_reasoning", parse_docstring=True)

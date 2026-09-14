@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+
 from deerflow.bots.profile import BotProfile
 
 _EPOCH_PATTERN = re.compile(r"Capability epoch: ([0-9a-f]{12})")

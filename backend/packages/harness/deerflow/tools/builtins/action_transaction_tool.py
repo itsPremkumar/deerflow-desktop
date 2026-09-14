@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+
 from langchain.tools import tool
 
 from deerflow.action import ActionPrimitive, ActionRequest, ActionTransaction

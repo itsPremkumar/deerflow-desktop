@@ -6,7 +6,7 @@ import time
 import uuid
 from dataclasses import asdict, dataclass, field
 from enum import Enum
-from typing import Any, Dict, Optional
+from typing import Any
 
 
 class ObservationType(str, Enum):
@@ -21,13 +21,13 @@ class ObservationType(str, Enum):
 class Observation:
     """Base class for all environment/system observations."""
     observation_type: ObservationType
-    action_id: Optional[str] = None
+    action_id: str | None = None
     content: str = ""
     observation_id: str = field(default_factory=lambda: str(uuid.uuid4()))
     timestamp: float = field(default_factory=time.time)
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         data = asdict(self)
         data["observation_type"] = self.observation_type.value
         return data
@@ -47,7 +47,7 @@ class CmdOutputObservation(Observation):
         stdout: str = "",
         stderr: str = "",
         duration_ms: float = 0.0,
-        action_id: Optional[str] = None,
+        action_id: str | None = None,
         **kwargs: Any,
     ):
         content = stdout if exit_code == 0 else f"{stdout}\n[STDERR]: {stderr}".strip()
@@ -68,7 +68,7 @@ class FileEditObservation(Observation):
     """Result of a file creation, replacement, or modification."""
     path: str = ""
     success: bool = True
-    diff: Optional[str] = None
+    diff: str | None = None
     lines_added: int = 0
     lines_removed: int = 0
 
@@ -76,10 +76,10 @@ class FileEditObservation(Observation):
         self,
         path: str,
         success: bool = True,
-        diff: Optional[str] = None,
+        diff: str | None = None,
         lines_added: int = 0,
         lines_removed: int = 0,
-        action_id: Optional[str] = None,
+        action_id: str | None = None,
         **kwargs: Any,
     ):
         content = f"File '{path}' edited successfully (+{lines_added}, -{lines_removed})" if success else f"Failed to edit file '{path}'"
@@ -102,15 +102,15 @@ class CriticObservation(Observation):
     critic_name: str = ""
     verdict: str = "approved"
     reason: str = ""
-    diagnostic_prompt: Optional[str] = None
+    diagnostic_prompt: str | None = None
 
     def __init__(
         self,
         critic_name: str,
         verdict: str,
         reason: str,
-        diagnostic_prompt: Optional[str] = None,
-        action_id: Optional[str] = None,
+        diagnostic_prompt: str | None = None,
+        action_id: str | None = None,
         **kwargs: Any,
     ):
         super().__init__(
@@ -130,14 +130,14 @@ class ErrorObservation(Observation):
     """Observation capturing an exception or fatal execution failure."""
     error_type: str = "ExecutionError"
     message: str = ""
-    traceback_str: Optional[str] = None
+    traceback_str: str | None = None
 
     def __init__(
         self,
         error_type: str,
         message: str,
-        traceback_str: Optional[str] = None,
-        action_id: Optional[str] = None,
+        traceback_str: str | None = None,
+        action_id: str | None = None,
         **kwargs: Any,
     ):
         super().__init__(

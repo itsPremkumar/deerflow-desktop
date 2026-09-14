@@ -1,6 +1,7 @@
 ﻿"""Tests for Comment-Checker Guard."""
 
 import pytest
+
 from deerflow.safety.comment_guard import (
     LazyCommentDetectedError,
     check_for_lazy_comments,

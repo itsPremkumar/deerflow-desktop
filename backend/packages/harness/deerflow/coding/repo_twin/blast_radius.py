@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Set
+from typing import Any
 
 from .symbol_graph import SymbolGraph
 
@@ -10,12 +10,12 @@ from .symbol_graph import SymbolGraph
 @dataclass
 class BlastRadiusReport:
     target_file: str
-    target_symbols: List[str] = field(default_factory=list)
-    importing_files: List[str] = field(default_factory=list)
+    target_symbols: list[str] = field(default_factory=list)
+    importing_files: list[str] = field(default_factory=list)
     blast_score: float = 0.0  # 0.0 to 1.0 (1.0 = massive blast radius)
     affected_components_count: int = 0
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "target_file": self.target_file,
             "target_symbols": self.target_symbols,
@@ -34,7 +34,7 @@ class BlastRadiusCalculator:
         target_stem = Path(target_file).stem
         target_symbols = [s.name for s in graph.get_symbols_in_file(norm_target)]
 
-        importing_files: Set[str] = set()
+        importing_files: set[str] = set()
         for fpath, imports in graph.import_edges.items():
             if fpath == norm_target:
                 continue

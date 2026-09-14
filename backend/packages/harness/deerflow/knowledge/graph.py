@@ -12,7 +12,7 @@ from __future__ import annotations
 import collections
 from dataclasses import asdict, dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any
 
 
 class EntityType(str, Enum):
@@ -45,9 +45,9 @@ class EntityNode:
     entity_id: str
     name: str
     entity_type: EntityType = EntityType.CUSTOM
-    properties: Dict[str, Any] = field(default_factory=dict)
+    properties: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         data = asdict(self)
         data["entity_type"] = self.entity_type.value
         return data
@@ -59,9 +59,9 @@ class RelationEdge:
     relation_type: RelationType
     target_id: str
     weight: float = 1.0
-    properties: Dict[str, Any] = field(default_factory=dict)
+    properties: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         data = asdict(self)
         data["relation_type"] = self.relation_type.value
         return data
@@ -71,18 +71,18 @@ class KnowledgeGraph:
     """Enterprise-wide Knowledge Graph supporting multi-hop queries and blast-radius analysis."""
 
     def __init__(self):
-        self._entities: Dict[str, EntityNode] = {}
+        self._entities: dict[str, EntityNode] = {}
         # Outgoing: source_id -> list of RelationEdge
-        self._outgoing: Dict[str, List[RelationEdge]] = {}
+        self._outgoing: dict[str, list[RelationEdge]] = {}
         # Incoming: target_id -> list of RelationEdge
-        self._incoming: Dict[str, List[RelationEdge]] = {}
+        self._incoming: dict[str, list[RelationEdge]] = {}
 
     def add_entity(
         self,
         entity_id: str,
         name: str,
         entity_type: EntityType = EntityType.CUSTOM,
-        properties: Optional[Dict[str, Any]] = None,
+        properties: dict[str, Any] | None = None,
     ) -> EntityNode:
         node = EntityNode(
             entity_id=entity_id.strip(),
@@ -101,7 +101,7 @@ class KnowledgeGraph:
         relation_type: RelationType,
         target_id: str,
         weight: float = 1.0,
-        properties: Optional[Dict[str, Any]] = None,
+        properties: dict[str, Any] | None = None,
     ) -> RelationEdge:
         src = source_id.strip()
         tgt = target_id.strip()
@@ -121,14 +121,14 @@ class KnowledgeGraph:
         self._incoming[tgt].append(edge)
         return edge
 
-    def get_entity(self, entity_id: str) -> Optional[EntityNode]:
+    def get_entity(self, entity_id: str) -> EntityNode | None:
         return self._entities.get(entity_id.strip())
 
     def query_by_relation(
         self,
         source_id: str,
-        relation_type: Optional[RelationType] = None,
-    ) -> List[Dict[str, Any]]:
+        relation_type: RelationType | None = None,
+    ) -> list[dict[str, Any]]:
         src = source_id.strip()
         edges = self._outgoing.get(src, [])
         if relation_type:
@@ -145,15 +145,15 @@ class KnowledgeGraph:
                 })
         return results
 
-    def query_dependencies(self, entity_id: str, max_depth: int = 4) -> Dict[str, Any]:
+    def query_dependencies(self, entity_id: str, max_depth: int = 4) -> dict[str, Any]:
         """Find all upstream entities that this entity depends on or uses directly or transitively."""
         start = entity_id.strip()
         if start not in self._entities:
             raise KeyError(f"Entity '{start}' not found.")
 
-        visited: Set[str] = set()
-        queue: collections.deque[Tuple[str, int]] = collections.deque([(start, 0)])
-        dependencies: List[Dict[str, Any]] = []
+        visited: set[str] = set()
+        queue: collections.deque[tuple[str, int]] = collections.deque([(start, 0)])
+        dependencies: list[dict[str, Any]] = []
 
         while queue:
             curr_id, depth = queue.popleft()
@@ -182,15 +182,15 @@ class KnowledgeGraph:
             "dependencies": dependencies,
         }
 
-    def impact_analysis(self, entity_id: str, max_depth: int = 4) -> Dict[str, Any]:
+    def impact_analysis(self, entity_id: str, max_depth: int = 4) -> dict[str, Any]:
         """Blast-radius analysis: Find all downstream systems/services that depend on this entity."""
         target = entity_id.strip()
         if target not in self._entities:
             raise KeyError(f"Entity '{target}' not found.")
 
-        visited: Set[str] = set()
-        queue: collections.deque[Tuple[str, int]] = collections.deque([(target, 0)])
-        affected_entities: List[Dict[str, Any]] = []
+        visited: set[str] = set()
+        queue: collections.deque[tuple[str, int]] = collections.deque([(target, 0)])
+        affected_entities: list[dict[str, Any]] = []
 
         while queue:
             curr_id, depth = queue.popleft()
@@ -217,15 +217,15 @@ class KnowledgeGraph:
             "affected_systems": affected_entities,
         }
 
-    def find_path(self, source_id: str, target_id: str) -> Optional[List[str]]:
+    def find_path(self, source_id: str, target_id: str) -> list[str] | None:
         """Shortest path (BFS) between two entities in the enterprise graph."""
         src = source_id.strip()
         tgt = target_id.strip()
         if src not in self._entities or tgt not in self._entities:
             return None
 
-        visited: Set[str] = {src}
-        queue: collections.deque[List[str]] = collections.deque([[src]])
+        visited: set[str] = {src}
+        queue: collections.deque[list[str]] = collections.deque([[src]])
 
         while queue:
             path = queue.popleft()
@@ -240,7 +240,7 @@ class KnowledgeGraph:
 
         return None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         all_edges = []
         for edge_list in self._outgoing.values():
             all_edges.extend([e.to_dict() for e in edge_list])

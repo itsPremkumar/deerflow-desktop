@@ -1,9 +1,5 @@
 from __future__ import annotations
 
-import json
-import re
-from typing import Any, Dict, List, Optional
-
 from .context_data import ContextHandle, ContextStore
 
 
@@ -23,7 +19,7 @@ class ContextTransformer:
         query: str,
         case_sensitive: bool = False,
         context_lines: int = 0,
-    ) -> Optional[ContextHandle]:
+    ) -> ContextHandle | None:
         content = self.store.get_content(handle_id)
         parent_handle = self.store.get_handle(handle_id)
         if content is None or parent_handle is None:
@@ -54,7 +50,7 @@ class ContextTransformer:
         handle_id: str,
         start_line: int,
         end_line: int,
-    ) -> Optional[ContextHandle]:
+    ) -> ContextHandle | None:
         content = self.store.get_content(handle_id)
         parent_handle = self.store.get_handle(handle_id)
         if content is None or parent_handle is None:
@@ -78,14 +74,14 @@ class ContextTransformer:
         self,
         handle_id: str,
         lines_per_chunk: int = 200,
-    ) -> List[ContextHandle]:
+    ) -> list[ContextHandle]:
         content = self.store.get_content(handle_id)
         parent_handle = self.store.get_handle(handle_id)
         if content is None or parent_handle is None:
             return []
 
         lines = content.splitlines()
-        chunk_handles: List[ContextHandle] = []
+        chunk_handles: list[ContextHandle] = []
 
         for i in range(0, len(lines), lines_per_chunk):
             chunk_slice = lines[i : i + lines_per_chunk]

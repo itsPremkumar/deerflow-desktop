@@ -374,7 +374,7 @@ class TestSnapshotStability:
         request = MagicMock()
         request.tool_call = {"name": "write_file", "id": "call_1", "args": {
             "path": "test.py",
-            "content": "# Initialize variables\nx = 1\ny = 2\n# Compute result\nz = x + y\n# Return result\nreturn z
+            "content": "# Initialize variables\nx = 1\ny = 2\n# Compute result\nz = x + y\n# Return result\nreturn z",
         }}
 
         runtime.context = {"thread_id": "test-thread", "review_role": "coder"}

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, Optional
+from typing import Any
 
 from .classifier import ActionRiskClassifier
 from .profiles import (
@@ -24,7 +24,7 @@ class AutonomyPolicyEngine:
     def __init__(
         self,
         default_profile: AutonomyProfile = AutonomyProfile.OPERATOR,
-        classifier: Optional[ActionRiskClassifier] = None,
+        classifier: ActionRiskClassifier | None = None,
     ) -> None:
         self.current_profile = default_profile
         self.classifier = classifier or ActionRiskClassifier()
@@ -36,7 +36,7 @@ class AutonomyPolicyEngine:
     def evaluate_action(
         self,
         action_name: str,
-        command_or_args: Optional[Any] = None,
+        command_or_args: Any | None = None,
     ) -> PolicyEvaluationResult:
         """Evaluates whether an action is permitted under the active autonomy profile."""
         if isinstance(command_or_args, str):

@@ -2,11 +2,7 @@
 
 from __future__ import annotations
 
-import os
-from typing import Any, Callable
-
 from deerflow.tools.code_mode.bridge import ToolBridge, execute_code_mode
-
 
 _global_bridge = ToolBridge()
 
@@ -17,7 +13,7 @@ def register_default_tools(bridge: ToolBridge) -> None:
         bridge.register("echo", lambda text="": text)
     if "read_text_file" not in bridge._tools:
         def _read_file(path: str) -> str:
-            with open(path, "r", encoding="utf-8", errors="replace") as f:
+            with open(path, encoding="utf-8", errors="replace") as f:
                 return f.read()
         bridge.register("read_text_file", _read_file)
 

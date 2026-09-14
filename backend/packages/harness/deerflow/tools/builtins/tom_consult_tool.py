@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+
 from langchain.tools import tool
 
 from deerflow.reasoning.tom.consultant import TheoryOfMindConsultant

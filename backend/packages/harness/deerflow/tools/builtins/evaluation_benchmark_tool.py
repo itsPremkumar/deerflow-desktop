@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from typing import Any, Dict, List, Optional
+
 from langchain.tools import tool
 
 from deerflow.evaluation.benchmark import (
@@ -14,7 +14,7 @@ from deerflow.evaluation.benchmark import (
     TaskEvaluationResult,
 )
 
-_BENCHMARK_RESULTS: List[TaskEvaluationResult] = []
+_BENCHMARK_RESULTS: list[TaskEvaluationResult] = []
 
 
 @tool("run_task_evaluation_benchmark", parse_docstring=True)

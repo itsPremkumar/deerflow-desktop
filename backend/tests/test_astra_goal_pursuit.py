@@ -1,13 +1,10 @@
-import pytest
+from deerflow.security.astra.goal_pursuit import (
+    AstraGoalHarness,
+)
 from deerflow.security.astra.spatiotemporal import (
     BoundingBox,
     SpatialObject,
     SpatioTemporalCache,
-)
-from deerflow.security.astra.goal_pursuit import (
-    AgentHighlight,
-    AstraGoalHarness,
-    MilestoneStatus,
 )
 
 

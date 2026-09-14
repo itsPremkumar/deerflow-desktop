@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import ipaddress
 import socket
+from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Sequence
 from urllib.parse import urlparse
 
 

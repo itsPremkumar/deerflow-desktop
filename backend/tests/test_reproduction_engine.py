@@ -1,13 +1,12 @@
 """Tests for Test-Driven Autonomous Reproduction Engine."""
 
 import json
-import sys
 from pathlib import Path
+
 from deerflow.reproduction.engine import ReproductionEngine
 from deerflow.reproduction.gates import (
     PostFixVerificationGate,
     PreFixFailureGate,
-    RegressionSafetyGuard,
 )
 from deerflow.reproduction.models import ReproductionStatus
 from deerflow.reproduction.synthesizer import ReproductionSynthesizer

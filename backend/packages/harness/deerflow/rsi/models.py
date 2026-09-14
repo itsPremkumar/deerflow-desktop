@@ -6,7 +6,7 @@ import time
 import uuid
 from dataclasses import asdict, dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 
 class RSIStage(str, Enum):
@@ -37,8 +37,8 @@ class RSICandidate:
     id: str = field(default_factory=lambda: str(uuid.uuid4())[:8])
     hypothesis_id: str = ""
     component: str = ""
-    original_config: Dict[str, Any] = field(default_factory=dict)
-    modified_config: Dict[str, Any] = field(default_factory=dict)
+    original_config: dict[str, Any] = field(default_factory=dict)
+    modified_config: dict[str, Any] = field(default_factory=dict)
     created_at: float = field(default_factory=time.time)
 
 
@@ -59,7 +59,7 @@ class HoldoutResult:
     regressed: bool
     score: float
     baseline_score: float
-    evidence: List[str] = field(default_factory=list)
+    evidence: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -69,11 +69,11 @@ class RSIResult:
     stage: RSIStage
     hypothesis: RSIHypothesis
     candidate: RSICandidate
-    ab_test: Optional[ABTestResult] = None
-    holdout: Optional[HoldoutResult] = None
-    evidence: List[str] = field(default_factory=list)
+    ab_test: ABTestResult | None = None
+    holdout: HoldoutResult | None = None
+    evidence: list[str] = field(default_factory=list)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "promoted": self.promoted,
             "stage": self.stage.value,

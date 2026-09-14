@@ -4,7 +4,7 @@ import time
 import uuid
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, Optional
+from typing import Any
 
 
 class ActionPrimitive(str, Enum):
@@ -32,12 +32,12 @@ class ActionRequest:
     primitive: ActionPrimitive
     target: str
     action_id: str = field(default_factory=lambda: f"act_{uuid.uuid4().hex[:10]}")
-    parameters: Dict[str, Any] = field(default_factory=dict)
+    parameters: dict[str, Any] = field(default_factory=dict)
     expected_outcome: str = ""
     timeout_seconds: float = 30.0
     created_at: float = field(default_factory=time.time)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "action_id": self.action_id,
             "primitive": self.primitive.value,

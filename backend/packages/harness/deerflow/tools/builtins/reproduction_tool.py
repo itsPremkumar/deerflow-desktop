@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import os
 from pathlib import Path
-from typing import Optional
+
 from langchain.tools import tool
 
 from deerflow.reproduction.engine import ReproductionEngine
@@ -16,9 +16,9 @@ def reproduce_and_verify(
     phase: str,
     issue_description: str = "",
     test_body: str = "",
-    script_path: Optional[str] = None,
-    regression_command: Optional[str] = None,
-    workspace_dir: Optional[str] = None,
+    script_path: str | None = None,
+    regression_command: str | None = None,
+    workspace_dir: str | None = None,
 ) -> str:
     """Execute test-driven autonomous bug reproduction and verification.
 

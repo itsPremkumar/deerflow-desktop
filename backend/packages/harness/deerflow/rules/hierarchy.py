@@ -11,16 +11,15 @@ Solves the context scaling problem in monorepos:
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Dict, List, Optional
 
 
 class HierarchicalRuleEngine:
     """Discovers and resolves hierarchical context from nested AGENTS.md files."""
 
-    def __init__(self, root_dir: Optional[Path] = None):
+    def __init__(self, root_dir: Path | None = None):
         self.root_dir = root_dir.resolve() if root_dir else Path.cwd().resolve()
 
-    def discover_context(self, target_path: Path) -> List[Dict[str, str]]:
+    def discover_context(self, target_path: Path) -> list[dict[str, str]]:
         """Walk up from target_path to root_dir and collect all AGENTS.md files."""
         target = target_path.resolve()
         if target.is_file():
@@ -28,7 +27,7 @@ class HierarchicalRuleEngine:
         else:
             current = target
 
-        discovered: List[Path] = []
+        discovered: list[Path] = []
         while True:
             agents_file = current / "AGENTS.md"
             if agents_file.is_file():
@@ -74,9 +73,9 @@ class HierarchicalRuleEngine:
         return f"<hierarchical_project_context target='{target_path}'>\n{joined}\n</hierarchical_project_context>"
 
 
-def init_deep_scaffold(project_root: Path, subdirs: Optional[List[str]] = None) -> List[Path]:
+def init_deep_scaffold(project_root: Path, subdirs: list[str] | None = None) -> list[Path]:
     """Scaffold hierarchical AGENTS.md files across root and key subdirectories."""
-    created: List[Path] = []
+    created: list[Path] = []
 
     # 1. Root AGENTS.md
     root_agents = project_root / "AGENTS.md"

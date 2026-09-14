@@ -5,12 +5,10 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 from enum import Enum
-from typing import List, Optional
 
 from deerflow.security.shell_ast.analyzer import (
     AnalysisReport,
     RiskLevel,
-    SecurityViolation,
     ShellASTSecurityAnalyzer,
 )
 from deerflow.security.shell_ast.parser import ShellASTParser

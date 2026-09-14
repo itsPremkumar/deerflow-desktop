@@ -10,10 +10,7 @@ Instead:
 
 from __future__ import annotations
 
-import re
 from dataclasses import dataclass, field
-from pathlib import Path
-from typing import Any, Dict, List, Optional, Set
 
 try:
     import yaml
@@ -25,20 +22,20 @@ except ImportError:
 class SkillMcpSpec:
     server_name: str
     command: str
-    args: List[str] = field(default_factory=list)
-    env: Dict[str, str] = field(default_factory=dict)
+    args: list[str] = field(default_factory=list)
+    env: dict[str, str] = field(default_factory=dict)
 
 
 class SkillMcpLifecycleManager:
     """Manages lazy on-demand lifecycle of skill-embedded MCP servers."""
 
     def __init__(self):
-        self._active_servers: Dict[str, SkillMcpSpec] = {}
-        self._skill_server_mapping: Dict[str, Set[str]] = {}
+        self._active_servers: dict[str, SkillMcpSpec] = {}
+        self._skill_server_mapping: dict[str, set[str]] = {}
 
-    def parse_skill_mcp_specs(self, skill_markdown: str) -> List[SkillMcpSpec]:
+    def parse_skill_mcp_specs(self, skill_markdown: str) -> list[SkillMcpSpec]:
         """Extract MCP server declarations from SKILL.md frontmatter."""
-        specs: List[SkillMcpSpec] = []
+        specs: list[SkillMcpSpec] = []
         if not skill_markdown.startswith("---"):
             return specs
 
@@ -73,7 +70,7 @@ class SkillMcpLifecycleManager:
                     ))
         return specs
 
-    def acquire_for_skill(self, skill_name: str, skill_markdown: str) -> List[str]:
+    def acquire_for_skill(self, skill_name: str, skill_markdown: str) -> list[str]:
         """Spin up declared MCP servers for an active skill."""
         specs = self.parse_skill_mcp_specs(skill_markdown)
         server_names = []
@@ -86,7 +83,7 @@ class SkillMcpLifecycleManager:
 
         return server_names
 
-    def release_for_skill(self, skill_name: str) -> List[str]:
+    def release_for_skill(self, skill_name: str) -> list[str]:
         """Tear down and unload MCP servers when skill execution finishes."""
         released = []
         if skill_name in self._skill_server_mapping:
@@ -97,5 +94,5 @@ class SkillMcpLifecycleManager:
             del self._skill_server_mapping[skill_name]
         return released
 
-    def get_active_servers(self) -> List[str]:
+    def get_active_servers(self) -> list[str]:
         return list(self._active_servers.keys())

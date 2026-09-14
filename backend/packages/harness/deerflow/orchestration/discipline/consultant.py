@@ -8,24 +8,23 @@ Inspired by Oh My OpenAgent (OmO / Sisyphus):
 
 from __future__ import annotations
 
-import re
 import time
 from dataclasses import asdict, dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 
 @dataclass
 class GapAnalysisReport:
     """Findings from pre-planning gap analysis."""
     task_title: str
-    gaps_identified: List[str] = field(default_factory=list)
-    suggested_additions: List[str] = field(default_factory=list)
-    ui_specifications: List[str] = field(default_factory=list)
+    gaps_identified: list[str] = field(default_factory=list)
+    suggested_additions: list[str] = field(default_factory=list)
+    ui_specifications: list[str] = field(default_factory=list)
     readiness_score: float = 1.0  # 0.0 (incomplete) to 1.0 (production-ready)
     model_family: str = "anthropic/claude-fable-5-1"
     timestamp: float = field(default_factory=time.time)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
 
@@ -39,13 +38,13 @@ class PlanConsultant:
         self,
         task_title: str,
         task_description: str,
-        proposed_steps: List[str],
+        proposed_steps: list[str],
         is_visual_or_frontend: bool = False,
     ) -> GapAnalysisReport:
         """Run structured gap analysis across error handling, dependencies, and UX."""
-        gaps: List[str] = []
-        additions: List[str] = []
-        ui_specs: List[str] = []
+        gaps: list[str] = []
+        additions: list[str] = []
+        ui_specs: list[str] = []
 
         all_text = (task_title + " " + task_description + " " + " ".join(proposed_steps)).lower()
 

@@ -4,7 +4,7 @@ import enum
 import time
 import uuid
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 
 class ProofType(enum.Enum):
@@ -20,11 +20,11 @@ class ClaimItem:
     """A factual claim made by an agent regarding task deliverables or state."""
     claim_id: str = field(default_factory=lambda: f"clm_{uuid.uuid4().hex[:8]}")
     statement: str = ""
-    target_path: Optional[str] = None
+    target_path: str | None = None
     claimed_success: bool = True
     created_at: float = field(default_factory=time.time)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "claim_id": self.claim_id,
             "statement": self.statement,
@@ -38,15 +38,15 @@ class ClaimItem:
 class VerificationProof:
     """Physical, execution-grounded proof supporting or refuting a claim."""
     proof_type: ProofType
-    command_run: Optional[str] = None
+    command_run: str | None = None
     exit_code: int = 0
     output_snippet: str = ""
     verified: bool = True
     contradiction_detected: bool = False
-    details: Dict[str, Any] = field(default_factory=dict)
+    details: dict[str, Any] = field(default_factory=dict)
     timestamp: float = field(default_factory=time.time)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "proof_type": self.proof_type.value,
             "command_run": self.command_run,
@@ -63,11 +63,11 @@ class VerificationProof:
 class EvidenceEntry:
     """Binds a claim to physical verification proof."""
     claim: ClaimItem
-    proof: Optional[VerificationProof] = None
+    proof: VerificationProof | None = None
     certified: bool = False
     audit_notes: str = ""
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "claim": self.claim.to_dict(),
             "proof": self.proof.to_dict() if self.proof else None,

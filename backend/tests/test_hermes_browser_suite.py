@@ -1,5 +1,7 @@
 import json
+
 import pytest
+
 from deerflow.browser.stealth import get_stealth_headers
 from deerflow.browser.supervisor import BrowserSupervisor
 from deerflow.tools.builtins.browser_supervisor_tool import browser_navigate_and_inspect

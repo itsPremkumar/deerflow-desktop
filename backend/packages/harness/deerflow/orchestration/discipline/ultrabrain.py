@@ -12,7 +12,7 @@ from __future__ import annotations
 import time
 import uuid
 from dataclasses import asdict, dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 
 @dataclass
@@ -25,11 +25,11 @@ class UltrabrainSolution:
     space_complexity: str = "O(1)"
     code_implementation: str = ""
     proof_of_correctness: str = ""
-    invariants_maintained: List[str] = field(default_factory=list)
+    invariants_maintained: list[str] = field(default_factory=list)
     model_family: str = "openai/gpt-6-astra"
     timestamp: float = field(default_factory=time.time)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
 
@@ -42,11 +42,11 @@ class UltrabrainWorker:
     def solve_goal(
         self,
         goal_statement: str,
-        constraints: Optional[List[str]] = None,
-        context_data: Optional[Dict[str, Any]] = None,
+        constraints: list[str] | None = None,
+        context_data: dict[str, Any] | None = None,
     ) -> UltrabrainSolution:
         """Formulate algorithm, complexity bounds, and verified implementation from goal."""
-        invariants: List[str] = [
+        invariants: list[str] = [
             "Bounded memory allocation",
             "Exception safety & idempotency",
             "Monotonic progress guarantee",

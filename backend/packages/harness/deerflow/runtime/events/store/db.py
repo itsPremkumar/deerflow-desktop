@@ -16,7 +16,6 @@ from typing import Any
 from sqlalchemy import delete, func, or_, select, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from deerflow.persistence.models.run_event import RunEventRow
 from deerflow.persistence.migrations.run_events_fts_ddl import (
     FTS_TABLE,
     PG_INDEX_DDL,
@@ -24,6 +23,7 @@ from deerflow.persistence.migrations.run_events_fts_ddl import (
     PG_TSVECTOR_EXPR,
     SQLITE_FTS_DDL,
 )
+from deerflow.persistence.models.run_event import RunEventRow
 from deerflow.runtime.events.message_identity import message_identity
 from deerflow.runtime.events.search import (
     MAX_SEARCH_LIMIT,
@@ -700,7 +700,7 @@ class DbRunEventStore(RunEventStore):
         # with precision post-filtering on extracted text (raw JSON would
         # otherwise match keys). Bounded candidate window, documented.
         likes = " AND ".join(f"CAST(content AS TEXT) LIKE :p{i} ESCAPE '\\'" for i in range(len(tokens)))
-        conditions = [f"category = 'message'", f"({likes})"]
+        conditions = ["category = 'message'", f"({likes})"]
         params: dict = {f"p{i}": f"%{escape_like(token)}%" for i, token in enumerate(tokens)}
         if user_id is not None:
             conditions.append("user_id = :uid")

@@ -1,6 +1,7 @@
 ﻿"""Tests for Hierarchical AGENTS.md Context & Scoped Rules Engine."""
 
 from pathlib import Path
+
 from deerflow.rules.hierarchy import (
     HierarchicalRuleEngine,
     init_deep_scaffold,

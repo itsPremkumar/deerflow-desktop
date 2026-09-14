@@ -4,16 +4,16 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Set
+from typing import Any
 
 
 @dataclass
 class TriggerContext:
     """Context information used to evaluate whether a MicroAgent should trigger."""
     query: str = ""
-    file_paths: List[str] = field(default_factory=list)
-    task_type: Optional[str] = None
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    file_paths: list[str] = field(default_factory=list)
+    task_type: str | None = None
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 class BaseTrigger(ABC):
@@ -33,10 +33,10 @@ class MicroAgent:
     agent_id: str
     name: str
     content: str
-    triggers: List[BaseTrigger] = field(default_factory=list)
+    triggers: list[BaseTrigger] = field(default_factory=list)
     priority: int = 10
     enabled: bool = True
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     def matches(self, context: TriggerContext) -> bool:
         if not self.enabled:

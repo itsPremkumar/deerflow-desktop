@@ -3,8 +3,9 @@
 /**
  * DeerFlow Desktop preload script.
  *
- * Runs in an isolated world before the page loads. Only exposes a minimal,
- * read-only API over IPC — no Node.js access is leaked to the renderer.
+ * Runs in an isolated world before the page loads. Only exposes a minimal
+ * API over IPC — no Node.js access is leaked to the renderer. Writes are
+ * limited to explicit user toggles (currently: start-with-Windows).
  */
 
 const { contextBridge, ipcRenderer } = require('electron');
@@ -31,5 +32,22 @@ contextBridge.exposeInMainWorld('deerflow', {
   /** Open the per-user data folder (config, homes, logs) in Explorer. */
   openUserData() {
     return ipcRenderer.invoke('deerflow:open-user-data');
+  },
+
+  /**
+   * Start-with-Windows login item state.
+   * @returns {Promise<{ supported: boolean, enabled: boolean, active: boolean }>}
+   */
+  getAutoStart() {
+    return ipcRenderer.invoke('deerflow:get-auto-start');
+  },
+
+  /**
+   * Register or clear the Windows login item (installed app only).
+   * @param {boolean} enabled
+   * @returns {Promise<boolean>} the OS-reported state after applying.
+   */
+  setAutoStart(enabled) {
+    return ipcRenderer.invoke('deerflow:set-auto-start', Boolean(enabled));
   },
 });
