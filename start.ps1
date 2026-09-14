@@ -68,11 +68,6 @@ if (-not (Test-Path "$RepoRoot\.env")) {
     Add-Content -Path "$RepoRoot\.env" -Value "`nBETTER_AUTH_SECRET=$secret`nDEER_FLOW_AUTH_DISABLED=1`n"
 }
 
-# frontend/.env
-if (-not (Test-Path "$RepoRoot\frontend\.env")) {
-    Write-Host "Creating frontend/.env..." -ForegroundColor Gray
-    Set-Content -Path "$RepoRoot\frontend\.env" -Value "NODE_ENV=development`n"
-}
 
 # config.yaml
 if (-not (Test-Path "$RepoRoot\config.yaml")) {

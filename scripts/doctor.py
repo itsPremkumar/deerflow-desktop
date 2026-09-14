@@ -768,7 +768,6 @@ def main() -> int:
     # ── Configuration ─────────────────────────────────────────────────────────
     cfg_checks: list[CheckResult] = [
         check_env_file(project_root),
-        check_frontend_env(project_root),
         check_config_exists(config_path),
         check_config_version(config_path, project_root),
         check_config_loadable(config_path),

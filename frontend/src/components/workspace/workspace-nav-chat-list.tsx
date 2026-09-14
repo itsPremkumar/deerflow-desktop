@@ -3,9 +3,7 @@
 import {
   BotIcon,
   CalendarClock,
-  LayoutDashboardIcon,
   MessagesSquare,
-  Users,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -32,17 +30,6 @@ export function WorkspaceNavChatList() {
     <SidebarGroup className="pt-1">
       <SidebarMenu>
         <SidebarMenuItem>
-          <SidebarMenuButton
-            isActive={pathname.startsWith("/workspace/overview")}
-            asChild
-          >
-            <Link className="text-muted-foreground" href="/workspace/overview">
-              <LayoutDashboardIcon />
-              <span>{t.sidebar.overview}</span>
-            </Link>
-          </SidebarMenuButton>
-        </SidebarMenuItem>
-        <SidebarMenuItem>
           <SidebarMenuButton isActive={pathname === "/workspace/chats"} asChild>
             <Link className="text-muted-foreground" href="/workspace/chats">
               <MessagesSquare />
@@ -62,16 +49,8 @@ export function WorkspaceNavChatList() {
               </Link>
             </SidebarMenuButton>
           ) : (
-            // Disabled: aria-disabled drives the sidebar CVA to suppress
-            // pointer events on the button, so wrap it in a hoverable span
-            // that still surfaces the "feature not enabled" tooltip for mouse
-            // users. The button stays in the tab order (no tabIndex={-1}) and
-            // is wired via aria-describedby to a visually-hidden reason, so
-            // keyboard and screen-reader users also learn why it is disabled.
             <Tooltip>
               <TooltipTrigger asChild>
-                {/* cursor-not-allowed lives on the span (the element that
-                    still receives pointer events), not the inert button. */}
                 <span className="block w-full cursor-not-allowed">
                   <SidebarMenuButton
                     className="text-muted-foreground/50"
@@ -103,17 +82,6 @@ export function WorkspaceNavChatList() {
             >
               <CalendarClock />
               <span>{t.sidebar.scheduledTasks}</span>
-            </Link>
-          </SidebarMenuButton>
-        </SidebarMenuItem>
-        <SidebarMenuItem>
-          <SidebarMenuButton
-            isActive={pathname.startsWith("/workspace/team")}
-            asChild
-          >
-            <Link className="text-muted-foreground" href="/workspace/team">
-              <Users />
-              <span>{t.sidebar.team}</span>
             </Link>
           </SidebarMenuButton>
         </SidebarMenuItem>

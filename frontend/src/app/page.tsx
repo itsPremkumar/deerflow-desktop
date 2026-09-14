@@ -10,5 +10,5 @@ import { redirect } from "next/navigation";
  * URL; the agent workflow is untouched — only the `/` landing target changes.
  */
 export default function HomePage() {
-  redirect("/workspace");
+  redirect("/workspace/chats/new");
 }
