@@ -113,6 +113,16 @@ NEXT_PUBLIC_LANGGRAPH_BASE_URL=http://localhost:8001/api
 
 Leave these unset for the standard `make dev` / Docker flow, where nginx serves the public `/api/langgraph/*` prefix and rewrites it to Gateway's native `/api/*` routes.
 
+Production surfaces owned by the App Router root: `src/app/api/health/route.ts`
+(frontend liveness probe, independent of the Gateway), `src/app/not-found.tsx`
+(404 page), and `src/app/global-error.tsx` (root error boundary with retry —
+must stay a client component rendering its own `<html>`/`<body>`). Response
+hardening for everything Next.js serves lives in `next.config.js` `headers()`
+(nosniff, same-origin referrer, `SAMEORIGIN` framing, camera/geolocation
+permissions-policy); HSTS is intentionally left to the TLS-terminating proxy
+so plain-HTTP local development keeps working. The Gateway sets the same
+headers on API responses (see backend `security_headers_middleware.py`).
+
 `make build-static` creates a standalone read-only demo and copies `.next/static`
 and `public` into the output. In static mode, `core/api/static-response.ts`
 resolves Gateway REST reads with empty capability/catalog responses or existing

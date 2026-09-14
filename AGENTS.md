@@ -120,6 +120,7 @@ Scheduled-task note:
 ```bash
 make setup       # Interactive setup wizard (recommended for new users)
 make doctor      # Check configuration and system requirements
+make prod-check  # Production readiness pre-flight (versions, config files, secrets)
 make support-bundle  # Generate redacted troubleshooting summary, AI issue draft, and optional zip
 make config      # Generate local config files from the examples
 make check       # Check that required tools are installed

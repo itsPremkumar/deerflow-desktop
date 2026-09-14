@@ -1,6 +1,6 @@
 # DeerFlow - Unified Development Environment
 
-.PHONY: help config config-upgrade check check-agent-guidance install extension-install extension-upgrade extension-list extension-enable extension-disable extension-remove setup doctor support-bundle detect-thread-boundaries detect-blocking-io dev dev-daemon start start-daemon nginx stop up down clean docker-init docker-start docker-stop docker-logs docker-logs-frontend docker-logs-gateway docker-logs-redis setup-sandbox
+.PHONY: help config config-upgrade check check-agent-guidance install extension-install extension-upgrade extension-list extension-enable extension-disable extension-remove setup doctor prod-check support-bundle detect-thread-boundaries detect-blocking-io dev dev-daemon start start-daemon nginx stop up down clean docker-init docker-start docker-stop docker-logs docker-logs-frontend docker-logs-gateway docker-logs-redis setup-sandbox
 
 BASH ?= bash
 BACKEND_UV_RUN = cd backend && uv run
@@ -25,6 +25,7 @@ help:
 	@echo "DeerFlow Development Commands:"
 	@echo "  make setup           - Interactive setup wizard (recommended for new users)"
 	@echo "  make doctor          - Check configuration and system requirements"
+	@echo "  make prod-check      - Production readiness pre-flight (versions, config, secrets)"
 	@echo "  make support-bundle  - Create a redacted issue summary, AI draft, and evidence bundle"
 	@echo "  make config          - Generate local config files (aborts if config already exists)"
 	@echo "  make config-upgrade  - Merge new fields from config.example.yaml into config.yaml"
@@ -67,6 +68,9 @@ setup:
 
 doctor:
 	@$(BACKEND_UV_RUN) python ../scripts/doctor.py
+
+prod-check:
+	@$(PYTHON) ./scripts/prod_check.py
 
 support-bundle:
 	@$(BACKEND_UV_RUN) python ../scripts/support_bundle.py --include-doctor

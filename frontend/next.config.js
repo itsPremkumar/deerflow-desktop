@@ -83,6 +83,27 @@ const config = {
 
     return rewrites;
   },
+  async headers() {
+    // Baseline response hardening for everything Next.js serves. The Gateway
+    // sets the same headers on API responses (see
+    // backend/app/gateway/security_headers_middleware.py); nginx remains the
+    // public entry point in Docker deployments. HSTS is intentionally owned
+    // by the TLS-terminating proxy, not set here, so plain-HTTP local
+    // development (localhost:3000 / localhost:2026) keeps working.
+    // Permissions-Policy leaves microphone at its default because workspace
+    // voice-input uses browser speech recognition.
+    return [
+      {
+        source: "/:path*",
+        headers: [
+          { key: "X-Content-Type-Options", value: "nosniff" },
+          { key: "Referrer-Policy", value: "same-origin" },
+          { key: "X-Frame-Options", value: "SAMEORIGIN" },
+          { key: "Permissions-Policy", value: "camera=(), geolocation=()" },
+        ],
+      },
+    ];
+  },
 };
 
 export default withNextra(config);
