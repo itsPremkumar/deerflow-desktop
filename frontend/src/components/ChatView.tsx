@@ -4,16 +4,35 @@ import React, { useState, useEffect, useRef } from "react";
 import { ThreadSidebar } from "@/components/ThreadSidebar";
 import { MessageItem } from "@/components/MessageItem";
 import { Composer } from "@/components/Composer";
+import { NavTabs, WorkspaceView } from "@/components/NavTabs";
 import { ChatMessage, Thread, AIModel } from "@/types/chat";
 import { BotProfile } from "@/types/bots";
 import { fetchThreads, createThread, fetchThreadHistory, fetchAvailableModels } from "@/lib/api";
 import { fetchBots } from "@/lib/bots";
+import { fetchFeatures, FeatureFlags } from "@/lib/workspace";
+import { fetchMe, UserInfo } from "@/lib/auth";
+import { listThreadRuns, cancelRun } from "@/lib/runs";
+import { rateMessage } from "@/lib/feedback";
+import { suggestionsEnabled, suggestFollowUps, polishDraft } from "@/lib/assist";
+import { uploadFiles } from "@/lib/files";
+import { fetchGoal, setGoal, clearGoal, compactThread, fetchTokenUsage, TokenUsage } from "@/lib/threads-ext";
 import { BotGallery } from "@/components/bots/BotGallery";
 import { BotDetailPanel } from "@/components/bots/BotDetailPanel";
 import { ActiveBotPicker } from "@/components/bots/ActiveBotPicker";
-import { Sparkles, Activity, MessageSquare, Bot } from "lucide-react";
-
-type MainView = "chat" | "bots";
+import { BotOpsSection } from "@/components/sections/BotOpsSection";
+import { RunsSection } from "@/components/sections/RunsSection";
+import { FilesSection } from "@/components/sections/FilesSection";
+import { ScheduledSection } from "@/components/sections/ScheduledSection";
+import { SubagentsSection } from "@/components/sections/SubagentsSection";
+import { SkillsSection } from "@/components/sections/SkillsSection";
+import { MemorySection } from "@/components/sections/MemorySection";
+import { ProjectsSection } from "@/components/sections/ProjectsSection";
+import { DashboardSection } from "@/components/sections/DashboardSection";
+import { AgentsSection } from "@/components/sections/AgentsSection";
+import { TeamOpsSection } from "@/components/sections/TeamOpsSection";
+import { ChannelsSection } from "@/components/sections/ChannelsSection";
+import { AuthSection } from "@/components/sections/AuthSection";
+import { Sparkles, Activity, Shrink, Target, X } from "lucide-react";
 
 export default function ChatView() {
   const [threads, setThreads] = useState<Thread[]>([]);
@@ -23,31 +42,60 @@ export default function ChatView() {
   const [selectedModel, setSelectedModel] = useState<string>("default");
   const [input, setInput] = useState<string>("");
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [notice, setNotice] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const abortRef = useRef<AbortController | null>(null);
 
   // Multi-bot-profile state
   const [bots, setBots] = useState<BotProfile[]>([]);
   const [botsLoading, setBotsLoading] = useState<boolean>(true);
   const [activeBot, setActiveBot] = useState<BotProfile | null>(null);
-  const [view, setView] = useState<MainView>("chat");
+  const [view, setView] = useState<WorkspaceView>("chat");
+  const [botsTab, setBotsTab] = useState<"profiles" | "ops">("profiles");
   const [inspectedBot, setInspectedBot] = useState<BotProfile | null>(null);
+
+  // Platform state
+  const [features, setFeatures] = useState<FeatureFlags>({ agentsApi: false, browserControl: false, mcpTasks: false, subagentBatches: false });
+  const [user, setUser] = useState<UserInfo | null>(null);
+  const [userLoading, setUserLoading] = useState(true);
+  const [guestDismissed, setGuestDismissed] = useState(false);
+
+  // Conversation helpers
+  const [goal, setGoalText] = useState<string | null>(null);
+  const [goalEditing, setGoalEditing] = useState(false);
+  const [goalDraft, setGoalDraft] = useState("");
+  const [usage, setUsage] = useState<TokenUsage | null>(null);
+  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [suggestionsOn, setSuggestionsOn] = useState(false);
+  const [polishing, setPolishing] = useState(false);
+  const [uploading, setUploading] = useState(false);
+
+  const flash = (msg: string) => {
+    setNotice(msg);
+    window.setTimeout(() => setNotice(null), 4500);
+  };
 
   // Initial load
   useEffect(() => {
     async function init() {
-      const [tList, mList, bList] = await Promise.all([
+      const [tList, mList, bList, feats, me, suggOn] = await Promise.all([
         fetchThreads(),
         fetchAvailableModels(),
         fetchBots(),
+        fetchFeatures(),
+        fetchMe(),
+        suggestionsEnabled(),
       ]);
       setThreads(tList);
       setModels(mList);
       if (mList.length > 0) setSelectedModel(mList[0].id);
-      if (tList.length > 0) {
-        setActiveThreadId(tList[0].thread_id);
-      }
+      if (tList.length > 0) setActiveThreadId(tList[0].thread_id);
       setBots(bList);
       setBotsLoading(false);
+      setFeatures(feats);
+      setUser(me);
+      setUserLoading(false);
+      setSuggestionsOn(suggOn);
     }
     init();
   }, []);
@@ -57,22 +105,45 @@ export default function ChatView() {
     const bList = await fetchBots();
     setBots(bList);
     setBotsLoading(false);
-    // Keep activeBot reference fresh after refresh
     if (activeBot) {
       const fresh = bList.find((b) => b.name === activeBot.name);
       if (fresh) setActiveBot(fresh);
     }
   };
 
-  // Fetch messages when thread changes
+  const reloadThreads = async (selectId?: string) => {
+    const tList = await fetchThreads();
+    setThreads(tList);
+    if (selectId) setActiveThreadId(selectId);
+    else if (activeThreadId && !tList.some((t) => t.thread_id === activeThreadId)) {
+      setActiveThreadId(tList.length > 0 ? tList[0].thread_id : null);
+    }
+  };
+
+  // Fetch messages + goal + usage when thread changes
   useEffect(() => {
     if (!activeThreadId) {
       setMessages([]);
+      setGoalText(null);
+      setUsage(null);
+      setSuggestions([]);
       return;
     }
     async function loadMessages() {
       const history = await fetchThreadHistory(activeThreadId!);
       setMessages(history);
+      try {
+        const g = await fetchGoal(activeThreadId!);
+        setGoalText(g.goal);
+      } catch {
+        setGoalText(null);
+      }
+      try {
+        setUsage(await fetchTokenUsage(activeThreadId!));
+      } catch {
+        setUsage(null);
+      }
+      setSuggestions([]);
     }
     loadMessages();
   }, [activeThreadId]);
@@ -103,8 +174,6 @@ export default function ChatView() {
     setActiveBot(bot);
     setInspectedBot(null);
     setView("chat");
-    // Start a fresh thread titled for this bot so its work stays isolated,
-    // but fall back to reusing the current thread if creation fails.
     try {
       const newId = await createThread(`Chat with ${bot.display_name || bot.name}`);
       const newThread: Thread = {
@@ -121,36 +190,41 @@ export default function ChatView() {
     }
   };
 
-  const handleSubmit = async () => {
-    if (!input.trim() || isLoading) return;
+  /** Core send: streams one answer, attaches its run id, refreshes suggestions + usage. */
+  const sendMessage = async (text: string) => {
+    const content = text.trim();
+    if (!content || isLoading) return;
 
     let currentThreadId = activeThreadId;
     if (!currentThreadId) {
-      currentThreadId = await createThread(input.slice(0, 30));
+      currentThreadId = await createThread(content.slice(0, 30));
       setActiveThreadId(currentThreadId);
-      setThreads([{ thread_id: currentThreadId, title: input.slice(0, 30), created_at: new Date().toISOString(), updated_at: new Date().toISOString() }, ...threads]);
+      setThreads([{ thread_id: currentThreadId, title: content.slice(0, 30), created_at: new Date().toISOString(), updated_at: new Date().toISOString() }, ...threads]);
     }
+    const threadId = currentThreadId;
 
     const userMsg: ChatMessage = {
       id: `user-${Date.now()}`,
       role: "user",
-      content: input.trim(),
+      content,
       createdAt: new Date().toISOString(),
     };
-
     setMessages((prev) => [...prev, userMsg]);
     setInput("");
+    setSuggestions([]);
     setIsLoading(true);
+    const controller = new AbortController();
+    abortRef.current = controller;
 
     try {
-      // Stream or call gateway — route to the selected specialist bot.
-      const res = await fetch(`/api/gateway/threads/${currentThreadId}/runs/stream`, {
+      const res = await fetch(`/api/gateway/threads/${threadId}/runs/stream`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        signal: controller.signal,
         body: JSON.stringify({
           assistant_id: activeBot?.name || "lead_agent",
           input: {
-            messages: [{ role: "user", content: userMsg.content }],
+            messages: [{ role: "user", content }],
           },
           config: {
             configurable: {
@@ -160,10 +234,10 @@ export default function ChatView() {
         }),
       });
 
+      const assistantMsgId = `asst-${Date.now()}`;
       if (!res.ok) {
-        // Fallback simulate assistant response if stream endpoint requires specific multi-tenant headers
         const assistantMsg: ChatMessage = {
-          id: `asst-${Date.now()}`,
+          id: assistantMsgId,
           role: "assistant",
           content: `**${activeBot ? activeBot.display_name || activeBot.name : "DeerFlow"}** has received your request and evaluated the workflow. What next step would you like to execute?`,
           createdAt: new Date().toISOString(),
@@ -175,96 +249,255 @@ export default function ChatView() {
       const reader = res.body?.getReader();
       const decoder = new TextDecoder();
       let assistantText = "";
-      const thinkingText = "";
-
-      const assistantMsgId = `asst-${Date.now()}`;
       setMessages((prev) => [
         ...prev,
         { id: assistantMsgId, role: "assistant", content: "", createdAt: new Date().toISOString() },
       ]);
 
       if (reader) {
-        while (true) {
+        for (;;) {
           const { done, value } = await reader.read();
           if (done) break;
           const chunk = decoder.decode(value, { stream: true });
           assistantText += chunk;
-
           setMessages((prev) =>
-            prev.map((m) =>
-              m.id === assistantMsgId
-                ? { ...m, content: assistantText, thinking: thinkingText }
-                : m
-            )
+            prev.map((m) => (m.id === assistantMsgId ? { ...m, content: assistantText } : m))
           );
         }
       }
+
+      // Attach the newest run id so feedback + stop work on this answer.
+      try {
+        const runs = await listThreadRuns(threadId);
+        const newest = runs[0]?.run_id;
+        if (newest) {
+          setMessages((prev) => prev.map((m) => (m.id === assistantMsgId ? { ...m, runId: newest } : m)));
+        }
+        setUsage(await fetchTokenUsage(threadId));
+      } catch {
+        /* non-fatal */
+      }
+
+      // Follow-up suggestions.
+      if (suggestionsOn) {
+        try {
+          const convo = [...messages, userMsg, { ...userMsg, id: assistantMsgId, role: "assistant" as const, content: assistantText }]
+            .slice(-6)
+            .map((m) => ({ role: m.role, content: m.content.slice(0, 2000) }));
+          const s = await suggestFollowUps(threadId, convo);
+          setSuggestions(s);
+        } catch {
+          /* suggestions are optional */
+        }
+      }
     } catch (err) {
-      console.error(err);
+      if (err instanceof DOMException && err.name === "AbortError") {
+        setMessages((prev) => [
+          ...prev,
+          { id: `sys-${Date.now()}`, role: "assistant", content: "_Stopped — the answer was halted._", createdAt: new Date().toISOString() },
+        ]);
+      } else {
+        console.error(err);
+      }
     } finally {
       setIsLoading(false);
+      abortRef.current = null;
     }
   };
 
+  const handleSubmit = () => sendMessage(input);
+
+  /** Stop button: halt the stream, then cancel the run server-side (best effort). */
+  const handleStop = async () => {
+    abortRef.current?.abort();
+    if (activeThreadId) {
+      try {
+        const runs = await listThreadRuns(activeThreadId);
+        const live = runs.find((r) => r.status === "running" || r.status === "pending");
+        if (live) await cancelRun(activeThreadId, live.run_id);
+        flash("Stopped.");
+      } catch {
+        /* stream abort alone already halts the UI */
+      }
+    }
+  };
+
+  const handleRegenerate = () => {
+    const lastUser = [...messages].reverse().find((m) => m.role === "user");
+    if (lastUser) sendMessage(lastUser.content);
+  };
+
+  const handleEditResend = (_messageId: string, newContent: string) => {
+    sendMessage(newContent);
+  };
+
+  const handleRate = async (messageId: string, rating: 1 | -1) => {
+    const msg = messages.find((m) => m.id === messageId);
+    if (!msg?.runId || !activeThreadId) return;
+    const next = msg.rating === rating ? undefined : rating;
+    try {
+      if (next) await rateMessage(activeThreadId, msg.runId, next);
+      setMessages((prev) => prev.map((m) => (m.id === messageId ? { ...m, rating: next } : m)));
+      if (next) flash(next === 1 ? "Thanks — rated helpful." : "Noted — rated not helpful.");
+    } catch {
+      flash("Couldn't save your rating right now.");
+    }
+  };
+
+  const handlePolish = async () => {
+    if (!input.trim() || polishing) return;
+    setPolishing(true);
+    try {
+      const { text, changed } = await polishDraft(input, activeThreadId ?? undefined);
+      setInput(text);
+      flash(changed ? "Draft improved — review and send." : "Draft already looks good.");
+    } catch {
+      flash("Couldn't polish right now — send as-is.");
+    } finally {
+      setPolishing(false);
+    }
+  };
+
+  const handleAttach = async (files: FileList) => {
+    let threadId = activeThreadId;
+    if (!threadId) {
+      threadId = await createThread(`Files: ${files[0]?.name || "uploads"}`);
+      setActiveThreadId(threadId);
+      setThreads([{ thread_id: threadId, title: `Files: ${files[0]?.name || "uploads"}`, created_at: new Date().toISOString(), updated_at: new Date().toISOString() }, ...threads]);
+    }
+    setUploading(true);
+    try {
+      const added = await uploadFiles(threadId, files);
+      flash(`${added.length} file(s) attached — mention them in your message.`);
+    } catch (e) {
+      flash(e instanceof Error ? e.message : "Upload failed.");
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleSaveGoal = async () => {
+    if (!activeThreadId || !goalDraft.trim()) return;
+    try {
+      await setGoal(activeThreadId, goalDraft.trim());
+      setGoalText(goalDraft.trim());
+      setGoalEditing(false);
+      flash("Goal set — the agent works toward it until done.");
+    } catch {
+      flash("Couldn't save the goal.");
+    }
+  };
+
+  const handleClearGoal = async () => {
+    if (!activeThreadId) return;
+    try {
+      await clearGoal(activeThreadId);
+      setGoalText(null);
+      setGoalEditing(false);
+    } catch {
+      flash("Couldn't clear the goal.");
+    }
+  };
+
+  const handleCompact = async () => {
+    if (!activeThreadId) return;
+    if (!window.confirm("Summarize older messages to free context? Recent messages stay intact.")) return;
+    try {
+      const summary = await compactThread(activeThreadId);
+      flash(summary.slice(0, 200));
+      const history = await fetchThreadHistory(activeThreadId);
+      setMessages(history);
+      setUsage(await fetchTokenUsage(activeThreadId));
+    } catch {
+      flash("Compaction isn't available right now.");
+    }
+  };
+
+  const openThread = (id: string) => {
+    setActiveThreadId(id);
+    setView("chat");
+  };
+
+  const lastAssistantId = [...messages].reverse().find((m) => m.role === "assistant")?.id;
+
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-background">
-      <ThreadSidebar
-        threads={threads}
-        activeThreadId={activeThreadId}
-        onSelectThread={(id) => {
-          setActiveThreadId(id);
-          setView("chat");
-        }}
-        onNewChat={handleNewChat}
-      />
+      {view === "chat" && (
+        <ThreadSidebar
+          threads={threads}
+          activeThreadId={activeThreadId}
+          onSelectThread={(id) => {
+            setActiveThreadId(id);
+            setView("chat");
+          }}
+          onNewChat={handleNewChat}
+          onThreadsChanged={() => reloadThreads()}
+          onBranchOpened={(id) => reloadThreads(id)}
+        />
+      )}
 
-      <main className="flex-1 flex flex-col h-full overflow-hidden">
-        {/* Top Bar with Chat/Bots tabs + active bot */}
-        <header className="min-h-12 border-b border-border/60 px-4 py-2 flex items-center justify-between gap-3 bg-card/20 shrink-0 flex-wrap">
-          <div className="flex items-center gap-2">
-            <div className="flex items-center rounded-lg bg-muted/60 p-0.5 text-[11px] font-semibold">
-              <button
-                type="button"
-                onClick={() => setView("chat")}
-                className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md transition-colors ${
-                  view === "chat" ? "bg-card shadow text-foreground" : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                <MessageSquare className="size-3.5" /> Chat
-              </button>
-              <button
-                type="button"
-                onClick={() => setView("bots")}
-                className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md transition-colors ${
-                  view === "bots" ? "bg-card shadow text-foreground" : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                <Bot className="size-3.5" /> Bots ({bots.length})
-              </button>
-            </div>
-            {view === "chat" && (
-              <span className="text-xs font-semibold text-foreground hidden md:inline">
+      <main className="flex-1 flex flex-col h-full overflow-hidden min-w-0">
+        {/* Workspace navigation */}
+        <header className="border-b border-border/60 px-3 pt-2 pb-1.5 bg-card/20 shrink-0 space-y-1.5">
+          <div className="overflow-x-auto">
+            <NavTabs view={view} onChange={setView} badge={{ bots: bots.length }} />
+          </div>
+
+          {view === "chat" && (
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-xs font-semibold text-foreground truncate max-w-52">
                 {threads.find((t) => t.thread_id === activeThreadId)?.title || "Active Workspace"}
               </span>
-            )}
-            {view === "chat" && (
               <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 font-medium hidden sm:inline-flex items-center gap-1">
                 <span className="size-1.5 rounded-full bg-emerald-500" />
                 Connected
               </span>
-            )}
-          </div>
-
-          <div className="flex items-center gap-2">
-            <ActiveBotPicker bots={bots} activeBot={activeBot} onPick={setActiveBot} />
-            <div className="hidden lg:flex items-center gap-1.5 text-xs text-muted-foreground border-l border-border/60 pl-2">
-              <Sparkles className="size-3.5 text-primary" />
-              <span className="font-medium">{models.find((m) => m.id === selectedModel)?.name || "Default Agent"}</span>
+              <div className="flex-1" />
+              <ActiveBotPicker bots={bots} activeBot={activeBot} onPick={setActiveBot} />
+              <span className="hidden lg:inline text-xs text-muted-foreground">
+                {models.find((m) => m.id === selectedModel)?.name || "Default Agent"}
+              </span>
             </div>
-          </div>
+          )}
         </header>
 
+        {!userLoading && !user && !guestDismissed && (
+          <div className="shrink-0 px-4 pt-2">
+            <div className="max-w-4xl mx-auto flex items-center gap-2 rounded-xl border border-border/60 bg-card px-3 py-2 text-xs">
+              <span className="flex-1">Browsing as guest. <button type="button" onClick={() => setView("account")} className="text-primary font-semibold hover:underline">Sign in</button> for personal memory and admin actions.</span>
+              <button type="button" onClick={() => setGuestDismissed(true)} className="p-1 rounded hover:bg-muted text-muted-foreground" aria-label="Dismiss">
+                <X className="size-3.5" />
+              </button>
+            </div>
+          </div>
+        )}
+
+        {notice && (
+          <div className="shrink-0 px-4 pt-2">
+            <div className="max-w-4xl mx-auto rounded-xl border border-primary/30 bg-primary/5 px-3 py-2 text-xs">{notice}</div>
+          </div>
+        )}
+
         {view === "bots" ? (
+          <div className="shrink-0 px-4 sm:px-6 pt-3">
+            <div className="max-w-6xl mx-auto flex gap-1 rounded-xl bg-muted/60 p-1 w-fit">
+              {(["profiles", "ops"] as const).map((t) => (
+                <button
+                  key={t}
+                  type="button"
+                  onClick={() => setBotsTab(t)}
+                  className={`px-3 py-1.5 rounded-lg text-[11px] font-semibold ${botsTab === t ? "bg-card shadow" : "text-muted-foreground hover:text-foreground"}`}
+                >
+                  {t === "profiles" ? `Profiles (${bots.length})` : "Team ops"}
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : null}
+
+        {view === "bots" && botsTab === "ops" ? (
+          <BotOpsSection bots={bots} onRefreshBots={refreshBots} />
+        ) : view === "bots" ? (
           <BotGallery
             bots={bots}
             activeBotName={activeBot?.name || null}
@@ -273,6 +506,30 @@ export default function ChatView() {
             onChat={handleChatWithBot}
             onRefresh={refreshBots}
           />
+        ) : view === "runs" ? (
+          <RunsSection threadId={activeThreadId} />
+        ) : view === "files" ? (
+          <FilesSection threadId={activeThreadId} />
+        ) : view === "scheduled" ? (
+          <ScheduledSection bots={bots} />
+        ) : view === "subagents" ? (
+          <SubagentsSection />
+        ) : view === "skills" ? (
+          <SkillsSection />
+        ) : view === "memory" ? (
+          <MemorySection />
+        ) : view === "projects" ? (
+          <ProjectsSection onOpenThread={openThread} />
+        ) : view === "dashboard" ? (
+          <DashboardSection onOpenThread={openThread} />
+        ) : view === "agents" ? (
+          <AgentsSection enabled={features.agentsApi} />
+        ) : view === "team" ? (
+          <TeamOpsSection threadId={activeThreadId} mcpTasksAvailable={features.mcpTasks} />
+        ) : view === "channels" ? (
+          <ChannelsSection />
+        ) : view === "account" ? (
+          <AuthSection user={user} loading={userLoading} onChanged={async () => { setUser(await fetchMe()); }} />
         ) : (
           <>
             {/* Active-bot banner */}
@@ -282,20 +539,59 @@ export default function ChatView() {
                   <div className="size-7 rounded-lg bg-primary/10 flex items-center justify-center font-bold overflow-hidden shrink-0">
                     {activeBot.avatar || (activeBot.display_name || activeBot.name).slice(0, 2).toUpperCase()}
                   </div>
-                  <span>
+                  <span className="min-w-0">
                     Chatting as <strong>{activeBot.display_name || activeBot.name}</strong>
                     <span className="text-muted-foreground"> — {activeBot.role}</span>
                   </span>
                   <button
                     type="button"
                     onClick={() => setActiveBot(null)}
-                    className="ml-auto text-[11px] font-medium text-muted-foreground hover:text-foreground px-2 py-1 rounded-lg hover:bg-muted"
+                    className="ml-auto text-[11px] font-medium text-muted-foreground hover:text-foreground px-2 py-1 rounded-lg hover:bg-muted shrink-0"
                   >
                     Reset to Lead Agent
                   </button>
                 </div>
               </div>
             )}
+
+            {/* Goal bar */}
+            <div className="shrink-0 px-4 pt-2">
+              <div className="max-w-4xl mx-auto">
+                {goalEditing ? (
+                  <div className="flex gap-2 rounded-xl border border-primary/30 bg-card p-2">
+                    <input
+                      value={goalDraft}
+                      onChange={(e) => setGoalDraft(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") handleSaveGoal();
+                        if (e.key === "Escape") setGoalEditing(false);
+                      }}
+                      placeholder="What is the goal of this conversation? e.g. Ship the landing page"
+                      autoFocus
+                      aria-label="Conversation goal"
+                      className="flex-1 bg-transparent px-2 py-1.5 text-xs focus:outline-none"
+                    />
+                    <button type="button" onClick={handleSaveGoal} disabled={!goalDraft.trim()} className="px-2.5 py-1 rounded-lg bg-primary text-primary-foreground text-[11px] font-semibold disabled:opacity-40">
+                      Set
+                    </button>
+                    <button type="button" onClick={() => setGoalEditing(false)} className="px-2.5 py-1 rounded-lg border border-border text-[11px] hover:bg-muted">
+                      Cancel
+                    </button>
+                  </div>
+                ) : goal ? (
+                  <div className="flex items-center gap-2 rounded-xl border border-primary/30 bg-primary/5 px-3 py-1.5 text-xs">
+                    <Target className="size-3.5 text-primary shrink-0" />
+                    <span className="flex-1 truncate"><strong>Goal:</strong> {goal}</span>
+                    <button type="button" onClick={() => { setGoalDraft(goal); setGoalEditing(true); }} className="text-[11px] text-muted-foreground hover:text-foreground">Edit</button>
+                    <button type="button" onClick={handleClearGoal} className="text-[11px] text-muted-foreground hover:text-destructive">Clear</button>
+                  </div>
+                ) : activeThreadId ? (
+                  <button type="button" onClick={() => { setGoalDraft(""); setGoalEditing(true); }} className="inline-flex items-center gap-1.5 text-[11px] text-muted-foreground hover:text-foreground px-1 py-0.5">
+                    <Target className="size-3.5" /> Set a goal for this conversation
+                  </button>
+                ) : null}
+              </div>
+            </div>
 
             {/* Messages Viewport */}
             <div className="flex-1 overflow-y-auto px-4 py-6 space-y-4">
@@ -310,7 +606,7 @@ export default function ChatView() {
                   <p className="text-xs text-muted-foreground leading-relaxed">
                     {activeBot
                       ? `Talking to ${activeBot.display_name || activeBot.name} (${activeBot.role}). Switch specialists anytime from the Bots tab.`
-                      : "Streamlined, distraction-free conversational workspace directly connected to the DeerFlow cognitive autonomous engine."}
+                      : "Ask anything — research, code, plans. Attach files with the paperclip, polish drafts with the wand."}
                   </p>
                   {bots.length > 0 && (
                     <div className="flex flex-wrap justify-center gap-1.5 pt-1">
@@ -339,19 +635,68 @@ export default function ChatView() {
                   )}
                 </div>
               ) : (
-                messages.map((msg) => <MessageItem key={msg.id} message={msg} />)
+                messages.map((msg) => (
+                  <MessageItem
+                    key={msg.id}
+                    message={msg}
+                    onRate={handleRate}
+                    onRegenerate={handleRegenerate}
+                    showRegenerate={msg.id === lastAssistantId && msg.role === "assistant"}
+                    regenerating={isLoading}
+                    onEdit={handleEditResend}
+                  />
+                ))
               )}
 
               {isLoading && (
                 <div className="flex items-center gap-2 text-xs text-muted-foreground py-2 px-4 animate-pulse">
                   <Activity className="size-4 animate-spin text-primary" />
                   <span>
-                    {activeBot ? `${activeBot.display_name || activeBot.name} is generating response` : "DeerFlow agent is generating response"} & verifying tools...
+                    {activeBot ? `${activeBot.display_name || activeBot.name} is generating response` : "DeerFlow agent is generating response"} & verifying tools…
                   </span>
                 </div>
               )}
               <div ref={messagesEndRef} />
             </div>
+
+            {/* Follow-up suggestions */}
+            {suggestions.length > 0 && !isLoading && (
+              <div className="shrink-0 px-3 pb-1">
+                <div className="max-w-4xl mx-auto flex gap-1.5 flex-wrap">
+                  {suggestions.map((s, i) => (
+                    <button
+                      key={i}
+                      type="button"
+                      onClick={() => sendMessage(s)}
+                      className="text-[11px] px-2.5 py-1.5 rounded-full border border-border/70 text-muted-foreground hover:text-foreground hover:border-primary/40 transition-colors text-left"
+                    >
+                      {s}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Context toolbar */}
+            {activeThreadId && (
+              <div className="shrink-0 px-3 pb-1">
+                <div className="max-w-4xl mx-auto flex items-center gap-2 text-[11px] text-muted-foreground">
+                  {usage && (
+                    <span className="font-mono" title="Tokens used in this conversation">
+                      {usage.totalTokens > 0 ? `${(usage.totalTokens / 1000).toFixed(1)}k tokens` : "fresh context"}
+                      {usage.contextPercent !== null ? ` • ${usage.contextPercent}% of window` : ""}
+                    </span>
+                  )}
+                  <span className="flex-1" />
+                  <button type="button" onClick={handleCompact} className="inline-flex items-center gap-1 hover:text-foreground px-1.5 py-1 rounded-lg hover:bg-muted" title="Summarize older messages to free context">
+                    <Shrink className="size-3.5" /> Compact context
+                  </button>
+                  <button type="button" onClick={() => setSuggestionsOn((v) => !v)} className="hover:text-foreground px-1.5 py-1 rounded-lg hover:bg-muted" title="Toggle follow-up question suggestions">
+                    Suggestions {suggestionsOn ? "on" : "off"}
+                  </button>
+                </div>
+              </div>
+            )}
 
             {/* Composer */}
             <footer className="shrink-0 pb-3">
@@ -359,10 +704,15 @@ export default function ChatView() {
                 input={input}
                 setInput={setInput}
                 onSubmit={handleSubmit}
+                onStop={handleStop}
                 isLoading={isLoading}
                 models={models}
                 selectedModel={selectedModel}
                 onSelectModel={setSelectedModel}
+                onPolish={handlePolish}
+                polishing={polishing}
+                onAttach={handleAttach}
+                uploading={uploading}
               />
             </footer>
           </>

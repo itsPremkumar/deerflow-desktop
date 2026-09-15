@@ -37,6 +37,10 @@ export interface ChatMessage {
   artifacts?: ArtifactItem[];
   approvalRequest?: HumanApproval;
   createdAt: string;
+  /** Newest run that produced this message (enables feedback + stop). */
+  runId?: string;
+  /** Your rating for this answer (+1 / -1). */
+  rating?: 1 | -1;
 }
 
 export interface Thread {
