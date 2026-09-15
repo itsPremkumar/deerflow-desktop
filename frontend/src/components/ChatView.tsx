@@ -1,11 +1,11 @@
-﻿"use client";
+"use client";
 
 import React, { useState, useEffect, useRef } from "react";
 import { ThreadSidebar } from "@/components/ThreadSidebar";
 import { MessageItem } from "@/components/MessageItem";
 import { Composer } from "@/components/Composer";
 import { ChatMessage, Thread, AIModel } from "@/types/chat";
-import { fetchThreads, createThread, fetchThreadHistory, fetchAvailableModels } from "@/lib/api";
+import { fetchThreads, createThread, fetchThreadHistory, fetchAvailableModels, autoTriggerCommand } from "@/lib/api";
 import { Sparkles, Activity } from "lucide-react";
 
 export default function ChatView() {
@@ -76,16 +76,30 @@ export default function ChatView() {
       setThreads([{ thread_id: currentThreadId, title: input.slice(0, 30), created_at: new Date().toISOString(), updated_at: new Date().toISOString() }, ...threads]);
     }
 
+    const userPrompt = input.trim();
+    setInput("");
+    setIsLoading(true);
+
+    // Automatically detect and trigger slash command lifecycle at the right time
+    let detection = undefined;
+    try {
+      const d = await autoTriggerCommand(userPrompt, undefined, true, { thread_id: currentThreadId });
+      if (d && d.matched) {
+        detection = d;
+      }
+    } catch (e) {
+      console.warn("Autonomous trigger check:", e);
+    }
+
     const userMsg: ChatMessage = {
       id: `user-${Date.now()}`,
       role: "user",
-      content: input.trim(),
+      content: userPrompt,
+      autonomousDetection: detection,
       createdAt: new Date().toISOString(),
     };
 
     setMessages((prev) => [...prev, userMsg]);
-    setInput("");
-    setIsLoading(true);
 
     try {
       // Stream or call gateway

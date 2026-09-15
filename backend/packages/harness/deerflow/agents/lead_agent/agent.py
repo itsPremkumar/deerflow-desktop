@@ -543,6 +543,13 @@ def build_middlewares(
         )
     )
 
+    # Autonomous Command Lifecycle Middleware: automatically identifies required slash commands
+    # at the exact correct time in the lifecycle and stages their execution directives.
+    from deerflow.agents.middlewares.autonomous_command_middleware import AutonomousCommandMiddleware
+
+    middlewares.append(AutonomousCommandMiddleware())
+
+
     # Observe the final tool_search Command after every inner policy/result
     # transformer has run. Tool wrappers are first-in-list outermost, so this
     # must be registered before SkillToolPolicyMiddleware.

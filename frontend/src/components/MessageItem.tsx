@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import React, { useState } from "react";
 import ReactMarkdown from "react-markdown";
@@ -45,6 +45,26 @@ export function MessageItem({ message, onApprovalDecision }: MessageItemProps) {
             {copied ? <Check className="size-3.5 text-emerald-500" /> : <Copy className="size-3.5" />}
           </button>
         </div>
+
+        {/* Autonomous Slash Command Lifecycle Badge */}
+        {message.autonomousDetection && message.autonomousDetection.matched && (
+          <div className="rounded-lg border border-primary/30 bg-primary/5 p-2 text-xs space-y-1 my-1">
+            <div className="flex items-center gap-2">
+              <span className="flex items-center gap-1 font-mono font-semibold text-primary">
+                ⚡ Auto-Triggered: {message.autonomousDetection.command}
+              </span>
+              <span className="text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded bg-primary/20 text-primary">
+                {message.autonomousDetection.phase}
+              </span>
+              <span className="text-[10px] text-muted-foreground ml-auto">
+                {Math.round(message.autonomousDetection.confidence * 100)}% confidence
+              </span>
+            </div>
+            <p className="text-[11px] text-muted-foreground">
+              {message.autonomousDetection.reason}
+            </p>
+          </div>
+        )}
 
         {/* Collapsible Reasoning Thinking */}
         {message.thinking && (

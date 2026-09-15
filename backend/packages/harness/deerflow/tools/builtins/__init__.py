@@ -12,6 +12,7 @@ from .enclave_security_tool import astra_security_manage, enterprise_security_ma
 
 # Autonomous one-prompt planner: raw prompt -> fully decided execution plan
 from .autoplan_tool import build_autonomous_plan
+from .autonomous_command_tool import execute_slash_command_tool, identify_autonomous_command_tool
 from .avo_lineage_tool import run_avo_variation
 from .background_tasks_tool import cancel_background_task, list_background_tasks
 from .batch_task_tool import batch_status, batch_task, cancel_batch
@@ -233,6 +234,8 @@ __all__ = [
     "visual_verify_artifact",
     "manage_reflexion_memory",
     "compile_problem_model",
+    "execute_slash_command_tool",
+    "identify_autonomous_command_tool",
 ]
 
 

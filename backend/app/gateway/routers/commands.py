@@ -16,7 +16,13 @@ from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, Query, Request
 from pydantic import BaseModel, Field
 
-from deerflow.commands import CommandCategory, command_registry
+from deerflow.commands import (
+    CommandCategory,
+    LifecyclePhase,
+    autonomous_command_engine,
+    command_registry,
+)
+from fastapi import HTTPException
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +32,19 @@ router = APIRouter(prefix="/api/commands", tags=["commands"])
 class CommandExecuteRequest(BaseModel):
     command: str = Field(..., min_length=1, description="Slash command line to execute, e.g. '/goal status' or '/plan'")
     context: Optional[Dict[str, Any]] = Field(default=None, description="Optional execution context such as thread_id, agent_id, or options")
+
+
+class AutoTriggerRequest(BaseModel):
+    prompt: str = Field(..., min_length=1, description="Natural language prompt or task to analyze")
+    phase: Optional[str] = Field(default=None, description="Optional current phase hint")
+    auto_execute: bool = Field(default=True, description="Whether to immediately execute matched command")
+    context: Optional[Dict[str, Any]] = Field(default=None, description="Optional execution context")
+
+
+class PhaseTransitionRequest(BaseModel):
+    phase: str = Field(..., description="Target lifecycle phase ('planning', 'research', 'swarm', 'coding', 'verification', 'self_heal', 'reflection', 'schedule')")
+    details: str = Field(default="", description="Optional transition payload or error trace")
+    context: Optional[Dict[str, Any]] = Field(default=None, description="Optional execution context")
 
 
 @router.get("")
@@ -82,3 +101,57 @@ async def execute_command(payload: CommandExecuteRequest) -> Dict[str, Any]:
         context=payload.context,
     )
     return result.to_dict()
+
+
+@router.post("/auto-trigger")
+async def auto_trigger_command(payload: AutoTriggerRequest) -> Dict[str, Any]:
+    """Automatically identifies the required slash command and starts executing it at the correct time."""
+    phase_enum = None
+    if payload.phase:
+        try:
+            phase_enum = LifecyclePhase(payload.phase.lower())
+        except ValueError:
+            pass
+
+    detection = await asyncio.to_thread(
+        autonomous_command_engine.identify_and_trigger,
+        prompt=payload.prompt,
+        phase_hint=phase_enum,
+        auto_execute=payload.auto_execute,
+        context=payload.context,
+    )
+    return detection.to_dict()
+
+
+@router.post("/phase-transition")
+async def trigger_phase_transition(payload: PhaseTransitionRequest) -> Dict[str, Any]:
+    """Executes phase-specific autonomous slash commands at exact lifecycle events (e.g. on error, post-code edit)."""
+    try:
+        phase_enum = LifecyclePhase(payload.phase.lower())
+    except ValueError:
+        raise HTTPException(status_code=400, detail=f"Invalid phase: {payload.phase}")
+
+    detection = await asyncio.to_thread(
+        autonomous_command_engine.trigger_phase_transition,
+        phase=phase_enum,
+        details=payload.details,
+        context=payload.context,
+    )
+    return detection.to_dict()
+
+
+@router.get("/lifecycle-rules")
+async def get_lifecycle_rules() -> Dict[str, Any]:
+    """Returns all active autonomous command trigger rules and their lifecycle phases."""
+    rules = [
+        {
+            "rule_id": r.rule_id,
+            "phase": r.phase.value,
+            "target_command": r.target_command,
+            "description": r.description,
+            "keywords": r.keywords,
+            "priority": r.priority,
+        }
+        for r in autonomous_command_engine.rules
+    ]
+    return {"total_rules": len(rules), "rules": rules}

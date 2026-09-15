@@ -1,1 +1,9 @@
-from .registry import CommandCategory, SlashCommandDef, command_registry
+from .autonomous_engine import (
+    AutonomousCommandEngine,
+    AutonomousDetectionResult,
+    LifecyclePhase,
+    TriggerRule,
+    autonomous_command_engine,
+)
+from .registry import CommandCategory, CommandExecutionResult, SlashCommandDef, command_registry
+

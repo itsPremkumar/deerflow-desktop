@@ -36,6 +36,7 @@ export interface ChatMessage {
   todos?: TodoItem[];
   artifacts?: ArtifactItem[];
   approvalRequest?: HumanApproval;
+  autonomousDetection?: AutonomousDetection;
   createdAt: string;
 }
 
@@ -71,4 +72,16 @@ export interface SlashCommandResult {
   data: Record<string, unknown>;
   autonomous_directives?: string[];
 }
+
+export interface AutonomousDetection {
+  matched: boolean;
+  command: string;
+  phase: string;
+  confidence: number;
+  reason: string;
+  rule_id: string;
+  autonomous_directives?: string[];
+  execution_result?: SlashCommandResult;
+}
+
 

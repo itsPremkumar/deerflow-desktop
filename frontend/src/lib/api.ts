@@ -1,4 +1,4 @@
-import { ChatMessage, Thread, AIModel, SlashCommandInfo, SlashCommandResult } from "@/types/chat";
+import { ChatMessage, Thread, AIModel, SlashCommandInfo, SlashCommandResult, AutonomousDetection } from "@/types/chat";
 
 const BASE_URL = process.env.NEXT_PUBLIC_GATEWAY_URL || "/api/gateway";
 
@@ -114,4 +114,22 @@ export async function executeSlashCommand(
   }
   return res.json();
 }
+
+export async function autoTriggerCommand(
+  prompt: string,
+  phase?: string,
+  autoExecute: boolean = true,
+  context?: Record<string, unknown>
+): Promise<AutonomousDetection> {
+  const res = await fetch(`/api/commands/auto-trigger`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ prompt, phase, auto_execute: autoExecute, context }),
+  });
+  if (!res.ok) {
+    throw new Error(`Auto trigger failed: ${res.status}`);
+  }
+  return res.json();
+}
+
 
