@@ -96,3 +96,14 @@ async def test_gateway_mounts_workforce_routes() -> None:
     assert "/api/projects/{project_id}/events" in paths
     assert "/api/projects/{project_id}/context" in paths
     assert "/api/projects/{project_id}/completion-check" in paths
+    assert "/api/bots/{name}/dm" in paths
+    assert "/api/bots/{name}/inbox" in paths
+    assert "/api/bots/{name}/chat" in paths
+    assert "/api/skills/usage" in paths
+    assert "/api/skills/curator" in paths
+    assert "/api/skills/curator/run" in paths
+    assert "/api/scheduled-tasks/blueprints" in paths
+    assert "/api/scheduled-tasks/{task_id}/incidents" in paths
+    assert "/api/compat/openai/chat/completions" in paths
+    assert "/api/models/local/health" in paths
+    assert "/api/threads/{thread_id}/undo" in paths

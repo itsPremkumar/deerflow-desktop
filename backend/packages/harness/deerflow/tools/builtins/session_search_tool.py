@@ -20,6 +20,44 @@ from deerflow.tools.types import Runtime
 _READ_MESSAGE_CHARS = 1000
 _DEFAULT_SCROLL_LIMIT = 20
 _MAX_SCROLL_LIMIT = 50
+_DIGEST_CHARS = 2000
+
+
+def summarize_session_hits(hits: list[dict], *, max_chars: int = _DIGEST_CHARS, summarizer=None) -> str:
+    """Compress recall hits into a bounded digest for cross-session memory.
+
+    Extractive by default (top snippets, newest grouped by thread); pass a
+    ``summarizer`` callable for LLM-grade digests. Pure function, offline.
+    """
+    if not hits:
+        return "No past-session evidence to summarize."
+    by_thread: dict[str, list[dict]] = {}
+    for hit in hits:
+        by_thread.setdefault(str(hit.get("thread_id", "?")), []).append(hit)
+    if summarizer is not None:
+        try:
+            digest = summarizer(hits)
+            if isinstance(digest, str) and digest.strip():
+                return digest.strip()[:max_chars]
+        except Exception:
+            pass
+    lines = [f"Recall digest ({len(hits)} hits across {len(by_thread)} thread(s)):"]
+    budget = max_chars
+    for thread_id, thread_hits in by_thread.items():
+        if budget <= 0:
+            break
+        lines.append(f"Thread {thread_id}:")
+        for hit in thread_hits[:3]:
+            snippet = str(hit.get("snippet", "")).strip().replace("\n", " ")
+            if len(snippet) > 280:
+                snippet = snippet[:280] + "…"
+            line = f"- run {hit.get('run_id')} seq {hit.get('seq')}: {snippet}"
+            lines.append(line)
+            budget -= len(line)
+            if budget <= 0:
+                break
+    digest = "\n".join(lines)
+    return digest if len(digest) <= max_chars + 512 else digest[:max_chars] + "\n…[truncated]"
 
 
 def _resolve_store(runtime: Runtime | None):
@@ -61,6 +99,7 @@ async def session_search_tool(
     session_id: str | None = None,
     after_seq: int | None = None,
     limit: int = 10,
+    digest: bool = False,
 ) -> str:
     """Search past conversations or read one thread's history.
 
@@ -78,6 +117,7 @@ async def session_search_tool(
         session_id: Thread id to scope discovery or scroll. Omit to search all owned threads.
         after_seq: Scroll forward from this message seq (scroll mode only).
         limit: Max hits/messages (1-50, default 10; scroll default 20).
+        digest: Compress discovery hits into a bounded recall digest.
     """
     try:
         user_id = resolve_runtime_user_id(runtime)
@@ -100,6 +140,8 @@ async def session_search_tool(
             if not hits:
                 scope = f" in thread {session_id}" if session_id else ""
                 return f'No matches for "{query.strip()}"{scope}.'
+            if digest:
+                return summarize_session_hits(hits)
             lines = [f'{len(hits)} match(es) for "{query.strip()}":']
             lines.extend(_format_hit(hit) for hit in hits)
             last = hits[-1]

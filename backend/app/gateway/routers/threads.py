@@ -215,6 +215,23 @@ def _branch_target_human_message(messages: list[Any], target_message_ids: set[st
     )
 
 
+def _find_undo_target_ids(messages: list[Any]) -> list[str] | None:
+    """Assistant message ids of the turn before the last one (for undo).
+
+    Undo drops the final exchange by branching from the previous completed
+    assistant turn. Returns None when fewer than two human turns exist or
+    the previous turn has no addressable assistant messages.
+    """
+    human_indices = [i for i, m in enumerate(messages) if _message_type(m) == "human" and _is_branch_visible_message(m)]
+    if len(human_indices) < 2:
+        return None
+    prev_human, last_human = human_indices[-2], human_indices[-1]
+    ids = [_message_id(m) for m in messages[prev_human + 1 : last_human] if _is_branch_assistant_message(m)]
+    if not ids or any(i is None for i in ids):
+        return None
+    return [i for i in ids if i is not None]
+
+
 async def _find_branch_checkpoint(
     accessor: Any,
     config: dict[str, Any],
@@ -909,6 +926,70 @@ async def branch_thread(thread_id: ThreadId, body: ThreadBranchRequest, request:
             status_code=409,
             detail="Thread has work in flight. Branch it after the work finishes.",
         ) from None
+
+
+@router.post("/{thread_id}/undo", response_model=ThreadBranchResponse)
+@require_permission("threads", "write", owner_check=True, require_existing=True)
+async def undo_last_turn(thread_id: ThreadId, request: Request) -> ThreadBranchResponse:
+    """Undo the last exchange by branching from the previous completed turn.
+
+    Non-destructive: the source thread keeps its history; the new branch
+    contains everything up to (and including) the turn before the last one.
+    Continue in the returned thread to proceed as if the last turn never
+    happened. 409 when there is no previous turn to return to.
+    """
+    try:
+        async with goal_thread_lock(thread_id):
+            async with get_run_manager(request).reserve_thread_operation(
+                thread_id,
+                kind=ThreadOperationKind.branch,
+                user_id=get_effective_user_id(),
+            ):
+                return await _undo_with_reservation(thread_id, request)
+    except ConflictError:
+        raise HTTPException(
+            status_code=409,
+            detail="Thread has work in flight. Undo it after the work finishes.",
+        ) from None
+
+
+async def _undo_with_reservation(thread_id: ThreadId, request: Request) -> ThreadBranchResponse:
+    """Find the previous turn's assistant ids, then reuse the branch writer."""
+    from app.gateway.deps import get_thread_store
+
+    thread_store = get_thread_store(request)
+    source_record = await thread_store.get(thread_id)
+    if source_record is None:
+        raise HTTPException(status_code=404, detail=f"Thread {thread_id} not found")
+    source_metadata = source_record.get("metadata") or {}
+    if source_metadata.get(_SIDECAR_METADATA_KEY) is True:
+        raise HTTPException(status_code=409, detail="Undo is only available in the main conversation.")
+    source_accessor, source_config = await abuild_checkpoint_state_accessor(
+        request,
+        thread_id=thread_id,
+        assistant_id=source_record.get("assistant_id"),
+    )
+    head_messages: list[Any] = []
+    try:
+        for snapshot in await source_accessor.ahistory(source_config, limit=_BRANCH_HISTORY_RAW_SCAN_LIMIT):
+            if is_duration_only_checkpoint(snapshot):
+                continue
+            head_messages = _checkpoint_messages(snapshot)
+            if head_messages:
+                break
+    except _CHECKPOINT_MODE_ERRORS as exc:
+        raise _checkpoint_mode_http_error(exc, thread_id) from exc
+    except Exception:
+        logger.exception("Failed to scan history for undo on thread %s", sanitize_log_param(thread_id))
+        raise HTTPException(status_code=500, detail="Failed to find a turn to undo to")
+    target_ids = _find_undo_target_ids(head_messages or [])
+    if not target_ids:
+        raise HTTPException(status_code=409, detail="Nothing to undo: the thread has fewer than two completed turns.")
+    return await _branch_thread_with_reservation(
+        thread_id,
+        ThreadBranchRequest(message_id=target_ids[0], message_ids=target_ids[1:], title="Undo last turn"),
+        request,
+    )
 
 
 async def _branch_thread_with_reservation(

@@ -203,3 +203,19 @@ async def get_model(
         supports_thinking=model.supports_thinking,
         supports_reasoning_effort=model.supports_reasoning_effort,
     )
+
+
+@router.get(
+    "/models/local/health",
+    summary="Local Endpoint Health",
+    description="Probe an OpenAI-compatible local endpoint (Ollama, LM Studio, llama.cpp server). Loopback hosts only, unless allowlisted — never an arbitrary outbound probe.",
+)
+async def local_endpoint_health(base_url: str = "http://127.0.0.1:11434") -> dict:
+    import asyncio as _asyncio
+
+    def _probe():
+        from deerflow.models.local import probe_openai_compatible
+
+        return probe_openai_compatible(base_url).to_dict()
+
+    return await _asyncio.to_thread(_probe)

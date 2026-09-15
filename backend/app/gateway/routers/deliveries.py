@@ -54,3 +54,61 @@ async def mark_delivery(task_id: str, occurrence_id: str, body: DeliveryMarkRequ
     if result is None:
         raise HTTPException(status_code=404, detail="Delivery record not found; claim it first.")
     return result
+
+
+@router.get("/scheduled-tasks/blueprints")
+async def list_blueprints() -> dict:
+    def _do():
+        from deerflow.scheduler.blueprints import list_blueprints as _list
+
+        return _list()
+
+    return {"blueprints": await asyncio.to_thread(_do)}
+
+
+class BlueprintLaunchRequest(BaseModel):
+    values: dict = Field(default_factory=dict)
+
+
+@router.post("/scheduled-tasks/blueprints/{blueprint_id}/launch", status_code=201)
+async def launch_blueprint(blueprint_id: str, body: BlueprintLaunchRequest) -> dict:
+    def _do():
+        from deerflow.scheduler.blueprints import get_blueprint
+        from deerflow.scheduler.cron_manager import get_cron_manager
+
+        blueprint = get_blueprint(blueprint_id)
+        if blueprint is None:
+            return None
+        rendered = blueprint.render(**body.values)
+        job = get_cron_manager().add_job(rendered["name"], rendered["cron_expression"], rendered["command_or_prompt"])
+        return job.to_dict()
+
+    result = await asyncio.to_thread(_do)
+    if result is None:
+        raise HTTPException(status_code=404, detail=f"Blueprint '{blueprint_id}' not found.")
+    return result
+
+
+@router.get("/scheduled-tasks/{task_id}/incidents")
+async def list_incidents(task_id: str, unresolved_only: bool = False) -> dict:
+    def _do():
+        from deerflow.scheduler.incidents import get_incident_tracker
+
+        rows = get_incident_tracker().list(task_id=task_id, unresolved_only=unresolved_only)
+        return {"task_id": task_id, "incidents": [r.to_dict() for r in rows], "count": len(rows)}
+
+    return await asyncio.to_thread(_do)
+
+
+@router.post("/scheduled-tasks/incidents/{incident_id}/resolve")
+async def resolve_incident(incident_id: str) -> dict:
+    def _do():
+        from deerflow.scheduler.incidents import get_incident_tracker
+
+        rec = get_incident_tracker().resolve(incident_id)
+        return rec.to_dict() if rec else None
+
+    result = await asyncio.to_thread(_do)
+    if result is None:
+        raise HTTPException(status_code=404, detail="Incident not found or already resolved.")
+    return result

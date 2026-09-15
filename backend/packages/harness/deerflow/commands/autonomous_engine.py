@@ -65,7 +65,6 @@ DEFAULT_TRIGGER_RULES: List[TriggerRule] = [
         regex_patterns=[r"how\s+should\s+we\s+design", r"(?:design|create|build)\s+(?:an?\s+)?(?:\w+\s+)?(?:architecture|system)"],
         priority=75,
     ),
-
     # 2. SWARM & MULTI-AGENT ORCHESTRATION
     TriggerRule(
         rule_id="auto_swarm_create",
@@ -76,7 +75,6 @@ DEFAULT_TRIGGER_RULES: List[TriggerRule] = [
         regex_patterns=[r"(?:use|spawn|start)\s+(?:a\s+)?(?:swarm|team|multi-agent)"],
         priority=85,
     ),
-
     # 3. RESEARCH & DEEP SEARCH
     TriggerRule(
         rule_id="auto_research_deep",
@@ -87,7 +85,6 @@ DEFAULT_TRIGGER_RULES: List[TriggerRule] = [
         regex_patterns=[r"research\s+(?:about|on|into)", r"look\s+up\s+the\s+latest"],
         priority=70,
     ),
-
     # 4. CODING & REFACTORING
     TriggerRule(
         rule_id="auto_code_refactor",
@@ -98,7 +95,6 @@ DEFAULT_TRIGGER_RULES: List[TriggerRule] = [
         regex_patterns=[r"refactor\s+(?:the\s+)?\w+", r"clean\s+up\s+(?:the\s+)?code"],
         priority=65,
     ),
-
     # 5. VERIFICATION & LINTING (Runs automatically post-edit or when requested)
     TriggerRule(
         rule_id="auto_verify_all",
@@ -109,7 +105,6 @@ DEFAULT_TRIGGER_RULES: List[TriggerRule] = [
         regex_patterns=[r"run\s+(?:the\s+)?tests?", r"check\s+if\s+it\s+works?"],
         priority=90,
     ),
-
     # 6. SELF-HEALING & INCIDENT RECOVERY (Runs automatically upon error or crash)
     TriggerRule(
         rule_id="auto_self_heal",
@@ -120,7 +115,6 @@ DEFAULT_TRIGGER_RULES: List[TriggerRule] = [
         regex_patterns=[r"(?:fix|resolve)\s+(?:the\s+)?(?:error|bug|issue)", r"traceback\s+\(most\s+recent"],
         priority=95,
     ),
-
     # 7. REFLECTION & RECURSIVE SELF-IMPROVEMENT (Runs on task completion)
     TriggerRule(
         rule_id="auto_learn_save",
@@ -131,7 +125,6 @@ DEFAULT_TRIGGER_RULES: List[TriggerRule] = [
         regex_patterns=[r"(?:remember|save)\s+(?:this\s+)?(?:rule|lesson|pattern)"],
         priority=60,
     ),
-
     # 8. CRON & SCHEDULING
     TriggerRule(
         rule_id="auto_cron_schedule",
@@ -252,9 +245,7 @@ class AutonomousCommandEngine:
             # Automatically compose command with user args
             cmd_with_args = f"{target_cmd} {text}"
             exec_res = None
-            directives: List[str] = [
-                f"[AUTONOMOUS TRIGGER] Automatically identified '{target_cmd}' ({best_rule.phase.value}) based on: {best_reason}."
-            ]
+            directives: List[str] = [f"[AUTONOMOUS TRIGGER] Automatically identified '{target_cmd}' ({best_rule.phase.value}) based on: {best_reason}."]
 
             if auto_execute:
                 exec_res = command_registry.execute(cmd_with_args, context=context)
@@ -302,9 +293,7 @@ class AutonomousCommandEngine:
         rule = matching_rules[0]
         cmd = f"{rule.target_command} {details}".strip()
         exec_res = command_registry.execute(cmd, context=context)
-        directives = [
-            f"[AUTONOMOUS PHASE TRANSITION: {phase.value.upper()}] Automatically executing '{rule.target_command}'."
-        ]
+        directives = [f"[AUTONOMOUS PHASE TRANSITION: {phase.value.upper()}] Automatically executing '{rule.target_command}'."]
         if exec_res.autonomous_directives:
             directives.extend(exec_res.autonomous_directives)
 

@@ -46,6 +46,7 @@ from app.gateway.routers import (
     memory,
     missions,
     models,
+    openai_compat,
     ops,
     plan_mode,
     policy,
@@ -890,6 +891,7 @@ This gateway provides runtime endpoints for agent runs plus custom endpoints for
     app.include_router(commands.router)
     app.include_router(commands.router, prefix="/api/gateway")
     app.include_router(missions.router)
+    app.include_router(openai_compat.router)
     app.include_router(policy.router)
     app.include_router(council.router)
     app.include_router(benchmarks.router)

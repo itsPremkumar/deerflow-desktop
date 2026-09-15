@@ -26,6 +26,7 @@ logger = logging.getLogger(__name__)
 # 1. SKILL CREATOR & MANAGEMENT HANDLERS
 # ==============================================================================
 
+
 def handle_skill_create(args: str, context: Optional[Dict[str, Any]] = None) -> CommandExecutionResult:
     """Creates a brand new skill with frontmatter, description, tools, and instructions."""
     raw = args.strip()
@@ -46,6 +47,7 @@ def handle_skill_create(args: str, context: Optional[Dict[str, Any]] = None) -> 
         description = desc_part.split("tools:")[0].strip()
 
     from deerflow.skills.storage import get_or_new_skill_storage, reset_skill_storage
+
     storage = get_or_new_skill_storage()
 
     content = f"""---
@@ -56,7 +58,7 @@ author: Autonomous DeerFlow Agent
 tags: [custom, autonomous, workflow]
 ---
 
-# {skill_name.replace('-', ' ').title()}
+# {skill_name.replace("-", " ").title()}
 
 ## Overview
 {description}
@@ -93,6 +95,7 @@ tags: [custom, autonomous, workflow]
 def handle_skill_list(args: str, context: Optional[Dict[str, Any]] = None) -> CommandExecutionResult:
     """Lists all installed, builtin, and custom skills with their categories and metadata."""
     from deerflow.skills.storage import get_or_new_skill_storage
+
     storage = get_or_new_skill_storage()
     skills = list(storage.load_skills(enabled_only=False))
 
@@ -135,6 +138,7 @@ def handle_skill_test(args: str, context: Optional[Dict[str, Any]] = None) -> Co
         )
 
     from deerflow.skills.storage import get_or_new_skill_storage
+
     storage = get_or_new_skill_storage()
     skill = next((s for s in storage.load_skills(enabled_only=False) if s.name == skill_name), None)
     if not skill:
@@ -168,10 +172,12 @@ def handle_skill_test(args: str, context: Optional[Dict[str, Any]] = None) -> Co
 # 2. CONTINUOUS LOOP & RALPH LOOP HANDLERS
 # ==============================================================================
 
+
 def handle_loop_start(args: str, context: Optional[Dict[str, Any]] = None) -> CommandExecutionResult:
     """Starts a continuous goal-driven execution loop with self-healing and milestone tracking."""
     task_desc = args.strip() or "Continuous autonomous optimization loop"
     from deerflow.harness.continuous.runner import get_goal_runner
+
     runner = get_goal_runner()
 
     try:
@@ -183,12 +189,7 @@ def handle_loop_start(args: str, context: Optional[Dict[str, Any]] = None) -> Co
         return CommandExecutionResult(
             status="success",
             command="/loop:start",
-            output=(
-                f"Continuous Autonomous Loop active: {goal.goal_id}\n"
-                f"- Objective: {goal.title}\n"
-                f"- Milestones provisioned: {len(goal.milestones)}\n"
-                f"- Loop mode: Resilient self-healing (max 50 iterations)"
-            ),
+            output=(f"Continuous Autonomous Loop active: {goal.goal_id}\n- Objective: {goal.title}\n- Milestones provisioned: {len(goal.milestones)}\n- Loop mode: Resilient self-healing (max 50 iterations)"),
             data={"goal_id": goal.goal_id, "title": goal.title, "milestones": len(goal.milestones)},
             autonomous_directives=[f"Loop {goal.goal_id} active. Progress milestone 1 immediately."],
         )
@@ -204,6 +205,7 @@ def handle_loop_start(args: str, context: Optional[Dict[str, Any]] = None) -> Co
 def handle_loop_status(args: str, context: Optional[Dict[str, Any]] = None) -> CommandExecutionResult:
     """Inspects the active loop, current milestones, iterations, and blockers."""
     from deerflow.harness.continuous.store import get_goal_store
+
     store = get_goal_store()
     goals = store.list_goals()
 
@@ -232,6 +234,7 @@ def handle_loop_status(args: str, context: Optional[Dict[str, Any]] = None) -> C
 def handle_loop_pause(args: str, context: Optional[Dict[str, Any]] = None) -> CommandExecutionResult:
     """Pauses the currently running loop."""
     from deerflow.harness.continuous.store import get_goal_store
+
     store = get_goal_store()
     goals = store.list_goals()
     if not goals:
@@ -250,6 +253,7 @@ def handle_loop_pause(args: str, context: Optional[Dict[str, Any]] = None) -> Co
 def handle_loop_resume(args: str, context: Optional[Dict[str, Any]] = None) -> CommandExecutionResult:
     """Resumes a paused loop."""
     from deerflow.harness.continuous.store import get_goal_store
+
     store = get_goal_store()
     goals = store.list_goals()
     if not goals:
@@ -269,6 +273,7 @@ def handle_loop_resume(args: str, context: Optional[Dict[str, Any]] = None) -> C
 # ==============================================================================
 # 3. GOAL DECOMPOSITION & TRACKING HANDLERS
 # ==============================================================================
+
 
 def handle_goal_create(args: str, context: Optional[Dict[str, Any]] = None) -> CommandExecutionResult:
     """Creates a durable autonomous mission."""
@@ -292,6 +297,7 @@ def handle_goal_decompose(args: str, context: Optional[Dict[str, Any]] = None) -
     """Decomposes a complex objective into milestone DAGs with proof obligations."""
     objective = args.strip() or "Standard Engineering Objective"
     from deerflow.planning.meta_planner import CognitiveMetaPlanner
+
     plan = CognitiveMetaPlanner.evaluate_and_plan(prompt=objective)
 
     swarm_val = plan.decision.swarm_mode.value if plan.decision.swarm_mode else "none"
@@ -319,6 +325,7 @@ def handle_goal_decompose(args: str, context: Optional[Dict[str, Any]] = None) -
 # 4. SUBAGENT HIERARCHY & CONTROL PLANE HANDLERS
 # ==============================================================================
 
+
 def handle_subagent_spawn(args: str, context: Optional[Dict[str, Any]] = None) -> CommandExecutionResult:
     """Spawns an asynchronous task-scoped specialist subagent worker."""
     parts = args.strip().split(maxsplit=1)
@@ -326,6 +333,7 @@ def handle_subagent_spawn(args: str, context: Optional[Dict[str, Any]] = None) -
     task = parts[1] if len(parts) > 1 else "Autonomous task execution"
 
     from deerflow.subagents.lifecycle import SubagentContract, get_subagent_lifecycle_manager
+
     manager = get_subagent_lifecycle_manager()
 
     contract = SubagentContract(
@@ -341,12 +349,7 @@ def handle_subagent_spawn(args: str, context: Optional[Dict[str, Any]] = None) -
         status="success",
         command="/subagent:spawn",
         output=(
-            f"Subagent spawned successfully:\n"
-            f"• Subagent ID: `{handle.subagent_id}`\n"
-            f"• Role: `{handle.contract.role}`\n"
-            f"• Status: `{handle.status}`\n"
-            f"• Objective: {handle.contract.objective}\n"
-            f"• Lease Expiry: {handle.lease.expires_at:.0f}"
+            f"Subagent spawned successfully:\n• Subagent ID: `{handle.subagent_id}`\n• Role: `{handle.contract.role}`\n• Status: `{handle.status}`\n• Objective: {handle.contract.objective}\n• Lease Expiry: {handle.lease.expires_at:.0f}"
         ),
         data={"subagent_id": handle.subagent_id, "role": handle.contract.role, "status": str(handle.status)},
         autonomous_directives=[f"Delegate objective to subagent `{handle.subagent_id}`."],
@@ -356,6 +359,7 @@ def handle_subagent_spawn(args: str, context: Optional[Dict[str, Any]] = None) -
 def handle_subagent_list(args: str, context: Optional[Dict[str, Any]] = None) -> CommandExecutionResult:
     """Lists all active and registered subagents in the control plane."""
     from deerflow.subagents.lifecycle import get_subagent_lifecycle_manager
+
     manager = get_subagent_lifecycle_manager()
     subagents = manager.list_subagents()
 
@@ -383,9 +387,11 @@ def handle_subagent_list(args: str, context: Optional[Dict[str, Any]] = None) ->
 # 5. DIAGNOSTICS & SYSTEM HANDLERS (Doctor, Context, Security)
 # ==============================================================================
 
+
 def handle_doctor(args: str, context: Optional[Dict[str, Any]] = None) -> CommandExecutionResult:
     """Runs a system health check, dependency diagnostics, and configuration validation."""
     from deerflow.config import get_app_config
+
     config = get_app_config()
 
     checks = [
@@ -442,6 +448,7 @@ def handle_security_review(args: str, context: Optional[Dict[str, Any]] = None) 
 # BIND ALL CONCRETE HANDLERS TO MASTER REGISTRY
 # ==============================================================================
 
+
 def register_all_backend_handlers() -> None:
     """Binds all concrete backend execution handlers into the global command registry."""
     handlers = {
@@ -454,7 +461,6 @@ def register_all_backend_handlers() -> None:
         "/skills list": handle_skill_list,
         "/skill:test": handle_skill_test,
         "/skill test": handle_skill_test,
-
         # Continuous Loop & Ralph Loop
         "/loop:start": handle_loop_start,
         "/loop start": handle_loop_start,
@@ -464,7 +470,6 @@ def register_all_backend_handlers() -> None:
         "/loop pause": handle_loop_pause,
         "/loop:resume": handle_loop_resume,
         "/loop resume": handle_loop_resume,
-
         # Goal Management
         "/goal:create": handle_goal_create,
         "/goal create": handle_goal_create,
@@ -472,18 +477,21 @@ def register_all_backend_handlers() -> None:
         "/goal status": handle_goal_status,
         "/goal:decompose": handle_goal_decompose,
         "/goal decompose": handle_goal_decompose,
-
         # Subagents
         "/subagent:spawn": handle_subagent_spawn,
         "/subagent spawn": handle_subagent_spawn,
         "/subagent:list": handle_subagent_list,
         "/subagent list": handle_subagent_list,
-
         # System Diagnostics
         "/doctor": handle_doctor,
         "/compact": handle_compact,
+        "/compress": handle_compact,
         "/security-review": handle_security_review,
         "/security review": handle_security_review,
+        # Self-Improvement Workshop
+        "/learn": handle_learn,
+        "/moa": handle_moa,
+        "/usage": handle_usage,
     }
 
     for cmd_str, handler in handlers.items():
@@ -493,6 +501,7 @@ def register_all_backend_handlers() -> None:
         else:
             # Register dynamically if not in catalog
             from deerflow.commands.registry import CommandCategory
+
             new_def = SlashCommandDef(
                 command=cmd_str,
                 category=CommandCategory.CORE,
@@ -505,5 +514,88 @@ def register_all_backend_handlers() -> None:
     logger.info("Bound %d concrete backend handlers to SlashCommandRegistry.", len(handlers))
 
 
-# Automatically bind on module import
+# ==============================================================================
+# 6. SELF-IMPROVEMENT WORKSHOP HANDLERS (Hermes /learn + MoA + usage)
+# ==============================================================================
+
+
+def handle_learn(args: str, context: dict[str, Any] | None = None) -> CommandExecutionResult:
+    """Turns a source description into a skill-authoring turn via house standards."""
+    from deerflow.skills.authoring import build_learn_prompt
+
+    source = args.strip()
+    if not source:
+        return CommandExecutionResult(
+            status="error",
+            command="/learn",
+            output="Usage: /learn <source>\nExamples:\n  /learn the deploy runbook in docs/\n  /learn what we just did fixing the auth bug\n  /learn https://example.com/api-docs",
+        )
+    prompt = build_learn_prompt(source)
+    return CommandExecutionResult(
+        status="success",
+        command="/learn",
+        output=prompt,
+        data={"action": "author_skill", "source": source},
+        autonomous_directives=[
+            "Follow the authoring prompt to draft the skill, then validate it and file it via the skill proposal queue (propose_skill) for review.",
+            "Record the new skill with created_by=agent so the curator can maintain it.",
+        ],
+    )
+
+
+def handle_moa(args: str, context: dict[str, Any] | None = None) -> CommandExecutionResult:
+    """Marks this turn MoA-enabled: collect advisor drafts, then synthesize."""
+    from deerflow.deliberation.moa import MAX_ADVISORS, build_aggregator_prompt
+
+    raw = args.strip()
+    if not raw:
+        return CommandExecutionResult(
+            status="error",
+            command="/moa",
+            output="Usage: /moa <question> [--advisors model-a,model-b]\nExample: /moa Should we migrate to Postgres? --advisors reviewer,architect",
+        )
+    advisors = ["reviewer", "architect"]
+    question = raw
+    if "--advisors" in raw:
+        question, _, advisor_part = raw.partition("--advisors")
+        question = question.strip()
+        advisors = [a.strip() for a in advisor_part.split(",") if a.strip()][:MAX_ADVISORS] or advisors
+    if not question:
+        return CommandExecutionResult(status="error", command="/moa", output="Usage: /moa <question> [--advisors model-a,model-b]")
+    skeleton = build_aggregator_prompt(question, [])
+    return CommandExecutionResult(
+        status="success",
+        command="/moa",
+        output=(f"MoA turn armed.\nQuestion: {question}\nAdvisors: {', '.join(advisors)}\n\nCollect one draft per advisor (delegate via `task` in parallel), redact contacts, then synthesize with this frame:\n\n" + skeleton),
+        data={"action": "moa_turn", "question": question, "advisors": advisors},
+        autonomous_directives=[
+            "Gather advisor drafts in parallel first; never synthesize from a single perspective on a /moa turn.",
+            "Redact emails and phone numbers from advisor text before quoting it.",
+        ],
+    )
+
+
+def handle_usage(args: str, context: dict[str, Any] | None = None) -> CommandExecutionResult:
+    """Reports configured token budgets and where live usage lives."""
+    from deerflow.config import get_app_config
+
+    try:
+        config = get_app_config()
+        budgets = getattr(config, "token_budget", None)
+        budget_info = f"max_tokens={getattr(budgets, 'max_tokens', 'unset')}" if budgets else "token budgets not configured"
+        names = []
+        for m in (getattr(config, "models", []) or [])[:5]:
+            names.append(getattr(m, "name", None) or (m.get("name", "?") if isinstance(m, dict) else "?"))
+        models = ", ".join(names) or "none configured"
+    except Exception as exc:
+        return CommandExecutionResult(status="error", command="/usage", output=f"Usage report unavailable: {exc}")
+    return CommandExecutionResult(
+        status="success",
+        command="/usage",
+        output=(f"=== Usage ===\nBudgets: {budget_info}\nModels: {models}\nLive per-run tokens: workspace overview and /api/console. Digest over any period: learning insights summarizer."),
+        data={"action": "usage_report"},
+    )
+
+
+# Automatically bind on module import (after all handlers are defined)
 register_all_backend_handlers()

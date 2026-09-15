@@ -93,8 +93,14 @@ class CronManager:
     def list_jobs(self) -> list[CronJob]:
         return list(self._jobs.values())
 
-    def run_due(self, executor_fn: Callable[[CronJob], str] | None = None) -> list[dict[str, Any]]:
-        """Run all jobs that are enabled and due."""
+    def run_due(self, executor_fn: Callable[[CronJob], str] | None = None, wake_gate_fn: Callable[[CronJob], str] | None = None) -> list[dict[str, Any]]:
+        """Run all jobs that are enabled and due.
+
+        When ``wake_gate_fn`` is given, its output is parsed as a wake gate
+        first: a declined gate skips the job without calling the executor.
+        """
+        from deerflow.scheduler.wake_gate import should_wake
+
         now = time.time()
         results = []
 
@@ -102,6 +108,27 @@ class CronManager:
             if not job.is_enabled:
                 continue
             if job.next_run is None or job.next_run <= now:
+                if wake_gate_fn is not None:
+                    try:
+                        gate_out = wake_gate_fn(job)
+                    except Exception as e:
+                        gate_out = None
+                        job.last_output = f"Wake gate error (failing open): {e}"
+                    if gate_out is not None and not should_wake(gate_out):
+                        job.last_status = "skipped"
+                        job.last_output = "Skipped by wake gate (no LLM run)."
+                        job.last_run = now
+                        job.run_count += 1
+                        job.next_run = now + 300.0
+                        results.append(
+                            {
+                                "job_id": job.job_id,
+                                "name": job.name,
+                                "status": job.last_status,
+                                "output": job.last_output,
+                            }
+                        )
+                        continue
                 # Execute job
                 try:
                     if executor_fn:
@@ -118,12 +145,14 @@ class CronManager:
                 job.run_count += 1
                 # Schedule next run (mock interval default 300s)
                 job.next_run = now + 300.0
-                results.append({
-                    "job_id": job.job_id,
-                    "name": job.name,
-                    "status": job.last_status,
-                    "output": job.last_output,
-                })
+                results.append(
+                    {
+                        "job_id": job.job_id,
+                        "name": job.name,
+                        "status": job.last_status,
+                        "output": job.last_output,
+                    }
+                )
 
         self._save()
         return results

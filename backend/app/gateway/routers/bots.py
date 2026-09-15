@@ -368,7 +368,7 @@ async def ensure_bot(name: str, request: Request, body: BotEnsureRequest | None 
 
     def _ensure():
         try:
-            return _registry().get_or_create(
+            bot = _registry().get_or_create(
                 key,
                 display_name=payload.display_name,
                 role=payload.role,
@@ -383,6 +383,13 @@ async def ensure_bot(name: str, request: Request, body: BotEnsureRequest | None 
             )
         except ValueError as exc:
             raise _validation_error(str(exc)) from exc
+        # SOUL guarantee: custom SOULs keep the DM protocol section.
+        from deerflow.bots.dm import ensure_messaging_section
+
+        guarded = ensure_messaging_section(bot.soul, key)
+        if guarded != bot.soul:
+            bot = _registry().update_bot(key, soul=guarded, bump_version=False) or bot
+        return bot
 
     bot = await asyncio.to_thread(_ensure)
     return _bot_to_response(bot)
@@ -710,3 +717,55 @@ async def dm_schema(name: str) -> dict:
         return {"schema": message_agent_tool_schema(), "roster_snippet": build_roster_snippet(profiles)}
 
     return await asyncio.to_thread(_schema)
+
+
+@router.get("/{name}/chat", summary="Canonical Bot Chat thread plus inbox summary")
+async def bot_chat(name: str, limit: int = 20) -> dict:
+    """One canonical DM-visible conversation per bot (idempotent thread id)."""
+    key = _validate_bot_name(name)
+    limit = max(1, min(limit, 100))
+
+    def _chat():
+        from deerflow.bots.dm import canonical_bot_chat_id
+        from deerflow.bots.inbox import get_bot_inbox
+
+        bot = _registry().get_bot(key)
+        if bot is None:
+            return None
+        box = get_bot_inbox(key)
+        return {
+            "bot_name": key,
+            "canonical_thread_id": canonical_bot_chat_id(key),
+            "unread_count": box.unread_count(),
+            "recent": [m.to_dict() for m in box.list(limit=limit)],
+        }
+
+    result = await asyncio.to_thread(_chat)
+    if result is None:
+        raise HTTPException(status_code=404, detail=f"Bot '{key}' not found")
+    return result
+
+
+@router.post("/{name}/soul/backfill", summary="Backfill DM protocol into roster SOULs")
+async def backfill_soul_protocol(name: str, request: Request) -> dict:
+    await require_admin_user(request, detail=_ADMIN_REQUIRED_DETAIL)
+    key = _validate_bot_name(name)
+
+    def _backfill():
+        from deerflow.bots.dm import backfill_roster_profiles, ensure_messaging_section
+
+        if key == "all":
+            return {"updated": backfill_roster_profiles(registry=_registry())}
+        bot = _registry().get_bot(key)
+        if bot is None:
+            return None
+        updated = ensure_messaging_section(bot.soul, key)
+        if updated != bot.soul:
+            _registry().update_bot(key, soul=updated, bump_version=False)
+            return {"updated": [key]}
+        return {"updated": []}
+
+    result = await asyncio.to_thread(_backfill)
+    if result is None:
+        raise HTTPException(status_code=404, detail=f"Bot '{key}' not found")
+    return result

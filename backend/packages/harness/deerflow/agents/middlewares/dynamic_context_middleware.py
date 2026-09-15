@@ -377,6 +377,31 @@ class DynamicContextMiddleware(AgentMiddleware):
         current_date = _format_current_date()
         date_reminder = _format_current_date_reminder(current_date)
 
+        # Bot Mode roster: per-turn, framework-owned (registry names+roles),
+        # injected only when the runtime carries a bot identity — so plain
+        # chats see byte-identical prompts and bot chats gain DM capability
+        # without touching the static system prompt (prefix-cache safe).
+        try:
+            from deerflow.bots.dm import build_bot_roster_reminder, resolve_runtime_bot_name
+
+            roster = build_bot_roster_reminder(resolve_runtime_bot_name(runtime))
+            if roster:
+                date_reminder = f"{date_reminder}\n\n{roster}"
+        except Exception:
+            logger.debug("DynamicContextMiddleware: bot roster injection skipped", exc_info=True)
+
+        # Repository context files: explicit repo_root only, bounded excerpt.
+        try:
+            from deerflow.context_files import load_context_files, resolve_runtime_repo_root
+
+            repo_root = resolve_runtime_repo_root(runtime)
+            if repo_root:
+                excerpt = load_context_files(repo_root, max_total_chars=4000)
+                if excerpt:
+                    date_reminder = f"{date_reminder}\n\nRepository context:\n{excerpt}"
+        except Exception:
+            logger.debug("DynamicContextMiddleware: repo context injection skipped", exc_info=True)
+
         memory_block = memory_context.strip() if memory_context else None
 
         return date_reminder, memory_block

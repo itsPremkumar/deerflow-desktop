@@ -3,35 +3,37 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Callable, Dict, List, Optional
 
+
 class CommandCategory(str, Enum):
-    CORE = 'core'
-    MISSION = 'mission'
-    PLANNING = 'planning'
-    EXECUTION = 'execution'
-    SWARM = 'swarm'
-    AGENT = 'agent'
-    BACKGROUND = 'background'
-    RESEARCH = 'research'
-    MEMORY = 'memory'
-    CONTEXT = 'context'
-    SKILLS = 'skills'
-    MODEL = 'model'
-    TOOLS = 'tools'
-    VERIFICATION = 'verification'
-    EVIDENCE = 'evidence'
-    CODING = 'coding'
-    BROWSER = 'browser'
-    RSI = 'rsi'
-    EVOLUTION = 'evolution'
-    AUTONOMOUS_OPS = 'autonomous_ops'
-    SECURITY = 'security'
-    RUNTIME = 'runtime'
-    OBSERVABILITY = 'observability'
-    SESSION = 'session'
-    COLLABORATION = 'collaboration'
-    COMMUNICATION = 'communication'
-    ARTIFACT = 'artifact'
-    WORLD_MODEL = 'world_model'
+    CORE = "core"
+    MISSION = "mission"
+    PLANNING = "planning"
+    EXECUTION = "execution"
+    SWARM = "swarm"
+    AGENT = "agent"
+    BACKGROUND = "background"
+    RESEARCH = "research"
+    MEMORY = "memory"
+    CONTEXT = "context"
+    SKILLS = "skills"
+    MODEL = "model"
+    TOOLS = "tools"
+    VERIFICATION = "verification"
+    EVIDENCE = "evidence"
+    CODING = "coding"
+    BROWSER = "browser"
+    RSI = "rsi"
+    EVOLUTION = "evolution"
+    AUTONOMOUS_OPS = "autonomous_ops"
+    SECURITY = "security"
+    RUNTIME = "runtime"
+    OBSERVABILITY = "observability"
+    SESSION = "session"
+    COLLABORATION = "collaboration"
+    COMMUNICATION = "communication"
+    ARTIFACT = "artifact"
+    WORLD_MODEL = "world_model"
+
 
 @dataclass(frozen=True)
 class SlashCommandDef:
@@ -56,6 +58,7 @@ class SlashCommandDef:
             "metadata": self.metadata,
         }
 
+
 @dataclass
 class CommandExecutionResult:
     status: str
@@ -72,6 +75,7 @@ class CommandExecutionResult:
             "data": self.data,
             "autonomous_directives": self.autonomous_directives,
         }
+
 
 class SlashCommandRegistry:
     def __init__(self) -> None:
@@ -99,19 +103,13 @@ class SlashCommandRegistry:
         counts: Dict[CommandCategory, int] = {}
         for c in self._commands.values():
             counts[c.category] = counts.get(c.category, 0) + 1
-        return [
-            {"category": cat.value, "count": counts.get(cat, 0)}
-            for cat in CommandCategory
-        ]
+        return [{"category": cat.value, "count": counts.get(cat, 0)} for cat in CommandCategory]
 
     def search(self, query: str) -> List[SlashCommandDef]:
         q = query.lower().strip()
         if not q:
             return self.list_commands()
-        return [
-            c for c in self._commands.values()
-            if q in c.command.lower() or q in c.description.lower() or q in c.category.value.lower()
-        ]
+        return [c for c in self._commands.values() if q in c.command.lower() or q in c.description.lower() or q in c.category.value.lower()]
 
     def find_command(self, command_line: str) -> tuple[Optional[SlashCommandDef], str]:
         """Resolves a command line to its SlashCommandDef and remaining argument string."""
@@ -123,7 +121,7 @@ class SlashCommandRegistry:
         normalized = raw
         if ":" in raw.split()[0]:
             first_tok = raw.split()[0]
-            rest_tok = raw[len(first_tok):].strip()
+            rest_tok = raw[len(first_tok) :].strip()
             normalized = first_tok.replace(":", " ") + (" " + rest_tok if rest_tok else "")
 
         # Try exact two-word command match first (e.g. "/goal status" from "/goal status arg1 arg2")
@@ -139,7 +137,7 @@ class SlashCommandRegistry:
         one_word = tokens[0]
         cmd_def = self.get(one_word)
         if cmd_def:
-            args = normalized[len(one_word):].strip()
+            args = normalized[len(one_word) :].strip()
             return cmd_def, args
 
         # Try original raw string first token
@@ -204,19 +202,22 @@ class SlashCommandRegistry:
 
     def _register_default_catalog(self) -> None:
         from .catalog import get_default_catalog_entries
+
         for item in get_default_catalog_entries():
             cmd, cat, desc, usage, is_core = item[0], item[1], item[2], item[3], item[4]
             is_auto = item[5] if len(item) > 5 else False
             req_app = item[6] if len(item) > 6 else False
-            self.register(SlashCommandDef(
-                command=cmd,
-                category=cat,
-                description=desc,
-                usage=usage,
-                is_core=is_core,
-                is_autonomous_trigger=is_auto,
-                requires_approval=req_app,
-            ))
+            self.register(
+                SlashCommandDef(
+                    command=cmd,
+                    category=cat,
+                    description=desc,
+                    usage=usage,
+                    is_core=is_core,
+                    is_autonomous_trigger=is_auto,
+                    requires_approval=req_app,
+                )
+            )
+
 
 command_registry = SlashCommandRegistry()
-

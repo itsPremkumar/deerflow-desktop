@@ -115,6 +115,13 @@ class TelegramChannel(Channel):
         app.add_handler(CommandHandler("agent", self._cmd_generic))
         app.add_handler(CommandHandler("goal", self._cmd_generic))
         app.add_handler(CommandHandler("help", self._cmd_generic))
+        app.add_handler(CommandHandler("plan", self._cmd_generic))
+        app.add_handler(CommandHandler("swarm", self._cmd_generic))
+        app.add_handler(CommandHandler("team", self._cmd_generic))
+        app.add_handler(CommandHandler("project", self._cmd_generic))
+        app.add_handler(CommandHandler("approve", self._cmd_generic))
+        app.add_handler(CommandHandler("reject", self._cmd_generic))
+        app.add_handler(CommandHandler("standup", self._cmd_generic))
 
         # Slash skill commands are dynamic and cannot all be pre-registered
         # with Telegram, so route unknown slash commands through chat handling.

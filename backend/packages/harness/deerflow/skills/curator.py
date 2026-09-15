@@ -11,9 +11,11 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import shutil
 import threading
 import time
+from collections.abc import Callable
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any, Literal
@@ -21,6 +23,9 @@ from typing import Any, Literal
 from deerflow.skills.usage import SkillUsageTracker
 
 logger = logging.getLogger(__name__)
+
+DEFAULT_INTERVAL_HOURS = 24 * 7.0
+DEFAULT_MIN_IDLE_HOURS = 2.0
 
 SkillState = Literal["active", "stale", "archived"]
 
@@ -160,6 +165,27 @@ class SkillCurator:
                 logger.warning("Skill restore failed for %s", skill_name, exc_info=True)
                 return False
 
+    def collect_skill_bodies(self, *, max_chars: int = 4000) -> dict[str, str]:
+        """Read agent-created SKILL.md bodies for merge analysis (bounded)."""
+        bodies: dict[str, str] = {}
+        with self._lock:
+            pinned = set(self.state.pinned)
+        for name in self.known_skills():
+            if name in pinned or is_protected_builtin(name):
+                continue
+            stats = self.usage.stats(name)
+            if stats is None or stats.created_by != "agent":
+                continue
+            try:
+                text = (self.root / name / "SKILL.md").read_text(encoding="utf-8")[:max_chars]
+            except OSError:
+                continue
+            bodies[name] = text
+        return bodies
+
+    def suggest_merges(self, *, similarity: float = 0.55) -> list[list[str]]:
+        return find_consolidation_candidates(self.collect_skill_bodies(), similarity=similarity)
+
     def report(self) -> dict[str, Any]:
         with self._lock:
             return {
@@ -170,3 +196,80 @@ class SkillCurator:
                 "last_summary": self.state.last_summary,
                 "run_count": self.state.run_count,
             }
+
+
+def should_run_curator(
+    last_run_at: float | None,
+    *,
+    now: float | None = None,
+    interval_hours: float = DEFAULT_INTERVAL_HOURS,
+    idle_hours: float | None = None,
+    min_idle_hours: float = DEFAULT_MIN_IDLE_HOURS,
+    paused: bool = False,
+) -> bool:
+    """Inactivity-triggered scheduling: due interval + quiet machine + not paused."""
+    if paused:
+        return False
+    moment = now if now is not None else time.time()
+    if interval_hours <= 0:
+        return True
+    if last_run_at is not None and (moment - last_run_at) < interval_hours * 3600.0:
+        return False
+    if idle_hours is not None and idle_hours < min_idle_hours:
+        return False
+    return True
+
+
+def curator_interval_hours() -> float:
+    """Operator override via env; defaults to weekly."""
+    try:
+        return max(0.0, float(os.environ.get("DEERFLOW_CURATOR_INTERVAL_HOURS", DEFAULT_INTERVAL_HOURS)))
+    except (TypeError, ValueError):
+        return DEFAULT_INTERVAL_HOURS
+
+
+def _tokens(text: str) -> set[str]:
+    return {t for t in "".join(c.lower() if c.isalnum() else " " for c in text).split() if len(t) > 2}
+
+
+def find_consolidation_candidates(skills: dict[str, str], *, similarity: float = 0.55) -> list[list[str]]:
+    """Group agent-skill bodies that overlap heavily (Jaccard over tokens).
+
+    Returns groups of 2+ names worth one merge proposal each. Deterministic
+    and dependency-free; the LLM rewrite itself stays caller opt-in.
+    """
+    names = sorted(skills)
+    tokenized = {n: _tokens(skills[n]) for n in names}
+    grouped: set[str] = set()
+    out: list[list[str]] = []
+    for i, a in enumerate(names):
+        if a in grouped:
+            continue
+        group = [a]
+        for b in names[i + 1 :]:
+            if b in grouped:
+                continue
+            ta, tb = tokenized[a], tokenized[b]
+            union = ta | tb
+            score = (len(ta & tb) / len(union)) if union else 0.0
+            if score >= similarity:
+                group.append(b)
+                grouped.add(b)
+        if len(group) > 1:
+            grouped.add(a)
+            out.append(group)
+    return out
+
+
+def propose_consolidations(groups: list[list[str]], propose_fn: Callable[[str, str], Any]) -> list[Any]:
+    """File one merge proposal per duplicate group via the caller's queue."""
+    made: list[Any] = []
+    for group in groups:
+        title = f"Consolidate overlapping skills: {', '.join(group)}"
+        body = (
+            "These agent-created skills overlap heavily. Merge them into ONE skill: keep the best "
+            "procedure steps from each, dedupe triggers, keep a single Verification section, and follow "
+            "the house authoring bar. Archive the losers after the merged skill passes review.\n\nSkills:\n" + "\n".join(f"- {name}" for name in group)
+        )
+        made.append(propose_fn(title, body))
+    return made

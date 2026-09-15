@@ -141,6 +141,7 @@ CHANNEL_CAPABILITIES = {
     "discord": {"supports_streaming": False},
     "feishu": {"supports_streaming": True},
     "github": {"supports_streaming": False},
+    "signal": {"supports_streaming": False},
     "slack": {"supports_streaming": False},
     "telegram": {"supports_streaming": True},
     "wechat": {"supports_streaming": False},

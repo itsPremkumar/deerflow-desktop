@@ -87,6 +87,108 @@ def build_roster_snippet(profiles: list[dict[str, Any]]) -> str:
     return "\n".join(lines)
 
 
+def resolve_runtime_bot_name(runtime: Any | None) -> str | None:
+    """Best-effort bot name from a LangGraph runtime; None when absent.
+
+    Never raises and never touches disk — safe on every model-call path.
+    """
+    try:
+        if runtime is None:
+            return None
+        context = getattr(runtime, "context", None)
+        if isinstance(context, dict):
+            for key in ("bot_name", "botName", "bot"):
+                value = context.get(key)
+                if isinstance(value, str) and is_valid_agent_name(value.strip()):
+                    return value.strip().lower()
+        config = getattr(runtime, "config", None)
+        if isinstance(config, dict):
+            configurable = config.get("configurable")
+            if isinstance(configurable, dict):
+                for key in ("bot_name", "botName"):
+                    value = configurable.get(key)
+                    if isinstance(value, str) and is_valid_agent_name(value.strip()):
+                        return value.strip().lower()
+            metadata = config.get("metadata")
+            if isinstance(metadata, dict):
+                value = metadata.get("botName")
+                if isinstance(value, str) and is_valid_agent_name(value.strip()):
+                    return value.strip().lower()
+    except Exception:
+        return None
+    return None
+
+
+def build_bot_roster_reminder(bot_name: str | None, *, registry=None, max_teammates: int = 12) -> str | None:
+    """Roster reminder for per-turn injection; None when not a bot chat.
+
+    Framework-owned (registry names+roles only), so it rides the system
+    channel next to the date reminder without breaking prompt-cache rules:
+    the static system prompt stays identical; only the reminder varies.
+    """
+    if not bot_name or not is_valid_agent_name(bot_name):
+        return None
+    try:
+        from deerflow.bots.registry import get_bot_registry
+
+        reg = registry or get_bot_registry()
+        teammates = [{"name": b.name, "role": b.role} for b in reg.list_bots() if b.name.lower() != bot_name.lower() and b.status in ("active", "sleeping")][:max_teammates]
+        if not teammates:
+            return None
+        return build_roster_snippet(teammates)
+    except Exception:
+        return None
+
+
+def canonical_bot_chat_id(bot_name: str) -> str:
+    """Deterministic canonical Bot Chat thread id for a bot.
+
+    Thread creation is idempotent server-side, so opening this id always
+    lands in the same DM-visible conversation for the bot.
+    """
+    slug = "".join(c if (c.isalnum() or c in ("-", "_")) else "-" for c in bot_name.lower().strip()).strip("-")[:48] or "unknown"
+    return f"bot-chat-{slug}"
+
+
+PROTOCOL_MARKER = "<!-- deerflow:dm-protocol -->"
+
+
+def messaging_protocol_section(bot_name: str) -> str:
+    """The DM protocol block every bot SOUL must keep (custom SOULs included)."""
+    return (
+        f"{PROTOCOL_MARKER}\n"
+        "## Messaging other agents\n"
+        "You work alongside named teammates. To message one, call `message_agent` with their roster name and your composed message. "
+        "Delivery is fire-and-forget: the call returns an acknowledgement, never their reply — finish your turn and their reply arrives later as a new message. "
+        "Paraphrase actionable substance; never paste private 1:1 chat content verbatim."
+    )
+
+
+def ensure_messaging_section(soul: str, bot_name: str) -> str:
+    """Append the DM protocol block to a SOUL that lacks it; idempotent.
+
+    Custom SOULs used to silently drop DM capability — this keeps it.
+    """
+    text = soul or ""
+    if PROTOCOL_MARKER in text:
+        return text
+    suffix = "" if text.endswith("\n") else "\n"
+    return f"{text}{suffix}\n{messaging_protocol_section(bot_name)}\n"
+
+
+def backfill_roster_profiles(*, registry=None) -> list[str]:
+    """Add the protocol block to stored profiles missing it. Returns updated names."""
+    from deerflow.bots.registry import get_bot_registry
+
+    reg = registry or get_bot_registry()
+    updated: list[str] = []
+    for bot in reg.list_bots():
+        if PROTOCOL_MARKER not in (bot.soul or ""):
+            reg.update_bot(bot.name, soul=ensure_messaging_section(bot.soul, bot.name), bump_version=False)
+            updated.append(bot.name)
+    return updated
+
+
 @dataclass
 class DMAck:
     delivery_id: str | None
