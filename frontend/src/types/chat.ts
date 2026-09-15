@@ -49,6 +49,11 @@ export interface Thread {
   created_at: string;
   updated_at: string;
   status?: string;
+  /** Owning specialist bot (from server thread metadata). Absent = Lead Agent / unassigned. */
+  botName?: string | null;
+  assistantId?: string | null;
+  /** Server project membership (read-only metadata exposure). */
+  projectId?: string | null;
 }
 
 export interface AIModel {

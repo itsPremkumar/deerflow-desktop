@@ -2,9 +2,9 @@
 
 const BASE_URL = process.env.NEXT_PUBLIC_GATEWAY_URL || "/api/gateway";
 
-export async function fetchThreads(): Promise<Thread[]> {
+export async function fetchThreads(limit = 100): Promise<Thread[]> {
   try {
-    const res = await fetch(`${BASE_URL}/threads?limit=30`);
+    const res = await fetch(`${BASE_URL}/threads?limit=${limit}`);
     if (!res.ok) return [];
     const data = await res.json();
     return (data.threads || []).map((t: any) => ({
@@ -12,6 +12,10 @@ export async function fetchThreads(): Promise<Thread[]> {
       title: t.metadata?.title || t.title || "Untitled Session",
       created_at: t.created_at || new Date().toISOString(),
       updated_at: t.updated_at || new Date().toISOString(),
+      // Backend-owned bot association (thread metadata + assistant link).
+      botName: t.metadata?.bot_name || t.bot_name || null,
+      assistantId: t.assistant_id || null,
+      projectId: t.metadata?.deerflow_project_id || t.project_id || null,
     }));
   } catch (err) {
     console.error("Failed to fetch threads:", err);
@@ -19,11 +23,24 @@ export async function fetchThreads(): Promise<Thread[]> {
   }
 }
 
-export async function createThread(title?: string): Promise<string> {
+export interface CreateThreadOptions {
+  /** Specialist bot owning this conversation — stored on the server thread. */
+  botName?: string | null;
+  projectId?: string | null;
+}
+
+export async function createThread(title?: string, opts?: CreateThreadOptions): Promise<string> {
+  const metadata: Record<string, string> = { title: title || "New Conversation" };
+  if (opts?.botName) metadata.bot_name = opts.botName;
+  const body: Record<string, unknown> = {
+    metadata,
+    ...(opts?.botName ? { assistant_id: opts.botName } : {}),
+    ...(opts?.projectId ? { project_id: opts.projectId } : {}),
+  };
   const res = await fetch(`${BASE_URL}/threads`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ metadata: { title: title || "New Conversation" } }),
+    body: JSON.stringify(body),
   });
   if (!res.ok) throw new Error("Failed to create thread");
   const data = await res.json();

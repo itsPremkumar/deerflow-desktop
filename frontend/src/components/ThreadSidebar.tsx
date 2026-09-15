@@ -1,19 +1,27 @@
 ﻿"use client";
 
 import React, { useEffect, useState } from "react";
-import { Plus, MessageSquare, Search, PanelLeftClose, PanelLeft, Bot, MoreHorizontal, Pencil, GitBranch, FolderInput, Trash2 } from "lucide-react";
+import { Plus, MessageSquare, Search, PanelLeftClose, PanelLeft, Bot, MoreHorizontal, Pencil, GitBranch, FolderInput, Trash2, Download, Upload, FileText } from "lucide-react";
 import { Thread } from "@/types/chat";
 import { searchThreads, renameThread, deleteThread, branchThread, moveThread } from "@/lib/threads-ext";
+import { searchLocalMessages, removeLocalThread, upsertLocalThread, storageInfo, clearLocalStore, SearchHit } from "@/lib/history-store";
 import { listProjects, Project } from "@/lib/projects";
 import { errMsg } from "@/lib/http";
 
 interface ThreadSidebarProps {
   threads: Thread[];
   activeThreadId: string | null;
+  /** Current bot space (display name) — null = all conversations. */
+  scopeLabel: string | null;
+  scopeAvatar?: string;
+  /** Owner display name per thread (for badges in the all-view). */
+  ownerLabel: (t: Thread) => string | null;
   onSelectThread: (id: string) => void;
   onNewChat: () => void;
   onThreadsChanged: () => void;
   onBranchOpened?: (newThreadId: string) => void;
+  onExportHistory: () => void;
+  onImportHistory: (f: File) => Promise<string>;
 }
 
 export function ThreadSidebar({
@@ -23,6 +31,11 @@ export function ThreadSidebar({
   onNewChat,
   onThreadsChanged,
   onBranchOpened,
+  onExportHistory,
+  onImportHistory,
+  scopeLabel,
+  scopeAvatar,
+  ownerLabel,
 }: ThreadSidebarProps) {
   const [isOpen, setIsOpen] = useState(true);
   const [search, setSearch] = useState("");
@@ -32,10 +45,26 @@ export function ThreadSidebar({
   const [projects, setProjects] = useState<Project[]>([]);
   const [moving, setMoving] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [importMsg, setImportMsg] = useState<string | null>(null);
+  const fileRef = React.useRef<HTMLInputElement>(null);
+  const [storage, setStorage] = useState({ threads: 0, messages: 0, kb: 0 });
 
   useEffect(() => {
     listProjects().then(setProjects).catch(() => setProjects([]));
+    try {
+      setStorage(storageInfo());
+    } catch {
+      /* ignore */
+    }
   }, []);
+
+  useEffect(() => {
+    try {
+      setStorage(storageInfo());
+    } catch {
+      /* ignore */
+    }
+  }, [threads]);
 
   useEffect(() => {
     if (search.trim().length < 2) {
@@ -53,28 +82,46 @@ export function ThreadSidebar({
   }, [search]);
 
   const local = threads.filter((t) => t.title.toLowerCase().includes(search.toLowerCase()));
+  const messageHits: SearchHit[] = (() => {
+    try {
+      return searchLocalMessages(search);
+    } catch {
+      return [];
+    }
+  })();
 
   const doRename = async () => {
     if (!renaming || !renaming.title.trim()) return;
+    const target = threads.find((t) => t.thread_id === renaming.id);
     try {
       await renameThread(renaming.id, renaming.title.trim());
-      setRenaming(null);
-      setMenuFor(null);
-      onThreadsChanged();
     } catch (e) {
       setError(errMsg(e));
     }
+    try {
+      if (target) upsertLocalThread({ ...target, title: renaming.title.trim(), updated_at: new Date().toISOString() });
+    } catch {
+      /* ignore */
+    }
+    setRenaming(null);
+    setMenuFor(null);
+    onThreadsChanged();
   };
 
   const doDelete = async (id: string, title: string) => {
     if (!window.confirm(`Delete "${title}"? This removes its history.`)) return;
     try {
       await deleteThread(id);
-      setMenuFor(null);
-      onThreadsChanged();
     } catch (e) {
       setError(errMsg(e));
     }
+    try {
+      removeLocalThread(id);
+    } catch {
+      /* ignore */
+    }
+    setMenuFor(null);
+    onThreadsChanged();
   };
 
   const doBranch = async (id: string) => {
@@ -146,15 +193,29 @@ export function ThreadSidebar({
       </div>
 
       {/* New Chat Button */}
-      <div className="p-3 pb-2">
+      <div className="p-3 pb-2 space-y-2">
         <button
           type="button"
           onClick={onNewChat}
           className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-primary text-primary-foreground text-xs font-semibold hover:opacity-95 shadow-xs transition-opacity"
+          title={scopeLabel ? `Start a new chat with ${scopeLabel}` : "Start a new chat"}
         >
           <Plus className="size-4" />
-          <span>New Chat</span>
+          <span className="truncate">{scopeLabel ? `New chat with ${scopeLabel}` : "New Chat"}</span>
         </button>
+        <div className="flex items-center gap-2 px-1" title={scopeLabel ? `Showing only ${scopeLabel}'s conversations — switch bots above to see others` : "Showing every conversation across all bots"}>
+          {scopeLabel ? (
+            <>
+              <span className="size-5 rounded-md bg-primary/10 text-primary flex items-center justify-center text-xs font-bold overflow-hidden shrink-0">
+                {scopeAvatar || scopeLabel.slice(0, 2).toUpperCase()}
+              </span>
+              <span className="text-[11px] font-semibold truncate flex-1">{scopeLabel}'s space</span>
+            </>
+          ) : (
+            <span className="text-[11px] font-semibold text-muted-foreground">All conversations</span>
+          )}
+          <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground font-bold">{threads.length}</span>
+        </div>
       </div>
 
       {/* Search Input (searches the server after 2 characters) */}
@@ -231,7 +292,14 @@ export function ThreadSidebar({
                               aria-label="Rename conversation"
                             />
                           ) : (
-                            <span className="truncate flex-1">{t.title}</span>
+                            <span className="flex-1 min-w-0">
+                              <span className="block truncate">{t.title}</span>
+                              {!scopeLabel && ownerLabel(t) && (
+                                <span className="block text-[10px] text-primary/80 font-medium truncate">
+                                  {ownerLabel(t)}
+                                </span>
+                              )}
+                            </span>
                           )}
                         </button>
                         {renaming?.id === t.thread_id ? (
@@ -280,12 +348,92 @@ export function ThreadSidebar({
                 })}
           </>
         )}
+        {messageHits.length > 0 && (
+          <>
+            <p className="px-2 pt-2 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+              In messages ({messageHits.length})
+            </p>
+            {messageHits.map((h) => (
+              <button
+                key={`${h.thread_id}-${h.messageId}`}
+                type="button"
+                onClick={() => onSelectThread(h.thread_id)}
+                className="w-full flex items-start gap-2.5 px-3 py-2 rounded-lg text-left transition-all text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+              >
+                <FileText className="size-3.5 shrink-0 opacity-60 mt-0.5" />
+                <span className="flex-1 min-w-0">
+                  <span className="block truncate text-xs font-medium">{h.title}</span>
+                  <span className="block truncate text-[11px] opacity-80">{h.snippet}</span>
+                </span>
+              </button>
+            ))}
+          </>
+        )}
       </div>
 
-      {/* Footer info */}
-      <div className="p-3 border-t border-border/60 text-[11px] text-muted-foreground flex items-center justify-between">
-        <span>DeerFlow Studio</span>
-        <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted/80">v2.0</span>
+      {/* History storage footer */}
+      <div className="p-3 border-t border-border/60 space-y-2">
+        <p className="text-[10px] text-muted-foreground" title="Every chat is stored on the server; this browser keeps a copy for offline use">
+          💾 {storage.threads} chats • {storage.messages} msgs • auto-saved to server
+        </p>
+        {importMsg && <p className="text-[11px] text-emerald-600">{importMsg}</p>}
+        <div className="flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={onExportHistory}
+            className="flex-1 inline-flex items-center justify-center gap-1 px-2 py-1.5 rounded-lg border border-border text-[11px] font-medium hover:bg-muted"
+            title="Download all history as a file"
+          >
+            <Download className="size-3.5" /> Backup
+          </button>
+          <button
+            type="button"
+            onClick={() => fileRef.current?.click()}
+            className="flex-1 inline-flex items-center justify-center gap-1 px-2 py-1.5 rounded-lg border border-border text-[11px] font-medium hover:bg-muted"
+            title="Restore history from a backup file"
+          >
+            <Upload className="size-3.5" /> Restore
+          </button>
+          <input
+            ref={fileRef}
+            type="file"
+            accept="application/json,.json"
+            className="hidden"
+            onChange={async (e) => {
+              const f = e.target.files?.[0];
+              e.target.value = "";
+              if (!f) return;
+              try {
+                setImportMsg(await onImportHistory(f));
+              } catch (err) {
+                setError(err instanceof Error ? err.message : "Import failed.");
+              }
+              window.setTimeout(() => setImportMsg(null), 5000);
+            }}
+          />
+        </div>
+        <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+          <span>DeerFlow Studio</span>
+          <span className="flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => {
+                if (!window.confirm("Erase ALL chats saved in this browser? (Server copies are kept.)")) return;
+                try {
+                  clearLocalStore();
+                } catch {
+                  /* ignore */
+                }
+                onThreadsChanged();
+              }}
+              className="hover:text-destructive"
+              title="Erase browser-saved history"
+            >
+              Erase saved
+            </button>
+            <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted/80">v2.0</span>
+          </span>
+        </div>
       </div>
     </aside>
   );

@@ -126,7 +126,7 @@ export function TeamOpsSection(props: { threadId: string | null; mcpTasksAvailab
           <div className="rounded-2xl border border-border/60 bg-card p-4">
             <Field label="New group room" hint="Comma-separated member bot names, e.g. researcher, reviewer.">
               <div className="flex flex-col sm:flex-row gap-2">
-                <input value={groupName} onChange={(e) => setGroupName(e.target.value)} placeholder="Room nameâ€¦" className={inputCls} aria-label="Group room name" />
+                <input value={groupName} onChange={(e) => setGroupName(e.target.value)} placeholder="Room name…" className={inputCls} aria-label="Group room name" />
                 <input value={groupMembers} onChange={(e) => setGroupMembers(e.target.value)} placeholder="researcher, reviewer" className={inputCls} aria-label="Group members" />
                 <Btn onClick={() => groupName.trim() && act(() => createGroup(groupName.trim(), groupMembers.split(",").map((m) => m.trim()).filter(Boolean)).then(() => { setGroupName(""); setGroupMembers(""); }), "Room created.")} disabled={!groupName.trim()}>
                   <Plus className="size-3.5" /> Create
@@ -148,7 +148,7 @@ export function TeamOpsSection(props: { threadId: string | null; mcpTasksAvailab
                   <div className="px-4 pb-4 border-t border-border/50 pt-3 space-y-2">
                     <div className="space-y-1.5 max-h-56 overflow-y-auto">
                       {(groupMsgs[g.name] || []).length === 0 ? (
-                        <p className="text-[11px] text-muted-foreground">No messages yet â€” say hello below.</p>
+                        <p className="text-[11px] text-muted-foreground">No messages yet ” say hello below.</p>
                       ) : (
                         (groupMsgs[g.name] || []).slice(-20).map((m, i) => (
                           <div key={i} className="text-[11px] rounded-lg bg-muted/40 px-2.5 py-1.5">
@@ -159,13 +159,13 @@ export function TeamOpsSection(props: { threadId: string | null; mcpTasksAvailab
                       )}
                     </div>
                     <div className="flex gap-2">
-                      <input value={groupDraft} onChange={(e) => setGroupDraft(e.target.value)} onKeyDown={(e) => e.key === "Enter" && groupDraft.trim() && act(() => postGroupMessage(g.name, groupDraft.trim()).then(() => setGroupDraft("")).then(() => groupMessages(g.name)).then((ms) => setGroupMsgs((p) => ({ ...p, [g.name]: ms }))))} placeholder="Message the roomâ€¦" className={inputCls} aria-label={`Message ${g.name}`} />
+                      <input value={groupDraft} onChange={(e) => setGroupDraft(e.target.value)} onKeyDown={(e) => e.key === "Enter" && groupDraft.trim() && act(() => postGroupMessage(g.name, groupDraft.trim()).then(() => setGroupDraft("")).then(() => groupMessages(g.name)).then((ms) => setGroupMsgs((p) => ({ ...p, [g.name]: ms }))))} placeholder="Message the room…" className={inputCls} aria-label={`Message ${g.name}`} />
                       <Btn onClick={() => groupDraft.trim() && act(() => postGroupMessage(g.name, groupDraft.trim()).then(() => setGroupDraft("")).then(() => groupMessages(g.name)).then((ms) => setGroupMsgs((p) => ({ ...p, [g.name]: ms }))))}>
                         <Send className="size-3.5" />
                       </Btn>
                     </div>
                     <div className="flex gap-2">
-                      <input value={groupObjective} onChange={(e) => setGroupObjective(e.target.value)} placeholder="Autonomous goal, e.g. Draft the launch planâ€¦" className={inputCls} aria-label="Autonomous run objective" />
+                      <input value={groupObjective} onChange={(e) => setGroupObjective(e.target.value)} placeholder="Autonomous goal, e.g. Draft the launch plan…" className={inputCls} aria-label="Autonomous run objective" />
                       <Btn variant="ghost" onClick={() => groupObjective.trim() && act(() => startGroupRun(g.name, groupObjective.trim()).then(() => setGroupObjective("")), "Autonomous run started.")} disabled={!groupObjective.trim()}>
                         <Play className="size-3.5" /> Auto-run
                       </Btn>
@@ -181,7 +181,7 @@ export function TeamOpsSection(props: { threadId: string | null; mcpTasksAvailab
           <div className="rounded-2xl border border-border/60 bg-card p-4">
             <Field label="Launch a swarm" hint="Many workers in parallel on one objective.">
               <div className="flex gap-2">
-                <input value={swarmObjective} onChange={(e) => setSwarmObjective(e.target.value)} onKeyDown={(e) => e.key === "Enter" && swarmObjective.trim() && act(() => createSwarm(swarmObjective.trim()).then(() => setSwarmObjective("")), "Swarm launched.")} placeholder="Objectiveâ€¦" className={inputCls} />
+                <input value={swarmObjective} onChange={(e) => setSwarmObjective(e.target.value)} onKeyDown={(e) => e.key === "Enter" && swarmObjective.trim() && act(() => createSwarm(swarmObjective.trim()).then(() => setSwarmObjective("")), "Swarm launched.")} placeholder="Objective…" className={inputCls} />
                 <Btn onClick={() => swarmObjective.trim() && act(() => createSwarm(swarmObjective.trim()).then(() => setSwarmObjective("")), "Swarm launched.")} disabled={!swarmObjective.trim()}>
                   <Play className="size-3.5" /> Launch
                 </Btn>
@@ -215,7 +215,7 @@ export function TeamOpsSection(props: { threadId: string | null; mcpTasksAvailab
             <div className="rounded-2xl border border-border/60 bg-card p-4">
               <p className="text-xs font-semibold mb-1.5">Long-running tool tasks in this chat ({mcpTasks.length})</p>
               {mcpTasks.length === 0 ? (
-                <p className="text-[11px] text-muted-foreground">None â€” durable tool work appears here.</p>
+                <p className="text-[11px] text-muted-foreground">None ” durable tool work appears here.</p>
               ) : (
                 mcpTasks.slice(0, 10).map((t, i) => (
                   <p key={i} className="text-[11px] font-mono rounded-lg bg-muted/40 px-2.5 py-1.5 mb-1 break-all">
@@ -256,7 +256,7 @@ export function TeamOpsSection(props: { threadId: string | null; mcpTasksAvailab
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                 {kpis.slice(0, 12).map((k, i) => (
                   <div key={i} className="rounded-xl bg-muted/40 p-2.5">
-                    <p className="text-sm font-bold">{String(k.value ?? k.current ?? "â€”")}</p>
+                    <p className="text-sm font-bold">{String(k.value ?? k.current ?? "”")}</p>
                     <p className="text-[10px] text-muted-foreground">{String(k.name ?? k.label ?? k.metric ?? `KPI ${i + 1}`)}</p>
                   </div>
                 ))}
@@ -426,17 +426,17 @@ function InboxPanel(props: { threadId: string | null; onError: (m: string) => vo
         </div>
         {showRegister && (
           <div className="flex gap-2 mb-2">
-            <input value={regName} onChange={(e) => setRegName(e.target.value)} onKeyDown={(e) => e.key === "Enter" && regName.trim() && props.threadId && registerRosterAgent(props.threadId, regName.trim()).then(() => { setRegName(""); setShowRegister(false); loadRoster(); }).catch((e) => props.onError(errMsg(e)))} placeholder="Agent name, e.g. researcherï¿½" className={inputCls} aria-label="Agent name" />
+            <input value={regName} onChange={(e) => setRegName(e.target.value)} onKeyDown={(e) => e.key === "Enter" && regName.trim() && props.threadId && registerRosterAgent(props.threadId, regName.trim()).then(() => { setRegName(""); setShowRegister(false); loadRoster(); }).catch((e) => props.onError(errMsg(e)))} placeholder="Agent name, e.g. researcher…" className={inputCls} aria-label="Agent name" />
             <Btn onClick={() => regName.trim() && props.threadId && registerRosterAgent(props.threadId, regName.trim()).then(() => { setRegName(""); setShowRegister(false); loadRoster(); }).catch((e) => props.onError(errMsg(e)))}>Add</Btn>
           </div>
         )}
         {roster.length === 0 ? (
-          <p className="text-[11px] text-muted-foreground">Nobody registered yet ï¿½ add the agents working here.</p>
+          <p className="text-[11px] text-muted-foreground">Nobody registered yet — add the agents working here.</p>
         ) : (
           <div className="flex gap-1.5 flex-wrap">
             {roster.map((a) => (
               <button key={a.name} type="button" onClick={() => setWho(a.name)} className={`text-[11px] px-2.5 py-1.5 rounded-lg border font-medium ${who === a.name ? "border-primary bg-primary/10 text-primary" : "border-border/70 text-muted-foreground hover:text-foreground"}`}>
-                {a.name} ï¿½ {a.status}
+                {a.name} — {a.status}
               </button>
             ))}
           </div>
@@ -448,7 +448,7 @@ function InboxPanel(props: { threadId: string | null; onError: (m: string) => vo
           <p className="text-xs font-semibold">Inbox: {who} ({msgs.length})</p>
           <div className="space-y-1.5 max-h-56 overflow-y-auto">
             {msgs.length === 0 ? (
-              <p className="text-[11px] text-muted-foreground">No messages ï¿½ write one below.</p>
+              <p className="text-[11px] text-muted-foreground">No messages — write one below.</p>
             ) : (
               msgs.slice(-20).map((m) => (
                 <div key={m.id} className="text-[11px] rounded-lg bg-muted/40 px-2.5 py-1.5">
@@ -465,7 +465,7 @@ function InboxPanel(props: { threadId: string | null; onError: (m: string) => vo
                 <option key={a.name} value={a.name}>{a.name}</option>
               ))}
             </select>
-            <input value={sendText} onChange={(e) => setSendText(e.target.value)} onKeyDown={(e) => e.key === "Enter" && sendText.trim() && props.threadId && sendAgentMessage(props.threadId, who, sendTo || "all", sendText.trim()).then(() => { setSendText(""); loadInbox(who); }).catch((er) => props.onError(errMsg(er)))} placeholder={`Message as ${who}ï¿½`} className={inputCls} aria-label="Agent message" />
+            <input value={sendText} onChange={(e) => setSendText(e.target.value)} onKeyDown={(e) => e.key === "Enter" && sendText.trim() && props.threadId && sendAgentMessage(props.threadId, who, sendTo || "all", sendText.trim()).then(() => { setSendText(""); loadInbox(who); }).catch((er) => props.onError(errMsg(er)))} placeholder={`Message as ${who}…`} className={inputCls} aria-label="Agent message" />
             <Btn onClick={() => sendText.trim() && props.threadId && sendAgentMessage(props.threadId, who, sendTo || "all", sendText.trim()).then(() => { setSendText(""); loadInbox(who); }).catch((er) => props.onError(errMsg(er)))}>
               <Send className="size-3.5" /> Send
             </Btn>

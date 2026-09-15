@@ -1,4 +1,4 @@
-import { fetchFeatures } from "./workspace";
+import { get } from "./http";
 import { fetchConsoleStats } from "./workspace";
 import { fetchMemory } from "./memory";
 import { listSkills } from "./skills";
@@ -36,15 +36,29 @@ async function runProbe<T>(key: string, label: string, blurb: string, fn: () => 
 
 /** Live-check every subsystem so the UI can activate only what the server offers. */
 export async function probeAll(): Promise<Probe[]> {
-  const feats = await fetchFeatures().catch(() => ({ agentsApi: false, browserControl: false, mcpTasks: false, subagentBatches: false }));
+  // Raw fetch (no swallowed errors): the Gateway probe must fail honestly when offline.
+  const feats = await get<Record<string, unknown>>("/features")
+    .then((d) => ({
+      agentsApi: Boolean((d.agents_api as Record<string, unknown>)?.enabled),
+      browserControl: Boolean((d.browser_control as Record<string, unknown>)?.enabled),
+      mcpTasks: Boolean((d.mcp_tasks as Record<string, unknown>)?.enabled),
+      subagentBatches: Boolean(
+        ((d.subagent_batches as Record<string, unknown>) || {}).worker_running ||
+          ((d.subagent_batches as Record<string, unknown>) || {}).enabled
+      ),
+    }))
+    .catch(() => null);
   return Promise.all([
-    runProbe("gateway", "Gateway", "Core API answering", async () => fetchFeatures(), () => "online"),
+    runProbe("gateway", "Gateway", "Core API answering", async () => {
+      if (!feats) throw new Error("Server not reachable");
+      return true;
+    }, () => "online"),
     runProbe("agentsApi", "Custom agents API", "Agent builder endpoints", async () => {
-      if (!feats.agentsApi) throw new Error("Switched off (agents_api.enabled=false)");
+      if (!feats || !feats.agentsApi) throw new Error("Switched off (agents_api.enabled=false)");
       return true;
     }, () => "enabled"),
     runProbe("browser", "Live browser", "Agent drives a real browser tab", async () => {
-      if (!feats.browserControl) throw new Error("No browser capability on server");
+      if (!feats || !feats.browserControl) throw new Error("No browser capability on server");
       return true;
     }, () => "available"),
     runProbe("database", "History & usage", "SQL-backed runs, tokens, cost", async () => fetchConsoleStats(), (s) => `${s.runs} runs • ${s.threads} chats`),

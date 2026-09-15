@@ -44,7 +44,7 @@ export function SubagentsSection(props: { threadId: string | null }) {
     try {
       await spawnSubagent(objective.trim());
       setObjective("");
-      flash("Helper started â€” watch it below.");
+      flash("Helper started ” watch it below.");
       await load();
     } catch (e) {
       setError(errMsg(e));
@@ -53,7 +53,7 @@ export function SubagentsSection(props: { threadId: string | null }) {
 
   const onViewResult = async (s: LiveSubagent) => {
     const r = await subagentResult(s.id);
-    setResult({ id: s.id, text: r ? JSON.stringify(r, null, 2).slice(0, 8000) : "No result yet â€” it may still be working." });
+    setResult({ id: s.id, text: r ? JSON.stringify(r, null, 2).slice(0, 8000) : "No result yet ” it may still be working." });
   };
 
   return (
@@ -70,9 +70,9 @@ export function SubagentsSection(props: { threadId: string | null }) {
       {notice && <Notice message={notice} />}
 
       <div className="rounded-2xl border border-border/60 bg-card p-4">
-        <Field label="Start a helper" hint="Describe a self-contained job, e.g. â€œResearch three competitors and summarize pricingâ€. Needs admin rights on the server.">
+        <Field label="Start a helper" hint="Describe a self-contained job, e.g. “Research three competitors and summarize pricing”. Needs admin rights on the server.">
           <div className="flex gap-2">
-            <input value={objective} onChange={(e) => setObjective(e.target.value)} onKeyDown={(e) => e.key === "Enter" && onSpawn()} placeholder="What should the helper do?â€¦" className={inputCls} aria-label="Helper objective" />
+            <input value={objective} onChange={(e) => setObjective(e.target.value)} onKeyDown={(e) => e.key === "Enter" && onSpawn()} placeholder="What should the helper do?…" className={inputCls} aria-label="Helper objective" />
             <Btn onClick={onSpawn} disabled={!objective.trim()}>
               <Play className="size-3.5" /> Start
             </Btn>
@@ -134,7 +134,7 @@ export function SubagentsSection(props: { threadId: string | null }) {
                   <Badge tone={c.enabled ? "green" : "gray"}>{c.enabled ? "on" : "off"}</Badge>
                 </div>
                 <p className="text-[11px] text-muted-foreground mt-1 line-clamp-2">{c.description || "No description."}</p>
-                <p className="text-[10px] font-mono text-muted-foreground mt-1">{c.model}{c.source ? ` â€¢ ${c.source}` : ""}</p>
+                <p className="text-[10px] font-mono text-muted-foreground mt-1">{c.model}{c.source ? ` • ${c.source}` : ""}</p>
               </div>
             ))}
           </div>

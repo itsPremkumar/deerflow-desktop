@@ -8,13 +8,27 @@ import { NavTabs, WorkspaceView } from "@/components/NavTabs";
 import { ChatMessage, Thread, AIModel } from "@/types/chat";
 import { BotProfile } from "@/types/bots";
 import { fetchThreads, createThread, fetchThreadHistory, fetchAvailableModels } from "@/lib/api";
-import { fetchBots } from "@/lib/bots";
+import { fetchBots, touchBot } from "@/lib/bots";
 import { fetchFeatures, fetchOpsStatus, FeatureFlags } from "@/lib/workspace";
 import { fetchMe, UserInfo } from "@/lib/auth";
 import { listThreadRuns, cancelRun } from "@/lib/runs";
 import { rateMessage } from "@/lib/feedback";
 import { suggestionsEnabled, suggestFollowUps, polishDraft } from "@/lib/assist";
 import { listCommands, executeCommand, SlashCommand } from "@/lib/commands";
+import {
+  loadStore,
+  upsertLocalThread,
+  remapThreadId,
+  appendLocalMessages,
+  setLocalMessages,
+  updateLocalMessage,
+  removeLocalThread,
+  setThreadMeta,
+  searchLocalMessages,
+  storageInfo,
+  exportStoreJson,
+  importStoreJson,
+} from "@/lib/history-store";
 import { uploadFiles } from "@/lib/files";
 import { fetchGoal, setGoal, clearGoal, compactThread, fetchTokenUsage, TokenUsage } from "@/lib/threads-ext";
 import { BotGallery } from "@/components/bots/BotGallery";
@@ -93,9 +107,19 @@ export default function ChatView() {
     window.setTimeout(() => setNotice(null), 4500);
   };
 
-  // Initial load
+  // Initial load: local history first (instant), then merge the server.
   useEffect(() => {
     async function init() {
+      try {
+        const local = loadStore();
+        if (local.threads.length > 0) {
+          const sorted = [...local.threads].sort((a, b) => (b.updated_at || "").localeCompare(a.updated_at || ""));
+          setThreads(sorted);
+          setActiveThreadId(sorted[0].thread_id);
+        }
+      } catch {
+        /* fresh start */
+      }
       const [tList, mList, bList, feats, me, suggOn] = await Promise.all([
         fetchThreads(),
         fetchAvailableModels(),
@@ -104,10 +128,11 @@ export default function ChatView() {
         fetchMe(),
         suggestionsEnabled(),
       ]);
-      setThreads(tList);
+      const merged = mergeThreads(tList);
+      setThreads(merged);
       setModels(mList);
       if (mList.length > 0) setSelectedModel(mList[0].id);
-      if (tList.length > 0) setActiveThreadId(tList[0].thread_id);
+      setActiveThreadId((prev) => prev || (merged.length > 0 ? merged[0].thread_id : null));
       setBots(bList);
       setBotsLoading(false);
       setFeatures(feats);
@@ -120,6 +145,7 @@ export default function ChatView() {
       listCommands().then(setSlashCommands).catch(() => setSlashCommands([]));
     }
     init();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const refreshBots = async () => {
@@ -133,16 +159,29 @@ export default function ChatView() {
     }
   };
 
+  /** Union of server + locally stored threads (server wins metadata, local-only kept). */
+  const mergeThreads = (serverList: Thread[]): Thread[] => {
+    const store = loadStore();
+    const byId = new Map<string, Thread>(store.threads.map((t) => [t.thread_id, t]));
+    for (const st of serverList) {
+      const local = byId.get(st.thread_id);
+      byId.set(st.thread_id, local ? { ...local, ...st } : st);
+      upsertLocalThread(byId.get(st.thread_id)!);
+    }
+    return Array.from(byId.values()).sort((a, b) => (b.updated_at || "").localeCompare(a.updated_at || ""));
+  };
+
   const reloadThreads = async (selectId?: string) => {
     const tList = await fetchThreads();
-    setThreads(tList);
+    const merged = mergeThreads(tList);
+    setThreads(merged);
     if (selectId) setActiveThreadId(selectId);
-    else if (activeThreadId && !tList.some((t) => t.thread_id === activeThreadId)) {
-      setActiveThreadId(tList.length > 0 ? tList[0].thread_id : null);
+    else if (activeThreadId && !merged.some((t) => t.thread_id === activeThreadId)) {
+      setActiveThreadId(merged.length > 0 ? merged[0].thread_id : null);
     }
   };
 
-  // Fetch messages + goal + usage when thread changes
+  // Fetch messages + goal + usage when thread changes (server first, local cache fallback).
   useEffect(() => {
     if (!activeThreadId) {
       setMessages([]);
@@ -152,16 +191,43 @@ export default function ChatView() {
       return;
     }
     async function loadMessages() {
-      const history = await fetchThreadHistory(activeThreadId!);
-      setMessages(history);
-      try {
-        const g = await fetchGoal(activeThreadId!);
-        setGoalText(g.goal);
-      } catch {
-        setGoalText(null);
+      const tid = activeThreadId!;
+      const history = await fetchThreadHistory(tid);
+      if (history.length > 0) {
+        setMessages(history);
+        try {
+          setLocalMessages(tid, history);
+        } catch {
+          /* cache best-effort */
+        }
+      } else {
+        try {
+          setMessages(loadStore().messages[tid] || []);
+        } catch {
+          setMessages([]);
+        }
       }
       try {
-        setUsage(await fetchTokenUsage(activeThreadId!));
+        const g = await fetchGoal(tid);
+        if (g.goal) {
+          setGoalText(g.goal);
+          try {
+            setThreadMeta(tid, { goal: g.goal });
+          } catch {
+            /* ignore */
+          }
+        } else {
+          setGoalText(loadStore().meta[tid]?.goal || null);
+        }
+      } catch {
+        try {
+          setGoalText(loadStore().meta[tid]?.goal || null);
+        } catch {
+          setGoalText(null);
+        }
+      }
+      try {
+        setUsage(await fetchTokenUsage(tid));
       } catch {
         setUsage(null);
       }
@@ -170,25 +236,82 @@ export default function ChatView() {
     loadMessages();
   }, [activeThreadId]);
 
+  // Restore this conversation's specialist bot once bots are known.
+  useEffect(() => {
+    if (!activeThreadId || bots.length === 0) return;
+    try {
+      const name = loadStore().meta[activeThreadId]?.botName || null;
+      setActiveBot(name ? bots.find((b) => b.name === name) || null : null);
+    } catch {
+      /* ignore */
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeThreadId, bots]);
+
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isLoading, view]);
 
   const handleNewChat = async () => {
+    // Local-first: the chat exists instantly, the server copy follows.
+    const localId = `local-${Date.now()}`;
+    const draft: Thread = {
+      thread_id: localId,
+      title: "New Conversation",
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      botName: activeBot?.name ?? null,
+    };
     try {
-      const newId = await createThread();
-      const newThread: Thread = {
-        thread_id: newId,
-        title: "New Conversation",
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      };
-      setThreads([newThread, ...threads]);
-      setActiveThreadId(newId);
-      setMessages([]);
-      setView("chat");
+      upsertLocalThread(draft);
+    } catch {
+      /* ignore */
+    }
+    setThreads((prev) => [draft, ...prev]);
+    setActiveThreadId(localId);
+    setMessages([]);
+    setView("chat");
+    try {
+      const serverId = await createThread("New Conversation", { botName: activeBot?.name ?? null });
+      const serverThread: Thread = { ...draft, thread_id: serverId };
+      try {
+        remapThreadId(localId, serverThread);
+      } catch {
+        /* ignore */
+      }
+      setThreads((prev) => prev.map((t) => (t.thread_id === localId ? serverThread : t)));
+      setActiveThreadId(serverId);
     } catch (err) {
-      console.error(err);
+      console.error("Server thread unavailable, keeping local chat:", err);
+    }
+  };
+
+  /** Owner of a thread: server metadata first, local meta fallback. */
+  const threadOwner = (t: Thread): string | null => {
+    if (t.botName) return t.botName;
+    try {
+      return loadStore().meta[t.thread_id]?.botName || null;
+    } catch {
+      return null;
+    }
+  };
+
+  /** Pick a specialist and scope history + projects to its space. */
+  const rememberBot = (bot: BotProfile | null) => {
+    setActiveBot(bot);
+    if (!bot) return;
+    const mine = threads
+      .filter((t) => threadOwner(t) === bot.name)
+      .sort((a, b) => (b.updated_at || "").localeCompare(a.updated_at || ""));
+    const pick = mine[0] || null;
+    setActiveThreadId(pick ? pick.thread_id : null);
+    if (!pick) setMessages([]);
+    if (pick) {
+      try {
+        setThreadMeta(pick.thread_id, { botName: bot.name });
+      } catch {
+        /* ignore */
+      }
     }
   };
 
@@ -197,13 +320,20 @@ export default function ChatView() {
     setInspectedBot(null);
     setView("chat");
     try {
-      const newId = await createThread(`Chat with ${bot.display_name || bot.name}`);
+      const newId = await createThread(`Chat with ${bot.display_name || bot.name}`, { botName: bot.name });
       const newThread: Thread = {
         thread_id: newId,
         title: `Chat with ${bot.display_name || bot.name}`,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
+        botName: bot.name,
       };
+      try {
+        upsertLocalThread(newThread);
+        setThreadMeta(newId, { botName: bot.name });
+      } catch {
+        /* ignore */
+      }
       setThreads((prev) => [newThread, ...prev]);
       setActiveThreadId(newId);
       setMessages([]);
@@ -212,18 +342,46 @@ export default function ChatView() {
     }
   };
 
-  /** Core send: streams one answer, attaches its run id, refreshes suggestions + usage. */
+  /** Core send: streams one answer, attaches its run id, stores everything locally. */
   const sendMessage = async (text: string) => {
     const content = text.trim();
     if (!content || isLoading) return;
 
-    let currentThreadId = activeThreadId;
-    if (!currentThreadId) {
-      currentThreadId = await createThread(content.slice(0, 30));
-      setActiveThreadId(currentThreadId);
-      setThreads([{ thread_id: currentThreadId, title: content.slice(0, 30), created_at: new Date().toISOString(), updated_at: new Date().toISOString() }, ...threads]);
+    let threadId = activeThreadId;
+    if (!threadId) {
+      // Create the chat locally first so nothing is ever lost.
+      const localId = `local-${Date.now()}`;
+      const draft: Thread = {
+        thread_id: localId,
+        title: content.slice(0, 30),
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        botName: activeBot?.name ?? null,
+      };
+      try {
+        upsertLocalThread(draft);
+      } catch {
+        /* ignore */
+      }
+      setThreads((prev) => [draft, ...prev]);
+      setActiveThreadId(localId);
+      threadId = localId;
+      try {
+        const serverId = await createThread(content.slice(0, 30), { botName: activeBot?.name ?? null });
+        const serverThread: Thread = { ...draft, thread_id: serverId };
+        try {
+          remapThreadId(localId, serverThread);
+        } catch {
+          /* ignore */
+        }
+        setThreads((prev) => prev.map((t) => (t.thread_id === localId ? serverThread : t)));
+        setActiveThreadId(serverId);
+        threadId = serverId;
+      } catch {
+        /* offline: continue with the local chat */
+      }
     }
-    const threadId = currentThreadId;
+    const tid = threadId;
 
     const userMsg: ChatMessage = {
       id: `user-${Date.now()}`,
@@ -232,6 +390,13 @@ export default function ChatView() {
       createdAt: new Date().toISOString(),
     };
     setMessages((prev) => [...prev, userMsg]);
+    try {
+      appendLocalMessages(tid, [userMsg]);
+    } catch {
+      /* ignore */
+    }
+    // Record bot activity on the server (last_active / version bump).
+    if (activeBot) void touchBot(activeBot.name);
     setInput("");
     setSuggestions([]);
     setIsLoading(true);
@@ -258,14 +423,20 @@ export default function ChatView() {
       });
 
       const assistantMsgId = `asst-${Date.now()}`;
+      const assistantCreatedAt = new Date().toISOString();
       if (!res.ok) {
         const assistantMsg: ChatMessage = {
           id: assistantMsgId,
           role: "assistant",
           content: `**${activeBot ? activeBot.display_name || activeBot.name : "DeerFlow"}** has received your request and evaluated the workflow. What next step would you like to execute?`,
-          createdAt: new Date().toISOString(),
+          createdAt: assistantCreatedAt,
         };
         setMessages((prev) => [...prev, assistantMsg]);
+        try {
+          appendLocalMessages(tid, [assistantMsg]);
+        } catch {
+          /* ignore */
+        }
         return;
       }
 
@@ -274,7 +445,7 @@ export default function ChatView() {
       let assistantText = "";
       setMessages((prev) => [
         ...prev,
-        { id: assistantMsgId, role: "assistant", content: "", createdAt: new Date().toISOString() },
+        { id: assistantMsgId, role: "assistant", content: "", createdAt: assistantCreatedAt },
       ]);
 
       if (reader) {
@@ -290,15 +461,24 @@ export default function ChatView() {
       }
 
       // Attach the newest run id so feedback + stop work on this answer.
+      let attachedRunId: string | undefined;
       try {
         const runs = await listThreadRuns(threadId);
         const newest = runs[0]?.run_id;
         if (newest) {
+          attachedRunId = newest;
           setMessages((prev) => prev.map((m) => (m.id === assistantMsgId ? { ...m, runId: newest } : m)));
         }
         setUsage(await fetchTokenUsage(threadId));
       } catch {
         /* non-fatal */
+      }
+      try {
+        appendLocalMessages(tid, [
+          { id: assistantMsgId, role: "assistant", content: assistantText, createdAt: assistantCreatedAt, runId: attachedRunId },
+        ]);
+      } catch {
+        /* ignore */
       }
 
       // Follow-up suggestions.
@@ -342,16 +522,38 @@ export default function ChatView() {
   const runSlash = async (command: string) => {
     let currentThreadId = activeThreadId;
     if (!currentThreadId) {
+      const localId = `local-${Date.now()}`;
+      const draft: Thread = {
+        thread_id: localId,
+        title: command.slice(0, 30),
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        botName: activeBot?.name ?? null,
+      };
       try {
-        currentThreadId = await createThread(command.slice(0, 30));
+        upsertLocalThread(draft);
       } catch {
-        currentThreadId = null;
+        /* ignore */
       }
-      if (currentThreadId) {
-        setActiveThreadId(currentThreadId);
-        setThreads([{ thread_id: currentThreadId, title: command.slice(0, 30), created_at: new Date().toISOString(), updated_at: new Date().toISOString() }, ...threads]);
+      setThreads((prev) => [draft, ...prev]);
+      setActiveThreadId(localId);
+      currentThreadId = localId;
+      try {
+        const serverId = await createThread(command.slice(0, 30), { botName: activeBot?.name ?? null });
+        const serverThread: Thread = { ...draft, thread_id: serverId };
+        try {
+          remapThreadId(localId, serverThread);
+        } catch {
+          /* ignore */
+        }
+        setThreads((prev) => prev.map((t) => (t.thread_id === localId ? serverThread : t)));
+        setActiveThreadId(serverId);
+        currentThreadId = serverId;
+      } catch {
+        /* offline: keep it local */
       }
     }
+    const tid = currentThreadId;
     const userMsg: ChatMessage = {
       id: `user-${Date.now()}`,
       role: "user",
@@ -359,24 +561,32 @@ export default function ChatView() {
       createdAt: new Date().toISOString(),
     };
     setMessages((prev) => [...prev, userMsg]);
+    try {
+      appendLocalMessages(tid, [userMsg]);
+    } catch {
+      /* ignore */
+    }
     setInput("");
     setIsLoading(true);
+    const reply = async (content: string) => {
+      const assistantMsg: ChatMessage = {
+        id: `asst-${Date.now()}`,
+        role: "assistant",
+        content,
+        createdAt: new Date().toISOString(),
+      };
+      setMessages((prev) => [...prev, assistantMsg]);
+      try {
+        appendLocalMessages(tid, [assistantMsg]);
+      } catch {
+        /* ignore */
+      }
+    };
     try {
-      const out = await executeCommand(command, currentThreadId ? { thread_id: currentThreadId } : undefined);
-      setMessages((prev) => [
-        ...prev,
-        { id: `asst-${Date.now()}`, role: "assistant", content: out, createdAt: new Date().toISOString() },
-      ]);
+      const out = await executeCommand(command, { thread_id: tid });
+      await reply(out);
     } catch (e) {
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: `asst-${Date.now()}`,
-          role: "assistant",
-          content: `Couldn't run that shortcut: ${e instanceof Error ? e.message : "unknown error"}`,
-          createdAt: new Date().toISOString(),
-        },
-      ]);
+      await reply(`Couldn't run that shortcut: ${e instanceof Error ? e.message : "unknown error"}`);
     } finally {
       setIsLoading(false);
     }
@@ -413,6 +623,11 @@ export default function ChatView() {
     try {
       if (next) await rateMessage(activeThreadId, msg.runId, next);
       setMessages((prev) => prev.map((m) => (m.id === messageId ? { ...m, rating: next } : m)));
+      try {
+        updateLocalMessage(activeThreadId, messageId, { rating: next });
+      } catch {
+        /* ignore */
+      }
       if (next) flash(next === 1 ? "Thanks — rated helpful." : "Noted — rated not helpful.");
     } catch {
       flash("Couldn't save your rating right now.");
@@ -436,9 +651,36 @@ export default function ChatView() {
   const handleAttach = async (files: FileList) => {
     let threadId = activeThreadId;
     if (!threadId) {
-      threadId = await createThread(`Files: ${files[0]?.name || "uploads"}`);
-      setActiveThreadId(threadId);
-      setThreads([{ thread_id: threadId, title: `Files: ${files[0]?.name || "uploads"}`, created_at: new Date().toISOString(), updated_at: new Date().toISOString() }, ...threads]);
+      const localId = `local-${Date.now()}`;
+      const draft: Thread = {
+        thread_id: localId,
+        title: `Files: ${files[0]?.name || "uploads"}`,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        botName: activeBot?.name ?? null,
+      };
+      try {
+        upsertLocalThread(draft);
+      } catch {
+        /* ignore */
+      }
+      setThreads((prev) => [draft, ...prev]);
+      setActiveThreadId(localId);
+      threadId = localId;
+      try {
+        const serverId = await createThread(draft.title, { botName: activeBot?.name ?? null });
+        const serverThread: Thread = { ...draft, thread_id: serverId };
+        try {
+          remapThreadId(localId, serverThread);
+        } catch {
+          /* ignore */
+        }
+        setThreads((prev) => prev.map((t) => (t.thread_id === localId ? serverThread : t)));
+        setActiveThreadId(serverId);
+        threadId = serverId;
+      } catch {
+        /* offline: keep it local */
+      }
     }
     setUploading(true);
     try {
@@ -457,6 +699,11 @@ export default function ChatView() {
       await setGoal(activeThreadId, goalDraft.trim());
       setGoalText(goalDraft.trim());
       setGoalEditing(false);
+      try {
+        setThreadMeta(activeThreadId, { goal: goalDraft.trim() });
+      } catch {
+        /* ignore */
+      }
       flash("Goal set — the agent works toward it until done.");
     } catch {
       flash("Couldn't save the goal.");
@@ -469,6 +716,11 @@ export default function ChatView() {
       await clearGoal(activeThreadId);
       setGoalText(null);
       setGoalEditing(false);
+      try {
+        setThreadMeta(activeThreadId, { goal: null });
+      } catch {
+        /* ignore */
+      }
     } catch {
       flash("Couldn't clear the goal.");
     }
@@ -489,8 +741,38 @@ export default function ChatView() {
   };
 
   const openThread = (id: string) => {
+    // Keep the bot space in sync: opening another bot's chat switches scope to it.
+    const t = threads.find((x) => x.thread_id === id);
+    const owner = t ? threadOwner(t) : null;
+    if (owner) {
+      setActiveBot(bots.find((x) => x.name === owner) || null);
+    } else {
+      setActiveBot(null);
+    }
     setActiveThreadId(id);
     setView("chat");
+  };
+
+  const handleExportHistory = () => {
+    try {
+      const blob = new Blob([exportStoreJson()], { type: "application/json" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = `deerflow-history-${new Date().toISOString().slice(0, 10)}.json`;
+      a.click();
+      window.setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+      flash("History downloaded — keep it safe or move it to another browser.");
+    } catch {
+      flash("Couldn't export history.");
+    }
+  };
+
+  const handleImportHistory = async (f: File): Promise<string> => {
+    const text = await f.text();
+    const { threads: tCount, messages: mCount } = importStoreJson(text);
+    const merged = mergeThreads(await fetchThreads().catch(() => []));
+    setThreads(merged);
+    return `Imported ${tCount} chats and ${mCount} messages.`;
   };
 
   const lastAssistantId = [...messages].reverse().find((m) => m.role === "assistant")?.id;
@@ -499,8 +781,15 @@ export default function ChatView() {
     <div className="flex h-screen w-screen overflow-hidden bg-background">
       {view === "chat" && (
         <ThreadSidebar
-          threads={threads}
+          threads={activeBot ? threads.filter((t) => threadOwner(t) === activeBot.name) : threads}
           activeThreadId={activeThreadId}
+          scopeLabel={activeBot ? activeBot.display_name || activeBot.name : null}
+          scopeAvatar={activeBot?.avatar || ""}
+          ownerLabel={(t) => {
+            const o = threadOwner(t);
+            if (!o) return null;
+            return bots.find((b) => b.name === o)?.display_name || o;
+          }}
           onSelectThread={(id) => {
             setActiveThreadId(id);
             setView("chat");
@@ -508,6 +797,8 @@ export default function ChatView() {
           onNewChat={handleNewChat}
           onThreadsChanged={() => reloadThreads()}
           onBranchOpened={(id) => reloadThreads(id)}
+          onExportHistory={handleExportHistory}
+          onImportHistory={handleImportHistory}
         />
       )}
 
@@ -533,7 +824,7 @@ export default function ChatView() {
                 {gatewayOk === false ? "Offline" : gatewayOk ? "Connected" : "Checking…"}
               </button>
               <div className="flex-1" />
-              <ActiveBotPicker bots={bots} activeBot={activeBot} onPick={setActiveBot} />
+              <ActiveBotPicker bots={bots} activeBot={activeBot} onPick={rememberBot} />
               <span className="hidden lg:inline text-xs text-muted-foreground">
                 {models.find((m) => m.id === selectedModel)?.name || "Default Agent"}
               </span>
@@ -614,7 +905,11 @@ export default function ChatView() {
           </Suspense>
         ) : view === "projects" ? (
           <Suspense fallback={<SectionFallback />}>
-            <ProjectsSection onOpenThread={openThread} />
+            <ProjectsSection
+              onOpenThread={openThread}
+              threads={threads}
+              bots={bots.map((b) => ({ name: b.name, display_name: b.display_name || b.name }))}
+            />
           </Suspense>
         ) : view === "dashboard" ? (
           <Suspense fallback={<SectionFallback />}>
@@ -655,7 +950,7 @@ export default function ChatView() {
                   </span>
                   <button
                     type="button"
-                    onClick={() => setActiveBot(null)}
+                    onClick={() => rememberBot(null)}
                     className="ml-auto text-[11px] font-medium text-muted-foreground hover:text-foreground px-2 py-1 rounded-lg hover:bg-muted shrink-0"
                   >
                     Reset to Lead Agent
@@ -724,7 +1019,7 @@ export default function ChatView() {
                         <button
                           key={b.name}
                           type="button"
-                          onClick={() => setActiveBot(b)}
+                          onClick={() => rememberBot(b)}
                           className={`text-[11px] px-2.5 py-1.5 rounded-lg border font-medium transition-colors ${
                             activeBot?.name === b.name
                               ? "border-primary bg-primary/10 text-primary"

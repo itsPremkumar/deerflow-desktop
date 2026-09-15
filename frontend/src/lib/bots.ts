@@ -212,3 +212,12 @@ export function computeFleetHealth(bots: BotProfile[]): FleetHealth {
 export function uniqueDepartments(bots: BotProfile[]): string[] {
   return Array.from(new Set(bots.map((b) => b.department || "general"))).sort();
 }
+
+/** Tell the server this bot was invoked in a run (updates last_active/version). Best-effort. */
+export async function touchBot(name: string): Promise<void> {
+  try {
+    await fetch(`${BASE_URL}/bots/${encodeURIComponent(name)}/match`, { method: "POST" });
+  } catch {
+    /* offline or not permitted — never block chatting */
+  }
+}
