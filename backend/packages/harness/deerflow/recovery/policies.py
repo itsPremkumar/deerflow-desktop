@@ -79,15 +79,47 @@ BOT_RETRY_NONE = "none"
 
 
 def bot_turn_retry_action(error: str, *, failure_reason: str | None = None) -> str:
-    """Map a bot-turn failure to resume | compress_then_resume | none."""
-    from deerflow.bots.failure_reasons import CONTEXT_OVERFLOW, is_auto_retryable
+    """Map a bot-turn failure to resume | compress_then_resume | none.
 
-    reason = failure_reason or classify_failure(error)
-    if reason == CONTEXT_OVERFLOW or classify_failure(error) == "context_overflow":
+    Accepts reason codes from either vocabulary (recovery classes like
+    ``model_rate_limit`` or bot codes like ``provider_rate_limit``) or raw
+    error text, which is classified directly.
+    """
+    from deerflow.bots.failure_reasons import (
+        ALL_REASONS,
+        CONTEXT_OVERFLOW,
+        MISSING_CONFIG,
+        MODEL_UNAVAILABLE,
+        PROVIDER_AUTH_OR_ACCESS,
+        PROVIDER_QUOTA_LIMIT,
+        PROVIDER_RATE_LIMIT,
+        PROVIDER_SERVER_ERROR,
+        RUNTIME_OFFLINE,
+        classify_agent_error,
+        is_auto_retryable,
+    )
+
+    _RECOVERY_TO_BOT = {
+        "model_rate_limit": PROVIDER_RATE_LIMIT,
+        "model_timeout": RUNTIME_OFFLINE,
+        "tool_timeout": RUNTIME_OFFLINE,
+        "tool_failure": PROVIDER_SERVER_ERROR,
+        "context_overflow": CONTEXT_OVERFLOW,
+        "container_crash": RUNTIME_OFFLINE,
+        "unknown": "unknown",
+    }
+    reason = failure_reason
+    if reason is not None and reason not in ALL_REASONS:
+        reason = _RECOVERY_TO_BOT.get(reason, "unknown")
+    if reason is None:
+        reason = classify_agent_error(error)
+    if reason == CONTEXT_OVERFLOW:
         return BOT_RETRY_COMPRESS_THEN_RESUME
     if is_auto_retryable(reason):
         return BOT_RETRY_RESUME
+    if reason in (PROVIDER_AUTH_OR_ACCESS, PROVIDER_QUOTA_LIMIT, MISSING_CONFIG, MODEL_UNAVAILABLE):
+        return BOT_RETRY_NONE
     text = (error or "").lower()
-    if "timeout" in text or "timed out" in text or "temporarily" in text or "unavailable" in text:
+    if "timeout" in text or "timed out" in text or "temporarily" in text:
         return BOT_RETRY_RESUME
     return BOT_RETRY_NONE
