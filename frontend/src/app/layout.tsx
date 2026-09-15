@@ -1,29 +1,19 @@
-import "@/styles/globals.css";
-
-import { type Metadata } from "next";
-
-import { ThemeProvider } from "@/components/theme-provider";
-import { DEFAULT_LOCALE } from "@/core/i18n/locale";
+﻿import type { Metadata } from "next";
+import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "DeerFlow",
-  description: "A LangChain-based framework for building super agents.",
+  title: "DeerFlow AI - Lightweight Workspace",
+  description: "High-performance, clean AI chat studio",
 };
 
 export default function RootLayout({
   children,
-}: Readonly<{ children: React.ReactNode }>) {
+}: {
+  children: React.ReactNode;
+}) {
   return (
-    <html
-      lang={DEFAULT_LOCALE}
-      suppressContentEditableWarning
-      suppressHydrationWarning
-    >
-      <body>
-        <ThemeProvider attribute="class" enableSystem disableTransitionOnChange>
-          {children}
-        </ThemeProvider>
-      </body>
+    <html lang="en" className="dark">
+      <body className="antialiased selection:bg-primary/20">{children}</body>
     </html>
   );
 }
