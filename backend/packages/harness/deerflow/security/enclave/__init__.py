@@ -1,31 +1,23 @@
-"""Legacy backward-compatibility module redirecting to deerflow.security.enclave."""
-
 from __future__ import annotations
 
-from deerflow.security.enclave import (
+from .boundary import BoundaryViolationError, TaskBoundaryPolicy
+from .checkpoint_crypto import CheckpointCrypto, CheckpointIntegrityError
+from .credentials import CredentialLease, CredentialRedactor, ScopedCredentialVault
+from .goal_pursuit import (
     AgentHighlight,
     AstraGoalHarness,
-    BoundaryViolationError,
-    BoundingBox,
-    CheckpointCrypto,
-    CheckpointIntegrityError,
-    CredentialLease,
-    CredentialRedactor,
-    DeceptionWatchdog,
     EnclaveGoalHarness,
     Milestone,
     MilestoneStatus,
-    MultimodalGrounding,
-    ProactiveTriggerEngine,
-    ScopedCredentialVault,
+)
+from .multimodal import MultimodalGrounding, ProactiveTriggerEngine, VisualEvidenceItem
+from .spatiotemporal import (
+    BoundingBox,
     SpatialObject,
     SpatioTemporalCache,
-    TaskBoundaryPolicy,
-    TelemetryEntry,
-    TrajectoryFlightRecorder,
     VideoKeyframe,
-    VisualEvidenceItem,
 )
+from .telemetry import DeceptionWatchdog, TelemetryEntry, TrajectoryFlightRecorder
 
 __all__ = [
     "TaskBoundaryPolicy",

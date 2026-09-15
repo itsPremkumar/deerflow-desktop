@@ -34,7 +34,7 @@ class KnowledgeEntry:
 
 class DomainKnowledgeBase:
     """
-    Domain Knowledge Base K for NVIDIA AVO.
+    Domain Knowledge Base K for Autonomous Agentic Variation Operators (AVO).
     Stores architectural specs, hardware constraints, reference implementations,
     and accumulated positive/negative design patterns discovered across evolution runs.
     """
@@ -44,7 +44,7 @@ class DomainKnowledgeBase:
         self._seed_default_knowledge()
 
     def _seed_default_knowledge(self) -> None:
-        """Seeds foundational hardware/algorithmic knowledge inspired by NVIDIA AVO."""
+        """Seeds foundational hardware/algorithmic knowledge for AVO optimization."""
         # 1. Branchless accumulator rescaling (v20 optimization in AVO paper)
         self.add_entry(
             category="pattern",

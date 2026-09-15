@@ -15,7 +15,7 @@ logger = logging.getLogger("deerflow.avo.engine")
 
 class AVOEngine:
     """
-    NVIDIA Agentic Variation Operators (AVO) Engine.
+    Autonomous Agentic Variation Operators (AVO) Optimization Engine.
     Executes evolutionary search with multi-dimensional vector evaluation,
     domain knowledge retrieval (K), autonomous multi-trial repair loops,
     and supervisory anti-stagnation intervention.

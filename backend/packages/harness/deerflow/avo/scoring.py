@@ -8,7 +8,7 @@ from typing import Any
 @dataclass
 class EvaluationVector:
     """
-    Multi-dimensional evaluation vector f(x) for NVIDIA AVO.
+    Multi-dimensional evaluation vector f(x) for Autonomous AVO.
     Tracks configuration-specific metrics (e.g. sequence lengths, batch sizes, level action efficiencies)
     with hard correctness gating and Pareto dominance verification.
     """
@@ -98,7 +98,7 @@ class EvaluationVector:
         rel_tolerance: float = 0.0,
     ) -> bool:
         """
-        Enforces NVIDIA AVO's Matches-or-Improves policy:
+        Enforces Autonomous AVO's Matches-or-Improves policy:
         A candidate is acceptable if:
           1. It passes correctness checks.
           2. AND it dominates the baseline OR its geometric mean matches/improves the baseline.

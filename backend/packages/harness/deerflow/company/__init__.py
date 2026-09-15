@@ -13,8 +13,13 @@ from deerflow.company.bot_medic import BotMedicEngine, HealingReport
 from deerflow.company.discovery import ContinuousWorkDiscoveryEngine
 from deerflow.company.executive import ExecutiveDigest, ExecutiveIntelligenceLayer
 from deerflow.company.group_chat import GroupChannel, GroupChatEngine, GroupMessage, GroupMessageType
-from deerflow.company.hermes_bridge import HermesBotMetadata, HermesLocalBridge
-from deerflow.company.hermes_kanban import HermesKanbanAdapter
+from deerflow.company.enterprise_kanban import EnterpriseKanbanAdapter, HermesKanbanAdapter
+from deerflow.company.swarm_bridge import (
+    HermesBotMetadata,
+    HermesLocalBridge,
+    SwarmBotMetadata,
+    SwarmLocalBridge,
+)
 from deerflow.company.kanban import (
     CompanyKanbanEngine,
     KanbanActivityLog,
@@ -84,12 +89,15 @@ __all__ = [
     "get_security_soc_archetype",
     "get_research_lab_archetype",
     "synthesize_custom_archetype",
+    "SwarmBotMetadata",
+    "SwarmLocalBridge",
     "HermesBotMetadata",
     "HermesLocalBridge",
     "ProductionStage",
     "StageArtifact",
     "ProductionLineRun",
     "ProductionLineEngine",
+    "EnterpriseKanbanAdapter",
     "HermesKanbanAdapter",
     "GroupChannel",
     "GroupMessage",

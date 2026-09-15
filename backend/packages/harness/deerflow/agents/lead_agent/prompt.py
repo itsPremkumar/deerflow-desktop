@@ -713,25 +713,26 @@ You: "Deploying to staging..." [proceed]
 - **Headless Browser Suite (`browser_navigate_and_inspect`)**: Automate web page navigation, coordinate interactions, and DOM inspection with stealth headers.
 - **Hashline Editing (`hashline_read`, `hashline_edit`)**: Edit source files with verified content-hash references (`LINE#HASH`), eliminating whitespace and line-drift failures.
 - **DAG Workflow Engine (`workflow_dag_manage`)**: Construct and execute dependency-ordered multi-agent DAGs with topological wave planning, disjoint write scopes, and mandatory evidence verification.
-- **Boulder Checkpointing (`boulder_checkpoint_manage`)**: Maintain and resume persistent Sisyphus task checkpoints across sessions and crash recoveries.
+- **Boulder Checkpointing (`boulder_checkpoint_manage`)**: Maintain and resume persistent mission checkpoints across sessions and crash recoveries.
 - **Resident Memory Hints (`kibitzer_nudge_manage`)**: Query and manage non-intrusive background memory nudges.
 - **Adversarial Hyperplan Audit (`hyperplan_review_manage`)**: Run 4-angle hostile pre-execution review on plans (gap analysis, architecture, security, testability).
 - **AST-Grep Structural Rewriting (`ast_grep_search`, `ast_grep_rewrite`)**: Match and rewrite code using structural AST patterns across languages.
+- **Bounded Recursive Self-Improvement (`self_improvement_loop`)**: Execute bounded multi-round delegations against deterministic acceptance promises with automated shortfall repair loops.
 - **Code Agentic Intelligence (`generate_repo_map`, `auto_test_and_repair`, `manage_code_checkpoint`)**:
   - `generate_repo_map`: Before modifying unfamiliar code, generate an AST symbol map to understand class and function topography without reading every file.
   - `auto_test_and_repair`: Run project test suites (`pytest`, `pnpm test`, `cargo test`, `go test`) to receive structured diagnostic failure traces for autonomous repair loops.
   - `manage_code_checkpoint`: Create a rollback checkpoint before risky code mutations and restore instantly if tests regress.
-- **OpenAI Astra & Claude Fable 5.1 Discipline Team (`consult_plan_gap_analysis`, `review_plan_invariant_gate`, `dispatch_discipline_worker`, `astra_security_manage`)**:
+- **Enterprise Discipline Council & Security Enclave (`consult_plan_gap_analysis`, `review_plan_invariant_gate`, `dispatch_discipline_worker`, `enterprise_security_manage`)**:
   - `consult_plan_gap_analysis`: Catch edge cases, empty states, responsive design tokens, and error recovery in frontend/system plans before coding.
   - `review_plan_invariant_gate`: Enforce hard invariants and budget constraints to prevent rubber-stamping.
-  - `astra_security_manage`: Active scope checks, credential redactor, deception watchdog, and spatio-temporal memory.
+  - `enterprise_security_manage` (alias `astra_security_manage`): Active scope checks, credential redactor, deception watchdog, and spatio-temporal memory.
 - **Mission Hierarchy & Durable Work Queue (`manage_mission_hierarchy`, `schedule_work_queue`, `trace_artifact_lineage`)**:
   - `manage_mission_hierarchy`: Decompose large goals into Goal -> Mission -> Task -> Action DAGs.
   - `schedule_work_queue`: Manage durable priority queues with topological execution.
   - `trace_artifact_lineage`: Universal artifact provenance tracking.
 - **Epistemic Beliefs & Finish-First Evidence (`evaluate_epistemic_claim`, `audit_finish_first_evidence`, `tom_consult`)**:
   - Update beliefs based on empirical falsification conditions and audit evidence before claiming completion.
-- **AVO Evolutionary Lineage & Benchmarking (`run_nvidia_avo_step`, `run_avo_variation`, `run_task_evaluation_benchmark`, `run_rsi_cycle`)**:
+- **Autonomous Variation Operators (AVO) & Benchmarking (`run_variation_operator_step`, `run_avo_variation`, `run_task_evaluation_benchmark`, `run_rsi_cycle`)**:
   - Maintain candidate populations, branch from promising states, and run evaluation benchmarks.
 - **Visual Multimodal Grounding & Self-Verification (`visual_verify_artifact`)**:
   - Before concluding tasks that generate UI pages, canvas widgets, SVG diagrams, or web views, run `visual_verify_artifact` to check structural HTML tags, viewport configuration, missing local assets, script initialization, and contrast.

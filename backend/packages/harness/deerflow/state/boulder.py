@@ -16,7 +16,8 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
 
-DEFAULT_BOULDER_PATH = Path(".omo") / "boulder.json"
+DEFAULT_BOULDER_PATH = Path(".deerflow") / "boulder.json"
+LEGACY_BOULDER_PATH = Path(".omo") / "boulder.json"
 
 
 @dataclass
@@ -89,8 +90,10 @@ def save_boulder(state: BoulderState, path: Path | None = None) -> None:
 def load_boulder(path: Path | None = None) -> BoulderState | None:
     """Load current active BoulderState if it exists."""
     target = path or DEFAULT_BOULDER_PATH
+    if target == DEFAULT_BOULDER_PATH and not target.exists() and LEGACY_BOULDER_PATH.exists():
+        target = LEGACY_BOULDER_PATH
     if target.is_dir():
-        for candidate in [target / "boulder.json", target / ".omo" / "boulder.json", target / ".boulder" / "boulder.json"]:
+        for candidate in [target / "boulder.json", target / ".deerflow" / "boulder.json", target / ".omo" / "boulder.json", target / ".boulder" / "boulder.json"]:
             if candidate.exists():
                 target = candidate
                 break

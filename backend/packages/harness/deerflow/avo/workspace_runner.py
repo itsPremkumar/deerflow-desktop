@@ -1,6 +1,6 @@
 """Workspace AVO Runner: Grounded Workspace Candidate Execution with Auto-Rollback.
 
-Integrates NVIDIA AVO's evolutionary loop directly with real workspace code files:
+Integrates Autonomous AVO's evolutionary loop directly with real workspace code files:
 1. Micro-checkpoints target file before mutation.
 2. Applies modification and executes empirical tests/benchmarks.
 3. Evaluates multi-dimensional vector f(x) with hard binary correctness gate.

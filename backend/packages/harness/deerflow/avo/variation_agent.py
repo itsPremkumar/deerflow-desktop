@@ -14,7 +14,7 @@ logger = logging.getLogger("deerflow.avo.variation_agent")
 
 class AgenticVariationLoop:
     """
-    Autonomous multi-turn variation agent loop for NVIDIA AVO.
+    Autonomous multi-turn variation agent loop for Autonomous AVO.
     Implements Vary(P_t) = Agent(P_t, K, f).
     
     Rather than a single-shot generation, the agent conducts an internal iterative loop:

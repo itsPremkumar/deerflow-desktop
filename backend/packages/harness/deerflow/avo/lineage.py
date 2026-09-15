@@ -11,7 +11,7 @@ from .scoring import EvaluationVector
 @dataclass
 class VersionRecord:
     """
-    Immutable version record in the NVIDIA AVO evolution lineage.
+    Immutable version record in the Autonomous AVO evolution lineage.
     Represents either a committed candidate x_i in P_t or an intermediate trajectory attempt.
     """
     version_id: str = field(default_factory=lambda: f"v_{uuid.uuid4().hex[:8]}")
@@ -93,7 +93,7 @@ class VersionRecord:
 class AVOLineage:
     """
     Maintains historical evolution tree and strictly enforces
-    NVIDIA AVO's matches-or-improves commit policy.
+    Autonomous AVO's matches-or-improves commit policy.
     Unsuccessful intermediate attempts are archived in trajectory memory.
     """
 
@@ -104,7 +104,7 @@ class AVOLineage:
 
     def commit_candidate(self, candidate: VersionRecord) -> bool:
         """
-        NVIDIA AVO Matches-or-improves commit policy:
+        Autonomous AVO Matches-or-improves commit policy:
           - FAIL correctness -> discard & archive in internal trajectory
           - Worse score than parent -> reject & archive in internal trajectory
           - Matches or improves parent -> accept & commit to P_t

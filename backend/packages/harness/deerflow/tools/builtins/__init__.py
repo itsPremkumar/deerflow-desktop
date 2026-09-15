@@ -7,8 +7,8 @@ from .artifact_lineage_tool import trace_artifact_lineage
 from .ask_oracle_tool import ask_oracle
 from .ast_grep_tool import ast_grep_rewrite, ast_grep_search
 
-# Wave 5: OpenAI Astra Security & Telemetry Plane
-from .astra_security_tool import astra_security_manage
+# Enterprise Security Enclave & Telemetry Plane
+from .enclave_security_tool import astra_security_manage, enterprise_security_manage
 
 # Autonomous one-prompt planner: raw prompt -> fully decided execution plan
 from .autoplan_tool import build_autonomous_plan
@@ -16,7 +16,7 @@ from .avo_lineage_tool import run_avo_variation
 from .background_tasks_tool import cancel_background_task, list_background_tasks
 from .batch_task_tool import batch_status, batch_task, cancel_batch
 
-# Hermes AGI/ASI Wave 2 Advanced Operating System Tools
+# Enterprise Operating System & Cognitive Collaboration Tools
 from .blackboard_tool import blackboard_query, blackboard_record_evidence
 from .bot_roster_tool import bot_roster_tool
 from .boulder_checkpoint_tool import boulder_checkpoint_manage
@@ -35,7 +35,7 @@ from .cognitive_compiler_tool import compile_cognitive_plan
 from .cognitive_plan_tool import cognitive_plan
 from .company_tool import company_tool
 
-# Hermes AGI/ASI Executive Control Plane Tools
+# Strategic Autonomous Control Plane Tools
 from .compile_mission_tool import compile_mission
 from .computer_worker_tool import execute_sandboxed_computer_action
 from .consequence_tool import simulate_consequences
@@ -45,7 +45,7 @@ from .curriculum_tool import generate_curriculum_plan
 from .deliberation_tool import deliberation_tool
 from .delta_checkpoint_tool import create_workflow_checkpoint
 
-# Wave 8: Multi-Model Discipline Team (OpenAI Astra & Claude Fable 5.1 Profile)
+# Strategic Discipline Council (Multi-Perspective Governance Profile)
 from .discipline_team_tool import (
     consult_plan_gap_analysis,
     dispatch_discipline_worker,
@@ -65,7 +65,7 @@ from .goal_integrity_tool import goal_integrity_tool
 from .group_chat_tool import group_chat_tool
 from .harness_refine_tool import harness_refine_tool
 
-# Oh My OpenAgent (OmO / Sisyphus) Builtin Tools
+# Persistent Task Execution & Multi-Session Boulder Tools
 from .hashline_tool import hashline_edit, hashline_read
 from .hyperplan_tool import hyperplan_review_manage
 from .job_tool import job_tool
@@ -76,14 +76,14 @@ from .learning_graph_tool import learning_graph_manage
 from .list_uploaded_files_tool import list_uploaded_files
 from .metacognitive_tool import check_metacognitive_health
 
-# Wave 6: Mission Hierarchy, Work Queue DAG & Universal Artifact Lineage
+# Mission Hierarchy, Work Queue DAG & Universal Artifact Lineage
 from .mission_hierarchy_tool import manage_mission_hierarchy, schedule_work_queue
 from .moa_reasoning_tool import moa_multi_model_reasoning
 
-# NVIDIA Agentic Variation Operators (AVO) tool
-from .nvidia_avo_tool import run_nvidia_avo_step
+# Autonomous Agentic Variation Operators (AVO) Optimization Plane
+from .variation_operator_tool import run_nvidia_avo_step, run_variation_operator_step
 
-# Wave 7: Enterprise Harness Expansion
+# Enterprise Harness Expansion
 from .performance_registry_tool import manage_model_performance_registry
 from .present_file_tool import present_file_tool
 from .problem_model_tool import compile_problem_model
@@ -92,11 +92,11 @@ from .progress_card_tool import update_progress_card
 from .propose_skill_tool import propose_skill_tool
 from .python_repl_tool import python_repl_tool
 
-# Wave 4: Frontier Governance, Context Superintelligence & Truth Engine
+# Frontier Governance, Context Superintelligence & Truth Engine
 from .quality_council_tool import deliberate_artifact_quality
 
-# DeepSeek-Harness-style bounded self-improvement loop over delegations
-from .ralph_loop_tool import ralph_loop_tool
+# Bounded Recursive Self-Improvement Loop
+from .self_improvement_tool import ralph_loop_tool, self_improvement_loop_tool
 from .repo_twin_tool import inspect_repo_twin
 
 # Autonomous Reproduction and Experience Memory Tools
@@ -107,7 +107,7 @@ from .self_heal_tool import self_heal_diagnose
 from .session_search_tool import session_search_tool
 from .setup_agent_tool import setup_agent
 
-# Hermes-ASI-Master Wave 3 Tools
+# Autonomous Skill Synthesis & Swarm Orchestration Tools
 from .skill_forge_tool import forge_skill_from_trace
 from .skills_hub_tool import skills_hub_manage
 from .smart_approval_tool import verify_command_approval
@@ -116,7 +116,7 @@ from .supervision_tool import supervision_tool
 from .swarm_tool import swarm_tool
 from .task_tool import task_tool
 
-# OpenHands Builtin Tools
+# Environment Interaction & Perception Fabric
 from .tom_consult_tool import tom_consult
 from .tool_search_tool import catalog_tool_call, catalog_tool_describe, catalog_tool_search
 from .trajectory_audit_tool import trajectory_audit_tool
@@ -199,12 +199,15 @@ __all__ = [
     "create_workflow_checkpoint",
     "build_autonomous_plan",
     "ralph_loop_tool",
+    "self_improvement_loop_tool",
     "run_nvidia_avo_step",
+    "run_variation_operator_step",
     "deliberate_artifact_quality",
     "manage_context_data",
     "check_or_set_autonomy_profile",
     "audit_finish_first_evidence",
     "astra_security_manage",
+    "enterprise_security_manage",
     "manage_mission_hierarchy",
     "schedule_work_queue",
     "trace_artifact_lineage",

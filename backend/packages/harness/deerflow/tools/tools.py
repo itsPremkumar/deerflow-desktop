@@ -18,6 +18,7 @@ from deerflow.tools.builtins import (
     ast_grep_rewrite,
     ast_grep_search,
     astra_security_manage,
+    enterprise_security_manage,
     audit_finish_first_evidence,
     auto_test_and_repair,
     batch_status,
@@ -86,11 +87,13 @@ from deerflow.tools.builtins import (
     python_repl_tool,
     query_knowledge_graph,
     ralph_loop_tool,
+    self_improvement_loop_tool,
     reproduce_and_verify,
     review_plan_invariant_gate,
     review_skill_package,
     run_avo_variation,
     run_nvidia_avo_step,
+    run_variation_operator_step,
     run_rsi_cycle,
     run_task_evaluation_benchmark,
     schedule_work_queue,
@@ -145,9 +148,10 @@ BUILTIN_TOOLS = [
     catalog_tool_call,
     consolidate_memory_dream,
     update_progress_card,
-    # DeepSeek-Harness-style bounded self-improvement loop over delegations:
+    # Bounded Recursive Self-Improvement Loop:
+    self_improvement_loop_tool,
     ralph_loop_tool,
-    # Hermes Deep Integration extensions:
+    # Multi-Agent Swarm Intelligence & Continuous Skills Hub:
     learning_graph_manage,
     verify_command_approval,
     moa_multi_model_reasoning,
@@ -155,7 +159,7 @@ BUILTIN_TOOLS = [
     skills_hub_manage,
     cronjob_manage,
     browser_navigate_and_inspect,
-    # Oh My OpenAgent (OmO / Sisyphus) extensions:
+    # Resilient Multi-Session Workflow & Boulder Checkpointing Engine:
     hashline_read,
     hashline_edit,
     workflow_dag_manage,
@@ -183,6 +187,7 @@ BUILTIN_TOOLS = [
     simulate_consequences,
     evaluate_agent_competence,
     run_rsi_cycle,
+    run_variation_operator_step,
     run_nvidia_avo_step,
     inspect_repo_twin,
     check_metacognitive_health,
@@ -193,9 +198,10 @@ BUILTIN_TOOLS = [
     generate_repo_map,
     auto_test_and_repair,
     manage_code_checkpoint,
-    # OpenAI & DeepMind Astra Security Plane:
+    # Enterprise Security Enclave & Multi-Modal Boundary Enforcement:
+    enterprise_security_manage,
     astra_security_manage,
-    # Multi-Model Discipline Team:
+    # Strategic Discipline Council & Invariant Gates:
     consult_plan_gap_analysis,
     review_plan_invariant_gate,
     dispatch_discipline_worker,

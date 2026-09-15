@@ -1,4 +1,4 @@
-"""Durable Persistence Manager for NVIDIA AVO Lineage (P_t) and Knowledge Base (K).
+"""Durable Persistence Manager for Autonomous AVO Lineage (P_t) and Knowledge Base (K).
 
 Saves and restores evolutionary lineage trees, Pareto frontiers, and domain knowledge
 to disk (.avo/ directory) so long-horizon optimization runs can persist and resume

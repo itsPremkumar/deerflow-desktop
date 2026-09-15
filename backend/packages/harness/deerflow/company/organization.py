@@ -18,9 +18,9 @@ from deerflow.company.attendance import AttendanceLedgerEngine, AttendanceStatus
 from deerflow.company.bot_medic import BotMedicEngine
 from deerflow.company.discovery import ContinuousWorkDiscoveryEngine
 from deerflow.company.executive import ExecutiveDigest, ExecutiveIntelligenceLayer
-from deerflow.company.group_chat import GroupChannel, GroupChatEngine, GroupMessage
-from deerflow.company.hermes_bridge import HermesLocalBridge
-from deerflow.company.hermes_kanban import HermesKanbanAdapter
+from deerflow.company.enterprise_kanban import EnterpriseKanbanAdapter, HermesKanbanAdapter
+from deerflow.company.group_chat import GroupChatEngine
+from deerflow.company.swarm_bridge import HermesLocalBridge, SwarmLocalBridge
 from deerflow.company.kanban import CompanyKanbanEngine
 from deerflow.company.kpi import KPIEngine
 from deerflow.company.models import (
@@ -56,10 +56,12 @@ class AutonomousCompanyEngine:
         self._attendance_engines: dict[str, AttendanceLedgerEngine] = {}
         self._bot_medics: dict[str, BotMedicEngine] = {}
         self._kanban_engines: dict[str, CompanyKanbanEngine] = {}
-        # Local Hermes integrations
-        self._hermes_bridge = HermesLocalBridge()
+        # Local Swarm & Enterprise Kanban integrations
+        self._swarm_bridge = SwarmLocalBridge()
+        self._hermes_bridge = self._swarm_bridge
         self._production_line = ProductionLineEngine()
-        self._hermes_kanban = HermesKanbanAdapter()
+        self._enterprise_kanban = EnterpriseKanbanAdapter()
+        self._hermes_kanban = self._enterprise_kanban
 
     def list_archetypes(self) -> list[dict[str, str]]:
         """Returns catalogue of supported organization archetypes."""
@@ -458,36 +460,49 @@ class AutonomousCompanyEngine:
             raise KeyError(f"Organization '{org_id}' not found.")
         return ContinuousSelfImprovementEngine.run_retrospective(state=state)
 
+    def get_swarm_bridge(self) -> SwarmLocalBridge:
+        return self._swarm_bridge
+
     def get_hermes_bridge(self) -> HermesLocalBridge:
-        return self._hermes_bridge
+        return self._swarm_bridge
 
     def get_production_line(self) -> ProductionLineEngine:
         return self._production_line
 
-    def get_hermes_kanban(self) -> HermesKanbanAdapter:
-        return self._hermes_kanban
+    def get_enterprise_kanban(self) -> EnterpriseKanbanAdapter:
+        return self._enterprise_kanban
 
-    def sync_hermes_bots(self, org_id: str) -> dict[str, Any]:
-        """Discovers local Hermes bots and enriches company departments with real local Hermes profiles."""
+    def get_hermes_kanban(self) -> HermesKanbanAdapter:
+        return self._enterprise_kanban
+
+    def sync_swarm_bots(self, org_id: str) -> dict[str, Any]:
+        """Discovers local agent bots and enriches company departments with real local profiles."""
         state = self._organizations.get(org_id)
         if not state:
             raise KeyError(f"Organization '{org_id}' not found.")
-        local_bots = self._hermes_bridge.discover_local_bots()
-        metadata_map = self._hermes_bridge.get_all_local_profiles()
+        local_bots = self._swarm_bridge.discover_local_bots()
+        metadata_map = self._swarm_bridge.get_all_local_profiles()
         return {
             "org_id": org_id,
-            "hermes_installed": self._hermes_bridge.is_hermes_installed,
+            "swarm_installed": self._swarm_bridge.is_swarm_installed,
+            "hermes_installed": self._swarm_bridge.is_swarm_installed,
             "discovered_bots_count": len(local_bots),
             "bot_names": local_bots,
             "sample_profiles": {k: v.model_dump() for k, v in list(metadata_map.items())[:10]},
         }
 
-    def sync_company_to_hermes_kanban(self, org_id: str) -> dict[str, Any]:
-        """Syncs company projects into local Hermes SQLite kanban board."""
+    def sync_hermes_bots(self, org_id: str) -> dict[str, Any]:
+        return self.sync_swarm_bots(org_id)
+
+    def sync_company_to_enterprise_kanban(self, org_id: str) -> dict[str, Any]:
+        """Syncs company projects into local SQLite kanban board."""
         state = self._organizations.get(org_id)
         if not state:
             raise KeyError(f"Organization '{org_id}' not found.")
-        return self._hermes_kanban.sync_projects_to_kanban(state.projects)
+        return self._enterprise_kanban.sync_projects_to_kanban(state.projects)
+
+    def sync_company_to_hermes_kanban(self, org_id: str) -> dict[str, Any]:
+        return self.sync_company_to_enterprise_kanban(org_id)
 
     def get_chat_engine(self, org_id: str) -> GroupChatEngine:
         if org_id not in self._chat_engines:

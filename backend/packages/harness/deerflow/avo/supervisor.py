@@ -32,7 +32,7 @@ class StrategicPivotDirective:
 
 class AVOSupervisor:
     """
-    Self-supervision and anti-stagnation watchdog for NVIDIA AVO.
+    Self-supervision and anti-stagnation watchdog for Autonomous AVO.
     Detects two primary long-horizon failure modes:
       1. Exhaustion Stalls: search plateau after max_no_improve non-improving iterations.
       2. Oscillation Cycles: repeated alternating edits or identical failure churn.

@@ -31,7 +31,7 @@ def boulder_checkpoint_manage(
     session_id: str | None = None,
     custom_path: str | None = None,
 ) -> str:
-    """Manage persistent Sisyphus task checkpoints. Actions: 'create', 'status', 'update_step', 'append_session', 'complete', 'clear'."""
+    """Manage persistent multi-session task checkpoints. Actions: 'create', 'status', 'update_step', 'append_session', 'complete', 'clear'."""
     path = Path(custom_path) if custom_path else None
 
     if action == "create":
