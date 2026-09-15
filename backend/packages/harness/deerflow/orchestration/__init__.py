@@ -1,5 +1,7 @@
-"""Crash-Resilient Durable Task Orchestration Package."""
-
+from deerflow.orchestration.autopilot import (
+    AutopilotPlan,
+    ExecutiveAutopilot,
+)
 from deerflow.orchestration.durable_replay import (
     DurableReplayEngine,
     DurableTaskCheckpoint,
@@ -10,4 +12,6 @@ __all__ = [
     "JournalEvent",
     "DurableTaskCheckpoint",
     "DurableReplayEngine",
+    "AutopilotPlan",
+    "ExecutiveAutopilot",
 ]

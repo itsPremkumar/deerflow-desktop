@@ -13,8 +13,11 @@ from deerflow.avo import (
     EvaluationVector,
     VersionRecord,
 )
+from deerflow.avo.persistence import AVOPersistenceManager
+from deerflow.avo.workspace_runner import WorkspaceAVORunner
 
 _NVIDIA_AVO_ENGINE = AVOEngine()
+_AVO_PERSISTENCE = AVOPersistenceManager()
 
 
 @tool("run_nvidia_avo_step", parse_docstring=True)
@@ -27,21 +30,28 @@ def run_nvidia_avo_step(
     correctness: bool = True,
     query_text: str = "",
     parent_id: str | None = None,
+    target_file: str = "",
+    test_command: str = "",
+    root_path: str | None = None,
 ) -> str:
     """Execute an NVIDIA Agentic Variation Operator (AVO) step.
 
     Supports multi-dimensional vector evaluation, Pareto dominance tracking,
-    domain knowledge base (K) queries, and supervisory plateau intervention.
+    domain knowledge base (K) queries, supervisory plateau intervention,
+    and grounded workspace candidate execution with auto-rollback.
 
     Args:
-        action: Action to perform: 'vary' (execute variation step), 'inspect_frontier' (get Pareto optimal solutions), 'knowledge_query' (query K for patterns/anti-patterns), 'stats' (get engine statistics).
+        action: Action to perform: 'vary' (in-memory candidate step), 'workspace_run' (grounded file mutation with auto-rollback), 'inspect_frontier' (get Pareto solutions), 'knowledge_query' (query K), 'stats' (engine statistics), 'persist' (save to disk), 'restore' (load from disk), 'supervisor_status' (check intervention status).
         hypothesis: Testable optimization hypothesis (e.g. 'Branchless accumulator rescaling').
         modification: Description of the code / algorithmic edit.
         code_snippet: Code implementation or diff.
-        metrics_json: JSON string mapping configuration names to throughput/reward metrics (e.g. '{"seq_4096": 1250.0, "seq_8192": 1320.0}').
+        metrics_json: JSON string mapping configuration names to throughput/reward metrics.
         correctness: Hard binary gate — if False, effective score is strictly zero.
         query_text: Query text for domain knowledge base lookup.
         parent_id: Optional parent version ID to branch from. Defaults to current head.
+        target_file: Path to the target workspace file (required for 'workspace_run').
+        test_command: Test or benchmark command (e.g. 'pytest tests/test_perf.py').
+        root_path: Project root path.
     """
     try:
         metrics = json.loads(metrics_json) if metrics_json else {}
@@ -120,7 +130,71 @@ def run_nvidia_avo_step(
             "pareto_frontier_size": len(_NVIDIA_AVO_ENGINE.lineage.get_pareto_frontier()),
         }, indent=2)
 
+    elif action == "workspace_run":
+        if not target_file:
+            return json.dumps({
+                "error": "Parameter 'target_file' is required for action 'workspace_run'."
+            }, indent=2)
+
+        runner = WorkspaceAVORunner(
+            lineage=_NVIDIA_AVO_ENGINE.lineage,
+            knowledge_base=_NVIDIA_AVO_ENGINE.knowledge_base,
+            supervisor=_NVIDIA_AVO_ENGINE.supervisor,
+            persistence_mgr=_AVO_PERSISTENCE,
+            root_path=root_path,
+        )
+        res = runner.run_workspace_variation(
+            target_file_path=target_file,
+            candidate_code=code_snippet,
+            hypothesis=hypothesis,
+            modification=modification,
+            test_command=test_command if test_command else None,
+            expected_metrics=metrics if metrics else None,
+            parent_id=parent_id,
+        )
+        return json.dumps(res, indent=2)
+
+    elif action == "persist":
+        mgr = AVOPersistenceManager(base_dir=root_path) if root_path else _AVO_PERSISTENCE
+        lineage_path = mgr.save_lineage(_NVIDIA_AVO_ENGINE.lineage)
+        kb_path = mgr.save_knowledge_base(_NVIDIA_AVO_ENGINE.knowledge_base)
+        return json.dumps({
+            "status": "persisted",
+            "lineage_path": str(lineage_path),
+            "knowledge_base_path": str(kb_path),
+            "versions_count": len(_NVIDIA_AVO_ENGINE.lineage.versions),
+            "knowledge_entries": len(_NVIDIA_AVO_ENGINE.knowledge_base.entries),
+        }, indent=2)
+
+    elif action == "restore":
+        mgr = AVOPersistenceManager(base_dir=root_path) if root_path else _AVO_PERSISTENCE
+        loaded_lineage = mgr.load_lineage()
+        loaded_kb = mgr.load_knowledge_base()
+        if loaded_lineage:
+            _NVIDIA_AVO_ENGINE.lineage = loaded_lineage
+        if loaded_kb:
+            _NVIDIA_AVO_ENGINE.knowledge_base = loaded_kb
+        return json.dumps({
+            "status": "restored",
+            "lineage_restored": loaded_lineage is not None,
+            "knowledge_restored": loaded_kb is not None,
+            "versions_count": len(_NVIDIA_AVO_ENGINE.lineage.versions),
+            "knowledge_entries": len(_NVIDIA_AVO_ENGINE.knowledge_base.entries),
+            "head_id": _NVIDIA_AVO_ENGINE.lineage.head_id,
+        }, indent=2)
+
+    elif action == "supervisor_status":
+        sup = _NVIDIA_AVO_ENGINE.supervisor
+        return json.dumps({
+            "consecutive_stagnation": sup.consecutive_stagnation,
+            "max_no_improve": sup.max_no_improve,
+            "recent_signatures": list(sup.signature_history),
+            "last_directive": sup.last_directive.to_dict() if sup.last_directive else None,
+            "total_stagnation_events": sup.total_stagnation_events,
+            "total_cycle_events": sup.total_cycle_events,
+        }, indent=2)
+
     else:
         return json.dumps({
-            "error": f"Unknown action '{action}'. Supported actions: 'vary', 'inspect_frontier', 'knowledge_query', 'stats'."
+            "error": f"Unknown action '{action}'. Supported actions: 'vary', 'workspace_run', 'inspect_frontier', 'knowledge_query', 'stats', 'persist', 'restore', 'supervisor_status'."
         }, indent=2)

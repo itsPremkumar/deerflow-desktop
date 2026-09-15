@@ -700,6 +700,10 @@ def build_middlewares(
     # a clean one.
     middlewares.append(ModelLengthFinishReasonMiddleware())
 
+    # FinishFirstVerifierMiddleware — audits evidence on code modifications to prevent false completion
+    from deerflow.agents.middlewares.finish_first_verifier_middleware import FinishFirstVerifierMiddleware
+    middlewares.append(FinishFirstVerifierMiddleware())
+
     # SafetyFinishReasonMiddleware — suppress tool execution when the provider
     # safety-terminated the response. Registered after the terminal-response
     # and custom/configured middlewares so LangChain's reverse-order after_model
@@ -933,7 +937,8 @@ def _assemble_lead_agent(config: RunnableConfig, *, app_config: AppConfig) -> Le
     # its own fixed minimal graph and ignores presets.
     from deerflow.config.agent_preset_config import preset_summary, resolve_agent_preset
 
-    preset_name, preset = resolve_agent_preset(cfg.get("agent_preset"), presets=resolved_app_config.agent_presets)
+    prompt_hint = cfg.get("prompt") or cfg.get("user_input") or cfg.get("query")
+    preset_name, preset = resolve_agent_preset(cfg.get("agent_preset"), presets=resolved_app_config.agent_presets, prompt=prompt_hint)
 
     agent_config = load_agent_config(agent_name, user_id=resolved_user_id) if not is_bootstrap else None
     # Keep compatibility with lightweight AgentConfig-shaped objects used by

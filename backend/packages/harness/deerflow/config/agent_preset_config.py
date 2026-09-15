@@ -52,15 +52,48 @@ class AgentPresetConfig(BaseModel):
 
 
 def default_presets() -> dict[str, AgentPresetConfig]:
-    """Built-in presets. ``minimal`` stays group-agnostic on purpose: tool
-    group names are operator-defined, so the cheap preset is expressed as
-    switches (no MCP, no subagents, no clarification) rather than groups."""
+    """Built-in presets for DeepSeek-Harness and Frontier execution modes."""
     return {
         STANDARD_PRESET_NAME: AgentPresetConfig(),
         MINIMAL_PRESET_NAME: AgentPresetConfig(
             include_mcp=False,
             subagent_enabled=False,
             disabled_tools=["ask_clarification"],
+        ),
+        "plan": AgentPresetConfig(
+            include_mcp=True,
+            subagent_enabled=True,
+            tool_groups=["code", "web", "planning"],
+        ),
+        "act": AgentPresetConfig(
+            include_mcp=True,
+            subagent_enabled=False,
+            disabled_tools=["ask_clarification"],
+        ),
+        "deep_code": AgentPresetConfig(
+            include_mcp=True,
+            subagent_enabled=True,
+            tool_groups=["code", "bash", "ast_grep", "git", "editing", "memory", "testing"],
+        ),
+        "research": AgentPresetConfig(
+            include_mcp=True,
+            subagent_enabled=True,
+            tool_groups=["web", "retrieval", "epistemic", "memory"],
+        ),
+        "discipline": AgentPresetConfig(
+            include_mcp=True,
+            subagent_enabled=True,
+            tool_groups=["discipline", "governance", "security", "gap_analysis"],
+        ),
+        "mission_director": AgentPresetConfig(
+            include_mcp=True,
+            subagent_enabled=True,
+            tool_groups=["mission", "planning", "queue", "provenance"],
+        ),
+        "autonomous_swarm": AgentPresetConfig(
+            include_mcp=True,
+            subagent_enabled=True,
+            tool_groups=["swarm", "subagents", "blackboard", "a2a", "company"],
         ),
     }
 
@@ -69,12 +102,13 @@ def resolve_agent_preset(
     name: str | None,
     *,
     presets: Mapping[str, AgentPresetConfig] | None = None,
+    prompt: str | None = None,
 ) -> tuple[str, AgentPresetConfig]:
     """Resolve a requested preset name to ``(effective_name, config)``.
 
-    ``None``/empty selects ``standard``. Operator presets win over built-ins;
-    unknown names log a warning and fall back to ``standard`` (fail-open, so a
-    typo can never break run admission).
+    ``None``/empty selects ``standard`` (or evaluates prompt intent if name is 'auto').
+    Operator presets win over built-ins; unknown names log a warning and fall back to
+    ``standard`` (fail-open, so a typo can never break run admission).
     """
     builtin = default_presets()
     merged: dict[str, AgentPresetConfig] = dict(builtin)
@@ -83,8 +117,22 @@ def resolve_agent_preset(
     # Non-string values (e.g. a malformed client payload) fall back to
     # standard rather than raising out of assembly.
     requested = (name.strip() if isinstance(name, str) else "") or STANDARD_PRESET_NAME
+    if requested.lower() in ("auto", "autopilot") and prompt:
+        try:
+            from deerflow.orchestration.autopilot import ExecutiveAutopilot
+
+            resolved_auto = ExecutiveAutopilot.resolve_preset(prompt)
+            if resolved_auto in merged:
+                logger.info("ExecutiveAutopilot auto-selected preset %r for prompt", resolved_auto)
+                return resolved_auto, merged[resolved_auto]
+        except Exception as e:
+            logger.warning("Autopilot resolution failed: %s; falling back to standard", e)
+        return STANDARD_PRESET_NAME, merged[STANDARD_PRESET_NAME]
+
     preset = merged.get(requested)
     if preset is None:
+        if requested.lower() in ("auto", "autopilot"):
+            return STANDARD_PRESET_NAME, merged[STANDARD_PRESET_NAME]
         logger.warning("Unknown agent_preset %r; falling back to %r.", requested, STANDARD_PRESET_NAME)
         return STANDARD_PRESET_NAME, merged[STANDARD_PRESET_NAME]
     return requested, preset

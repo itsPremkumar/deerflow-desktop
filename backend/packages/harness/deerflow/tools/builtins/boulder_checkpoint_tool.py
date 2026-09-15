@@ -1,4 +1,4 @@
-﻿"""Boulder Checkpoint Tool (Sisyphus Task Continuation).
+"""Boulder Checkpoint Tool (Sisyphus Task Continuation).
 
 Provides tools for the agent to save and resume multi-session checkpoint progress.
 """
@@ -74,5 +74,46 @@ def boulder_checkpoint_manage(
     elif action == "clear":
         clear_boulder(path=path)
         return "Cleared active Boulder checkpoint."
+
+    elif action == "create_handoff":
+        from deerflow.state.handoff import SessionHandoffPackage, get_handoff_manager
+
+        state = load_boulder(path)
+        base_dir = path.parent if (path and (path.is_file() or str(path).endswith(".json"))) else custom_path
+        mgr = get_handoff_manager(base_dir)
+        work_id = state.work_id if state else (task or "default")
+        task_desc = getattr(state, "top_level_task", getattr(state, "task", task or "Ongoing multi-phase task"))
+        completed_items = []
+        pending_items = []
+        if state:
+            for item in state.checklist:
+                item_name = getattr(item, "item", getattr(item, "step", str(item)))
+                if item.completed:
+                    completed_items.append({"step": item_name, "evidence": item.evidence})
+                else:
+                    pending_items.append(item_name)
+        elif checklist:
+            pending_items = list(checklist)
+
+        pkg = SessionHandoffPackage(
+            work_id=work_id,
+            task_objective=task_desc,
+            completed_milestones=completed_items,
+            pending_milestones=pending_items,
+            active_hypotheses=[evidence] if evidence else [],
+            next_action=pending_items[0] if pending_items else "Task verification",
+        )
+        saved_file = mgr.save_handoff(pkg)
+        return f"Successfully created session handoff package at {saved_file}.\n\nContext:\n{mgr.format_for_context(pkg)}"
+
+    elif action == "restore_handoff":
+        from deerflow.state.handoff import get_handoff_manager
+
+        base_dir = path.parent if (path and (path.is_file() or str(path).endswith(".json"))) else custom_path
+        mgr = get_handoff_manager(base_dir)
+        pkg = mgr.load_latest_handoff()
+        if not pkg:
+            return "No previous session handoff package found."
+        return mgr.format_for_context(pkg)
 
     return f"Error: unknown action '{action}'."

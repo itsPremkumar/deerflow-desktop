@@ -23,6 +23,11 @@ from .boulder_checkpoint_tool import boulder_checkpoint_manage
 from .browser_supervisor_tool import browser_navigate_and_inspect
 from .canvas_widget_tool import canvas_widget_tool
 from .clarification_tool import ask_clarification_tool
+from .code_agentic_core import (
+    auto_test_and_repair,
+    generate_repo_map,
+    manage_code_checkpoint,
+)
 from .code_mode_tool import code_mode_tool
 from .cognitive_compiler_tool import compile_cognitive_plan
 
@@ -81,6 +86,7 @@ from .nvidia_avo_tool import run_nvidia_avo_step
 # Wave 7: Enterprise Harness Expansion
 from .performance_registry_tool import manage_model_performance_registry
 from .present_file_tool import present_file_tool
+from .problem_model_tool import compile_problem_model
 from .process_handle_tool import process_handle_tool
 from .progress_card_tool import update_progress_card
 from .propose_skill_tool import propose_skill_tool
@@ -114,8 +120,10 @@ from .task_tool import task_tool
 from .tom_consult_tool import tom_consult
 from .tool_search_tool import catalog_tool_call, catalog_tool_describe, catalog_tool_search
 from .trajectory_audit_tool import trajectory_audit_tool
+from .reflexion_tool import manage_reflexion_memory
 from .update_agent_tool import update_agent
 from .view_image_tool import view_image_tool
+from .visual_verification_tool import visual_verify_artifact
 from .workflow_dag_tool import workflow_dag_manage
 
 __all__ = [
@@ -216,6 +224,12 @@ __all__ = [
     "goal_integrity_tool",
     "a2a_tool",
     "company_tool",
+    "generate_repo_map",
+    "auto_test_and_repair",
+    "manage_code_checkpoint",
+    "visual_verify_artifact",
+    "manage_reflexion_memory",
+    "compile_problem_model",
 ]
 
 

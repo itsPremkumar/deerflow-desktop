@@ -1,4 +1,4 @@
-﻿"""Boulder State Machine & Multi-Session Checkpointing.
+"""Boulder State Machine & Multi-Session Checkpointing.
 
 Persists Sisyphus task progression across session interruptions, rate-limits,
 and system restarts:
@@ -89,6 +89,11 @@ def save_boulder(state: BoulderState, path: Path | None = None) -> None:
 def load_boulder(path: Path | None = None) -> BoulderState | None:
     """Load current active BoulderState if it exists."""
     target = path or DEFAULT_BOULDER_PATH
+    if target.is_dir():
+        for candidate in [target / "boulder.json", target / ".omo" / "boulder.json", target / ".boulder" / "boulder.json"]:
+            if candidate.exists():
+                target = candidate
+                break
     if not target.exists():
         return None
     try:

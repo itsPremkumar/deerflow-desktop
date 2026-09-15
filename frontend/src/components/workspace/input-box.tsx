@@ -132,6 +132,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "../ui/dropdown-menu";
+import { PresetSelector } from "./preset-selector";
 
 import {
   abortGoalRequest,
@@ -312,6 +313,7 @@ export function InputBox({
   > & {
     mode: "flash" | "thinking" | "pro" | "ultra" | undefined;
     reasoning_effort?: "minimal" | "low" | "medium" | "high";
+    agent_preset?: string;
   };
   extraHeader?: React.ReactNode;
   /**
@@ -859,6 +861,19 @@ export function InputBox({
       setModelDialogOpen(false);
     },
     [disabled, onContextChange, context, models, polishingInput],
+  );
+
+  const handlePresetSelect = useCallback(
+    (preset: string) => {
+      if (disabled || polishingInput) {
+        return;
+      }
+      onContextChange?.({
+        ...context,
+        agent_preset: preset,
+      });
+    },
+    [disabled, onContextChange, context, polishingInput],
   );
 
   const handleModeSelect = useCallback(
@@ -2720,6 +2735,11 @@ export function InputBox({
                 {goalObjectiveCounter.length}/{goalObjectiveCounter.max}
               </span>
             )}
+            <PresetSelector
+              currentPreset={context.agent_preset}
+              disabled={composerLocked}
+              onSelectPreset={handlePresetSelect}
+            />
             <ModelSelector
               open={modelDialogOpen}
               onOpenChange={setModelDialogOpen}
