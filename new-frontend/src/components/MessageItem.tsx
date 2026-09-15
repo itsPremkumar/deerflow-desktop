@@ -6,12 +6,15 @@ import remarkGfm from "remark-gfm";
 import { Bot, User, Brain, Copy, Check } from "lucide-react";
 import { ChatMessage } from "@/types/chat";
 import { ToolPill } from "./ToolPill";
+import { TodoBlock } from "./TodoBlock";
+import { HumanApprovalCard } from "./HumanApprovalCard";
 
 interface MessageItemProps {
   message: ChatMessage;
+  onApprovalDecision?: (approved: boolean) => void;
 }
 
-export function MessageItem({ message }: MessageItemProps) {
+export function MessageItem({ message, onApprovalDecision }: MessageItemProps) {
   const isUser = message.role === "user";
   const [copied, setCopied] = useState(false);
   const [showThinking, setShowThinking] = useState(false);
@@ -63,6 +66,16 @@ export function MessageItem({ message }: MessageItemProps) {
           </div>
         )}
 
+        {/* Task / To-Do Checklist */}
+        {message.todos && message.todos.length > 0 && (
+          <TodoBlock todos={message.todos} />
+        )}
+
+        {/* Interactive Human-in-the-loop Approval */}
+        {message.approvalRequest && onApprovalDecision && (
+          <HumanApprovalCard approval={message.approvalRequest} onDecision={onApprovalDecision} />
+        )}
+
         {/* Tool Invocations */}
         {message.toolCalls && message.toolCalls.length > 0 && (
           <div className="space-y-1 my-2">
@@ -73,11 +86,13 @@ export function MessageItem({ message }: MessageItemProps) {
         )}
 
         {/* Markdown Content */}
-        <div className="prose prose-sm dark:prose-invert max-w-none text-sm leading-relaxed break-words">
-          <ReactMarkdown remarkPlugins={[remarkGfm]}>
-            {message.content}
-          </ReactMarkdown>
-        </div>
+        {message.content && (
+          <div className="prose prose-sm dark:prose-invert max-w-none text-sm leading-relaxed break-words">
+            <ReactMarkdown remarkPlugins={[remarkGfm]}>
+              {message.content}
+            </ReactMarkdown>
+          </div>
+        )}
       </div>
     </div>
   );
