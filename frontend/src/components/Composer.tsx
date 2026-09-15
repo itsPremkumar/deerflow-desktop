@@ -1,9 +1,10 @@
 "use client";
 
 import React, { useRef, useEffect, useState, useMemo } from "react";
-import { Send, Square, Terminal, ChevronRight } from "lucide-react";
+import { Send, Square, Wand2, Paperclip, Terminal, ChevronRight } from "lucide-react";
 import { AIModel, SlashCommandInfo } from "@/types/chat";
 import { fetchCommands } from "@/lib/api";
+import { SlashCommand } from "@/lib/commands";
 
 const DEFAULT_CORE_COMMANDS: SlashCommandInfo[] = [
   { command: "/goal", category: "mission", description: "Define and orchestrate autonomous goals", usage: "/goal <objective>", is_core: true, is_autonomous_trigger: true, requires_approval: false },
@@ -33,6 +34,14 @@ interface ComposerProps {
   models: AIModel[];
   selectedModel: string;
   onSelectModel: (modelId: string) => void;
+  /** Polish the draft with AI before sending. */
+  onPolish?: () => void;
+  polishing?: boolean;
+  /** Attach files to the active conversation. */
+  onAttach?: (files: FileList) => void;
+  uploading?: boolean;
+  /** All shortcut commands (for the "/" palette). */
+  slashCommands?: SlashCommand[];
 }
 
 export function Composer({
@@ -44,13 +53,19 @@ export function Composer({
   models,
   selectedModel,
   onSelectModel,
+  onPolish,
+  polishing,
+  onAttach,
+  uploading,
+  slashCommands,
 }: ComposerProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
   const [availableCommands, setAvailableCommands] = useState<SlashCommandInfo[]>(DEFAULT_CORE_COMMANDS);
   const [selectedIndex, setSelectedIndex] = useState<number>(0);
   const [isDismissed, setIsDismissed] = useState<boolean>(false);
 
-  // Load registered commands on mount
+  // Load registered backend commands on mount, then merge the prop list.
   useEffect(() => {
     async function load() {
       const cmds = await fetchCommands();
@@ -61,16 +76,33 @@ export function Composer({
     load();
   }, []);
 
+  // Unified command source: backend registry wins, prop shortcuts fill gaps.
+  const mergedCommands = useMemo(() => {
+    const seen = new Set(availableCommands.map((c) => c.command.toLowerCase()));
+    const extra: SlashCommandInfo[] = (slashCommands || [])
+      .filter((c) => !seen.has(`/${c.name}`.toLowerCase()))
+      .map((c) => ({
+        command: `/${c.name}`,
+        category: c.category || "general",
+        description: c.description || "Run this shortcut",
+        usage: c.usage || `/${c.name}`,
+        is_core: false,
+        is_autonomous_trigger: false,
+        requires_approval: false,
+      }));
+    return [...availableCommands, ...extra];
+  }, [availableCommands, slashCommands]);
+
   // Filter slash commands
   const suggestions = useMemo(() => {
     if (isDismissed || !input.startsWith("/") || input.includes(" ")) {
       return [];
     }
     const q = input.toLowerCase();
-    return availableCommands
+    return mergedCommands
       .filter((c) => c.command.toLowerCase().startsWith(q) || c.command.toLowerCase().includes(q))
       .slice(0, 8);
-  }, [input, availableCommands, isDismissed]);
+  }, [input, mergedCommands, isDismissed]);
 
   useEffect(() => {
     if (input.startsWith("/")) {
@@ -172,16 +204,19 @@ export function Composer({
           onKeyDown={handleKeyDown}
           placeholder="Ask anything or type / for Master Slash Commands..."
           rows={1}
+          aria-label="Message the agent"
           className="w-full resize-none bg-transparent px-3 py-2 text-sm focus:outline-none placeholder:text-muted-foreground max-h-48 text-foreground"
         />
 
-        <div className="flex items-center justify-between pt-2 border-t border-border/40 px-2 mt-1">
-          <div className="flex items-center gap-2">
+        <div className="flex items-center justify-between pt-2 border-t border-border/40 px-2 mt-1 gap-2">
+          <div className="flex items-center gap-2 min-w-0">
             {/* Model Selector */}
             <select
               value={selectedModel}
               onChange={(e) => onSelectModel(e.target.value)}
-              className="text-xs bg-muted/60 border border-border/80 rounded-lg px-2.5 py-1 text-foreground focus:outline-none focus:ring-1 focus:ring-primary/40 font-medium cursor-pointer"
+              className="text-xs bg-muted/60 border border-border/80 rounded-lg px-2.5 py-1 text-foreground focus:outline-none focus:ring-1 focus:ring-primary/40 font-medium cursor-pointer max-w-36 truncate"
+              title="Language model for this chat"
+              aria-label="Language model"
             >
               {models.map((m) => (
                 <option key={m.id} value={m.id}>
@@ -189,15 +224,52 @@ export function Composer({
                 </option>
               ))}
             </select>
+            {onAttach && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => fileRef.current?.click()}
+                  disabled={uploading}
+                  className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-40"
+                  title={uploading ? "Uploading…" : "Attach files"}
+                  aria-label="Attach files"
+                >
+                  <Paperclip className="size-4" />
+                </button>
+                <input
+                  ref={fileRef}
+                  type="file"
+                  multiple
+                  className="hidden"
+                  onChange={(e) => {
+                    if (e.target.files && e.target.files.length > 0) onAttach(e.target.files);
+                    e.target.value = "";
+                  }}
+                />
+              </>
+            )}
+            {onPolish && (
+              <button
+                type="button"
+                onClick={onPolish}
+                disabled={!input.trim() || polishing || isLoading}
+                className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-40"
+                title={polishing ? "Polishing…" : "Improve my draft with AI"}
+                aria-label="Improve draft with AI"
+              >
+                <Wand2 className={`size-4 ${polishing ? "animate-pulse text-primary" : ""}`} />
+              </button>
+            )}
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 shrink-0">
             {isLoading ? (
               <button
                 type="button"
                 onClick={onStop}
                 className="size-8 rounded-lg bg-destructive text-destructive-foreground flex items-center justify-center hover:opacity-90 transition-opacity"
-                title="Stop generation"
+                title="Stop generating"
+                aria-label="Stop generating"
               >
                 <Square className="size-4 fill-current" />
               </button>
@@ -208,6 +280,7 @@ export function Composer({
                 onClick={onSubmit}
                 className="size-8 rounded-lg bg-primary text-primary-foreground flex items-center justify-center disabled:opacity-40 hover:opacity-95 transition-opacity"
                 title="Send message"
+                aria-label="Send message"
               >
                 <Send className="size-3.5" />
               </button>
@@ -216,9 +289,8 @@ export function Composer({
         </div>
       </div>
       <div className="text-[11px] text-center text-muted-foreground mt-2">
-        DeerFlow AI Agent • Type <kbd className="px-1 py-0.5 rounded bg-muted text-[10px] font-mono">/</kbd> for commands • <kbd className="px-1 py-0.5 rounded bg-muted text-[10px] font-mono">Enter</kbd> to send
+        DeerFlow AI Agent • Type <kbd className="px-1 py-0.5 rounded bg-muted text-[10px] font-mono">/</kbd> for commands • <kbd className="px-1 py-0.5 rounded bg-muted text-[10px] font-mono">Enter</kbd> to send • <kbd className="px-1 py-0.5 rounded bg-muted text-[10px] font-mono">Shift + Enter</kbd> for new line
       </div>
     </div>
   );
 }
-

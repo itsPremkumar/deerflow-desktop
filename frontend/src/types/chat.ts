@@ -38,6 +38,10 @@ export interface ChatMessage {
   approvalRequest?: HumanApproval;
   autonomousDetection?: AutonomousDetection;
   createdAt: string;
+  /** Newest run that produced this message (enables feedback + stop). */
+  runId?: string;
+  /** Your rating for this answer (+1 / -1). */
+  rating?: 1 | -1;
 }
 
 export interface Thread {
@@ -46,6 +50,11 @@ export interface Thread {
   created_at: string;
   updated_at: string;
   status?: string;
+  /** Owning specialist bot (from server thread metadata). Absent = Lead Agent / unassigned. */
+  botName?: string | null;
+  assistantId?: string | null;
+  /** Server project membership (read-only metadata exposure). */
+  projectId?: string | null;
 }
 
 export interface AIModel {
