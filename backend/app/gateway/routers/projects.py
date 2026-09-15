@@ -1,5 +1,6 @@
 """CRUD API for projects (Phase 1: organization only — no documents/trash)."""
 
+import asyncio
 import logging
 from typing import Any, Literal
 
@@ -165,3 +166,603 @@ async def list_project_threads(project_id: str, request: Request, limit: int = Q
         )
         for r in rows
     ]
+
+
+# ---------------------------------------------------------------------------
+# Workforce layer: membership, presence, constitution, state, memory, locks,
+# handoffs, events, context, goals, conflicts, evidence.
+# ---------------------------------------------------------------------------
+
+
+async def _require_project(project_id: str, request: Request) -> None:
+    if await get_project_repo(request).get(project_id) is None:
+        raise _not_found()
+
+
+class JoinRequest(BaseModel):
+    bot_name: str = Field(..., min_length=1, max_length=64)
+    role_in_project: str = Field(default="worker", max_length=64)
+
+
+class LeaveRequest(BaseModel):
+    bot_name: str = Field(..., min_length=1, max_length=64)
+
+
+class HeartbeatRequest(BaseModel):
+    bot_name: str = Field(..., min_length=1, max_length=64)
+    status: str | None = Field(default=None, max_length=16)
+    current_task_id: str | None = Field(default=None, max_length=64)
+    blocked_reason: str | None = Field(default=None, max_length=500)
+
+
+@router.post("/{project_id}/join")
+@require_permission("projects", "write")
+async def join_project(project_id: str, body: JoinRequest, request: Request) -> dict:
+    await _require_project(project_id, request)
+
+    def _do():
+        from deerflow.projects.events import get_event_bus
+        from deerflow.projects.membership import get_membership_store
+        from deerflow.projects.workspace import ensure_workspace
+
+        ensure_workspace(project_id)
+        m = get_membership_store().join(project_id, body.bot_name, body.role_in_project)
+        get_event_bus(project_id).emit("agent_joined", m.bot_name, {"role": m.role_in_project})
+        return m.to_dict()
+
+    return await asyncio.to_thread(_do)
+
+
+@router.post("/{project_id}/leave")
+@require_permission("projects", "write")
+async def leave_project(project_id: str, body: LeaveRequest, request: Request) -> dict:
+    await _require_project(project_id, request)
+
+    def _do():
+        from deerflow.projects.events import get_event_bus
+        from deerflow.projects.membership import get_membership_store
+
+        ok = get_membership_store().leave(project_id, body.bot_name)
+        if ok:
+            get_event_bus(project_id).emit("agent_left", body.bot_name.lower().strip(), {})
+        return {"left": ok}
+
+    return await asyncio.to_thread(_do)
+
+
+@router.post("/{project_id}/heartbeat")
+@require_permission("projects", "write")
+async def project_heartbeat(project_id: str, body: HeartbeatRequest, request: Request) -> dict:
+    await _require_project(project_id, request)
+
+    def _do():
+        from deerflow.projects.membership import get_membership_store
+
+        m = get_membership_store().heartbeat(project_id, body.bot_name, status=body.status, current_task_id=body.current_task_id, blocked_reason=body.blocked_reason)
+        if m is None:
+            return None
+        return m.to_dict()
+
+    result = await asyncio.to_thread(_do)
+    if result is None:
+        raise HTTPException(status_code=404, detail="Membership not found; join the project first.")
+    return result
+
+
+@router.get("/{project_id}/presence")
+@require_permission("projects", "read")
+async def project_presence(project_id: str, request: Request) -> dict:
+    await _require_project(project_id, request)
+
+    def _do():
+        from deerflow.projects.membership import get_membership_store
+
+        rows = get_membership_store().presence(project_id)
+        return {"project_id": project_id, "members": [m.to_dict() for m in rows], "count": len(rows)}
+
+    return await asyncio.to_thread(_do)
+
+
+class ConstitutionRequest(BaseModel):
+    markdown: str = Field(..., min_length=50, max_length=60000)
+
+
+@router.get("/{project_id}/constitution")
+@require_permission("projects", "read")
+async def get_constitution(project_id: str, request: Request) -> dict:
+    await _require_project(project_id, request)
+
+    def _do():
+        from deerflow.projects import constitution as const_mod
+
+        const = const_mod.get_constitution(project_id)
+        if const is None:
+            return {"project_id": project_id, "present": False, "template": const_mod.DEFAULT_CONSTITUTION_TEMPLATE}
+        return {"project_id": project_id, "present": True, "markdown": const.markdown, "sha16": const.sha16, "updated_at": const.updated_at}
+
+    return await asyncio.to_thread(_do)
+
+
+@router.put("/{project_id}/constitution")
+@require_permission("projects", "write")
+async def put_constitution(project_id: str, body: ConstitutionRequest, request: Request) -> dict:
+    await _require_project(project_id, request)
+
+    def _do():
+        from deerflow.projects import constitution as const_mod
+        from deerflow.projects.events import get_event_bus
+
+        const = const_mod.put_constitution(project_id, body.markdown)
+        get_event_bus(project_id).emit("constitution_updated", "operator", {"sha16": const.sha16})
+        return {"project_id": project_id, "sha16": const.sha16, "updated_at": const.updated_at}
+
+    try:
+        return await asyncio.to_thread(_do)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+
+
+@router.get("/{project_id}/state")
+@require_permission("projects", "read")
+async def get_project_state(project_id: str, request: Request, refresh: bool = Query(default=False)) -> dict:
+    await _require_project(project_id, request)
+
+    def _do():
+        from deerflow.projects import state as state_mod
+
+        state = state_mod.refresh_state(project_id) if refresh else state_mod.get_state(project_id)
+        return state.to_dict()
+
+    return await asyncio.to_thread(_do)
+
+
+class PhaseRequest(BaseModel):
+    phase: str = Field(..., min_length=1, max_length=32)
+
+
+@router.post("/{project_id}/phase")
+@require_permission("projects", "write")
+async def set_project_phase(project_id: str, body: PhaseRequest, request: Request) -> dict:
+    await _require_project(project_id, request)
+
+    def _do():
+        from deerflow.projects import state as state_mod
+
+        return state_mod.set_phase(project_id, body.phase.strip().lower()).to_dict()
+
+    try:
+        return await asyncio.to_thread(_do)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+
+
+class DecisionRequest(BaseModel):
+    title: str = Field(..., min_length=3, max_length=300)
+    body: str = Field(..., min_length=1, max_length=20000)
+    reason: str = Field(default="", max_length=5000)
+    made_by: str = Field(default="", max_length=64)
+    approved_by: str | None = Field(default=None, max_length=64)
+    arch_version: str | None = Field(default=None, max_length=32)
+
+
+@router.get("/{project_id}/decisions")
+@require_permission("projects", "read")
+async def list_decisions(project_id: str, request: Request, q: str | None = Query(default=None, max_length=200)) -> dict:
+    await _require_project(project_id, request)
+
+    def _do():
+        from deerflow.projects.decisions import get_decision_log
+
+        log = get_decision_log(project_id)
+        rows = log.search(q) if q else log.list()
+        return {"project_id": project_id, "decisions": [d.to_dict() for d in rows], "count": len(rows)}
+
+    return await asyncio.to_thread(_do)
+
+
+@router.post("/{project_id}/decisions", status_code=201)
+@require_permission("projects", "write")
+async def record_decision(project_id: str, body: DecisionRequest, request: Request) -> dict:
+    await _require_project(project_id, request)
+
+    def _do():
+        from deerflow.projects.decisions import get_decision_log
+
+        return get_decision_log(project_id).record(body.title, body.body, reason=body.reason, made_by=body.made_by, approved_by=body.approved_by, arch_version=body.arch_version).to_dict()
+
+    return await asyncio.to_thread(_do)
+
+
+class LockRequest(BaseModel):
+    scope: str = Field(..., min_length=1, max_length=16)
+    path: str = Field(..., min_length=1, max_length=500)
+    owner_bot: str = Field(..., min_length=1, max_length=64)
+    reason: str = Field(default="", max_length=500)
+    ttl_seconds: float = Field(default=1800.0, ge=60.0, le=86400.0)
+
+
+@router.get("/{project_id}/locks")
+@require_permission("projects", "read")
+async def list_locks(project_id: str, request: Request) -> dict:
+    await _require_project(project_id, request)
+
+    def _do():
+        from deerflow.projects.locks import get_lock_manager
+
+        manager = get_lock_manager()
+        manager.sweep_expired()
+        return {
+            "project_id": project_id,
+            "locks": [lk.to_dict() for lk in manager.list_locks(project_id)],
+            "pending_requests": [r.to_dict() for r in manager.list_requests(project_id)],
+        }
+
+    return await asyncio.to_thread(_do)
+
+
+@router.post("/{project_id}/locks", status_code=201)
+@require_permission("projects", "write")
+async def acquire_lock(project_id: str, body: LockRequest, request: Request) -> dict:
+    await _require_project(project_id, request)
+    if body.scope not in ("file", "dir", "task", "artifact"):
+        raise HTTPException(status_code=422, detail="scope must be file|dir|task|artifact")
+
+    def _do():
+        from deerflow.projects.events import get_event_bus
+        from deerflow.projects.locks import LockConflictError, get_lock_manager
+
+        try:
+            lk = get_lock_manager().acquire(project_id, body.scope, body.path, body.owner_bot, reason=body.reason, ttl_seconds=body.ttl_seconds)
+        except LockConflictError as exc:
+            return {"conflict": True, "holder": exc.holder.to_dict()}
+        get_event_bus(project_id).emit("file_locked", lk.owner_bot, {"lock_id": lk.lock_id, "scope": lk.scope, "path": lk.path})
+        return {"conflict": False, "lock": lk.to_dict()}
+
+    result = await asyncio.to_thread(_do)
+    if result.get("conflict"):
+        raise HTTPException(status_code=423, detail={"message": "Resource is locked", "holder": result["holder"]})
+    return result["lock"]
+
+
+class ReleaseLockRequest(BaseModel):
+    requester_bot: str = Field(..., min_length=1, max_length=64)
+
+
+@router.delete("/{project_id}/locks/{lock_id}")
+@require_permission("projects", "write")
+async def release_lock(project_id: str, lock_id: str, request: Request, requester_bot: str = Query(...)) -> dict:
+    await _require_project(project_id, request)
+
+    def _do():
+        from deerflow.projects.events import get_event_bus
+        from deerflow.projects.locks import get_lock_manager
+
+        ok = get_lock_manager().release(lock_id, requester_bot)
+        if ok:
+            get_event_bus(project_id).emit("file_unlocked", requester_bot.lower().strip(), {"lock_id": lock_id})
+        return {"released": ok}
+
+    return await asyncio.to_thread(_do)
+
+
+class LockAccessRequest(BaseModel):
+    scope: str = Field(..., min_length=1, max_length=16)
+    path: str = Field(..., min_length=1, max_length=500)
+    requester_bot: str = Field(..., min_length=1, max_length=64)
+    mode: str = Field(default="shared", max_length=16)
+
+
+@router.post("/{project_id}/lock-requests", status_code=201)
+@require_permission("projects", "write")
+async def request_lock_access(project_id: str, body: LockAccessRequest, request: Request) -> dict:
+    await _require_project(project_id, request)
+
+    def _do():
+        from deerflow.projects.locks import get_lock_manager
+
+        return get_lock_manager().request_access(project_id, body.scope, body.path, body.requester_bot, mode=body.mode).to_dict()
+
+    try:
+        return await asyncio.to_thread(_do)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+
+
+class ResolveLockRequest(BaseModel):
+    approver_bot: str = Field(..., min_length=1, max_length=64)
+    approve: bool = True
+
+
+@router.post("/{project_id}/lock-requests/{request_id}/resolve")
+@require_permission("projects", "write")
+async def resolve_lock_access(project_id: str, request_id: str, body: ResolveLockRequest, request: Request) -> dict:
+    await _require_project(project_id, request)
+
+    def _do():
+        from deerflow.projects.locks import get_lock_manager
+
+        rq = get_lock_manager().resolve_request(request_id, body.approver_bot, approve=body.approve)
+        return rq.to_dict() if rq else None
+
+    result = await asyncio.to_thread(_do)
+    if result is None:
+        raise HTTPException(status_code=404, detail="Request not found, already resolved, or approver is not the lock owner.")
+    return result
+
+
+class HandoffRequest(BaseModel):
+    task_id: str = Field(..., min_length=1, max_length=64)
+    from_bot: str = Field(..., min_length=1, max_length=64)
+    to_bot: str = Field(..., min_length=1, max_length=64)
+    objective: str = Field(..., min_length=1, max_length=2000)
+    completed_work: str = Field(default="", max_length=20000)
+    findings: str = Field(default="", max_length=20000)
+    files_modified: list[str] = Field(default_factory=list)
+    decisions: list[str] = Field(default_factory=list)
+    remaining_work: str = Field(default="", max_length=20000)
+    known_risks: list[str] = Field(default_factory=list)
+    tests: list[str] = Field(default_factory=list)
+    recommended_next_action: str = Field(default="", max_length=2000)
+
+
+@router.get("/{project_id}/handoffs")
+@require_permission("projects", "read")
+async def list_handoffs(project_id: str, request: Request, status: str | None = Query(default=None)) -> dict:
+    await _require_project(project_id, request)
+
+    def _do():
+        from deerflow.projects.handoffs import get_handoff_store
+
+        rows = get_handoff_store(project_id).list(status=status)
+        return {"project_id": project_id, "handoffs": [r.to_dict() for r in rows]}
+
+    return await asyncio.to_thread(_do)
+
+
+@router.post("/{project_id}/handoffs", status_code=201)
+@require_permission("projects", "write")
+async def create_handoff(project_id: str, body: HandoffRequest, request: Request) -> dict:
+    await _require_project(project_id, request)
+
+    def _do():
+        from deerflow.projects.handoffs import get_handoff_store
+
+        return (
+            get_handoff_store(project_id)
+            .create(
+                body.task_id,
+                body.from_bot,
+                body.to_bot,
+                body.objective,
+                completed_work=body.completed_work,
+                findings=body.findings,
+                files_modified=body.files_modified,
+                decisions=body.decisions,
+                remaining_work=body.remaining_work,
+                known_risks=body.known_risks,
+                tests=body.tests,
+                recommended_next_action=body.recommended_next_action,
+            )
+            .to_dict()
+        )
+
+    try:
+        return await asyncio.to_thread(_do)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+
+
+class AcceptHandoffRequest(BaseModel):
+    to_bot: str = Field(..., min_length=1, max_length=64)
+
+
+@router.post("/{project_id}/handoffs/{handoff_id}/accept")
+@require_permission("projects", "write")
+async def accept_handoff(project_id: str, handoff_id: str, body: AcceptHandoffRequest, request: Request) -> dict:
+    await _require_project(project_id, request)
+
+    def _do():
+        from deerflow.projects.handoffs import get_handoff_store
+
+        rec = get_handoff_store(project_id).accept(handoff_id, body.to_bot)
+        return rec.to_dict() if rec else None
+
+    result = await asyncio.to_thread(_do)
+    if result is None:
+        raise HTTPException(status_code=404, detail="Handoff not found, not addressed to this bot, or already accepted.")
+    return result
+
+
+@router.get("/{project_id}/events")
+@require_permission("projects", "read")
+async def read_project_events(project_id: str, request: Request, after_seq: int = Query(default=0, ge=0), limit: int = Query(default=200, ge=1, le=1000), q: str | None = Query(default=None, max_length=200)) -> dict:
+    await _require_project(project_id, request)
+
+    def _do():
+        from deerflow.projects.events import get_event_bus
+
+        bus = get_event_bus(project_id)
+        rows = bus.search(q, limit=limit) if q else bus.read(after_seq=after_seq, limit=limit)
+        return {"project_id": project_id, "events": [e.to_dict() for e in rows]}
+
+    return await asyncio.to_thread(_do)
+
+
+@router.get("/{project_id}/context")
+@require_permission("projects", "read")
+async def get_project_context(project_id: str, request: Request, bot_role: str = Query(default="worker", max_length=64)) -> dict:
+    await _require_project(project_id, request)
+
+    def _do():
+        from deerflow.projects.context import build_context
+
+        return build_context(project_id, bot_role).to_dict()
+
+    return await asyncio.to_thread(_do)
+
+
+class GoalCreateRequest(BaseModel):
+    title: str = Field(..., min_length=3, max_length=500)
+    acceptance: list[str] = Field(default_factory=list)
+
+
+@router.post("/{project_id}/goals", status_code=201)
+@require_permission("projects", "write")
+async def create_goal_tree(project_id: str, body: GoalCreateRequest, request: Request) -> dict:
+    await _require_project(project_id, request)
+
+    def _do():
+        import uuid
+
+        from deerflow.projects.goals import GoalTree
+
+        goal_id = f"goal-{uuid.uuid4().hex[:8]}"
+        tree = GoalTree(project_id, goal_id)
+        root = tree.add_root(body.title, acceptance=body.acceptance)
+        return {"goal_id": goal_id, "root": root.to_dict(), "progress": tree.progress()}
+
+    return await asyncio.to_thread(_do)
+
+
+class SubgoalRequest(BaseModel):
+    parent_id: str = Field(..., min_length=1, max_length=64)
+    title: str = Field(..., min_length=3, max_length=500)
+    acceptance: list[str] = Field(default_factory=list)
+
+
+@router.post("/{project_id}/goals/{goal_id}/subgoals", status_code=201)
+@require_permission("projects", "write")
+async def add_subgoal(project_id: str, goal_id: str, body: SubgoalRequest, request: Request) -> dict:
+    await _require_project(project_id, request)
+
+    def _do():
+        from deerflow.projects.goals import GoalTree
+
+        try:
+            return GoalTree(project_id, goal_id).add_subgoal(body.parent_id, body.title, acceptance=body.acceptance).to_dict()
+        except ValueError as exc:
+            return {"error": str(exc)}
+
+    result = await asyncio.to_thread(_do)
+    if "error" in result:
+        raise HTTPException(status_code=404, detail=result["error"])
+    return result
+
+
+class GoalStatusRequest(BaseModel):
+    status: str = Field(..., min_length=1, max_length=16)
+    blocked_reason: str | None = Field(default=None, max_length=1000)
+
+
+@router.post("/{project_id}/goals/{goal_id}/nodes/{node_id}/status")
+@require_permission("projects", "write")
+async def set_goal_status(project_id: str, goal_id: str, node_id: str, body: GoalStatusRequest, request: Request) -> dict:
+    await _require_project(project_id, request)
+    if body.status not in ("open", "in_progress", "blocked", "satisfied", "abandoned"):
+        raise HTTPException(status_code=422, detail="Invalid goal status.")
+
+    def _do():
+        from deerflow.projects.goals import GoalTree
+
+        tree = GoalTree(project_id, goal_id)
+        node = tree.set_status(node_id, body.status, blocked_reason=body.blocked_reason)
+        if node is None:
+            return None
+        return {"node": node.to_dict(), "progress": tree.progress()}
+
+    result = await asyncio.to_thread(_do)
+    if result is None:
+        raise HTTPException(status_code=404, detail="Goal node not found.")
+    return result
+
+
+@router.get("/{project_id}/goals/{goal_id}")
+@require_permission("projects", "read")
+async def get_goal_tree(project_id: str, goal_id: str, request: Request) -> dict:
+    await _require_project(project_id, request)
+
+    def _do():
+        from deerflow.projects.goals import GoalTree
+
+        tree = GoalTree(project_id, goal_id)
+        return {**tree.to_dict(), "progress": tree.progress()}
+
+    return await asyncio.to_thread(_do)
+
+
+class ConflictRequest(BaseModel):
+    kind: str = Field(..., min_length=1, max_length=16)
+    subject: str = Field(..., min_length=1, max_length=500)
+    parties: list[str] = Field(default_factory=list)
+    details: str = Field(default="", max_length=5000)
+
+
+@router.post("/{project_id}/conflicts/detect")
+@require_permission("projects", "read")
+async def detect_conflicts(project_id: str, request: Request) -> dict:
+    await _require_project(project_id, request)
+
+    def _do():
+        from deerflow.projects.conflicts import detect_lock_conflicts
+
+        found = detect_lock_conflicts(project_id)
+        return {"project_id": project_id, "conflicts": [c.to_dict() for c in found]}
+
+    return await asyncio.to_thread(_do)
+
+
+@router.post("/{project_id}/conflicts", status_code=201)
+@require_permission("projects", "write")
+async def raise_conflict(project_id: str, body: ConflictRequest, request: Request) -> dict:
+    await _require_project(project_id, request)
+    if body.kind not in ("file", "task", "requirement", "architecture", "decision"):
+        raise HTTPException(status_code=422, detail="Invalid conflict kind.")
+
+    def _do():
+        from deerflow.projects.conflicts import raise_conflict as _raise
+
+        return _raise(project_id, body.kind, body.subject, body.parties, body.details).to_dict()
+
+    return await asyncio.to_thread(_do)
+
+
+class ResolveConflictRequest(BaseModel):
+    kind: str = Field(..., min_length=1, max_length=16)
+    subject: str = Field(..., min_length=1, max_length=500)
+    parties: list[str] = Field(default_factory=list)
+    details: str = Field(default="", max_length=5000)
+    resolution: str = Field(..., min_length=1, max_length=5000)
+    resolved_by: str = Field(..., min_length=1, max_length=64)
+
+
+@router.post("/{project_id}/conflicts/resolve")
+@require_permission("projects", "write")
+async def resolve_conflict(project_id: str, body: ResolveConflictRequest, request: Request) -> dict:
+    await _require_project(project_id, request)
+
+    def _do():
+        from deerflow.projects.conflicts import raise_conflict as _raise
+        from deerflow.projects.conflicts import resolve_conflict as _resolve
+
+        conflict = _raise(project_id, body.kind, body.subject, body.parties, body.details, actor=body.resolved_by)
+        return _resolve(project_id, conflict, body.resolution, resolved_by=body.resolved_by).to_dict()
+
+    return await asyncio.to_thread(_do)
+
+
+class CompletionCheckRequest(BaseModel):
+    evidence: list[dict[str, Any]] = Field(default_factory=list)
+    task_kind: str = Field(default="code", max_length=16)
+
+
+@router.post("/{project_id}/completion-check")
+@require_permission("projects", "read")
+async def completion_check(project_id: str, body: CompletionCheckRequest, request: Request) -> dict:
+    await _require_project(project_id, request)
+
+    def _do():
+        from deerflow.projects.evidence import check_completion
+
+        return check_completion(body.evidence, task_kind=body.task_kind).to_dict()
+
+    return await asyncio.to_thread(_do)

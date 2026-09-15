@@ -606,3 +606,42 @@ async def escalate_task_endpoint(name: str, request: Request, body: EscalateTask
             raise _validation_error(str(exc)) from exc
 
     return await asyncio.to_thread(_esc)
+
+
+class SelectAgentRequest(BaseModel):
+    required_capabilities: list[str] = Field(default_factory=list)
+    exclude: list[str] = Field(default_factory=list)
+    limit: int = Field(default=5, ge=1, le=20)
+    project_id: str | None = Field(default=None, max_length=64)
+
+
+@router.post("/select", summary="Workload-aware agent selection")
+async def select_agent_endpoint(body: SelectAgentRequest) -> dict:
+    """Rank bots by capability match, availability, load, and reputation."""
+
+    def _select():
+        from deerflow.projects.membership import get_membership_store
+        from deerflow.projects.routing import rank_candidates, select_agent
+
+        memberships = get_membership_store().presence(body.project_id) if body.project_id else None
+        ranked = rank_candidates(body.required_capabilities, exclude=set(body.exclude), limit=body.limit, memberships=memberships)
+        picked = select_agent(body.required_capabilities, exclude=set(body.exclude), memberships=memberships)
+        return {"candidates": [c.to_dict() for c in ranked], "selected": picked.to_dict() if picked else None}
+
+    return await asyncio.to_thread(_select)
+
+
+class RouteTaskRequest(BaseModel):
+    task_type: str = Field(..., min_length=1, max_length=64)
+
+
+@router.post("/route-task", summary="Route a task type to a model chain")
+async def route_task_endpoint(body: RouteTaskRequest) -> dict:
+    """Map task type to category chain with measured re-ranking (local-first)."""
+
+    def _route():
+        from deerflow.models.task_router import route_task
+
+        return route_task(body.task_type).to_dict()
+
+    return await asyncio.to_thread(_route)

@@ -21,6 +21,7 @@ from app.gateway.routers import (
     artifacts,
     assistants_compat,
     auth,
+    benchmarks,
     bots,
     browser,
     channel_connections,
@@ -28,8 +29,10 @@ from app.gateway.routers import (
     commands,
     company,
     console,
+    council,
     deliberation,
-
+    deliveries,
+    evolution,
     features,
     feedback,
     github_webhooks,
@@ -38,13 +41,14 @@ from app.gateway.routers import (
     input_polish,
     integrations,
     jobs,
-
     mcp,
     mcp_tasks,
     memory,
+    missions,
     models,
     ops,
     plan_mode,
+    policy,
     projects,
     runs,
     scheduled_tasks,
@@ -885,7 +889,12 @@ This gateway provides runtime endpoints for agent runs plus custom endpoints for
     app.include_router(company.router)
     app.include_router(commands.router)
     app.include_router(commands.router, prefix="/api/gateway")
-
+    app.include_router(missions.router)
+    app.include_router(policy.router)
+    app.include_router(council.router)
+    app.include_router(benchmarks.router)
+    app.include_router(evolution.router)
+    app.include_router(deliveries.router)
 
     # Suggestions API is mounted at /api/threads/{thread_id}/suggestions
     app.include_router(suggestions.router)

@@ -71,6 +71,7 @@ def _room_to_response(room) -> dict:
         "members": data.get("members", []),
         "mode": data.get("mode"),
         "moderator": data.get("moderator"),
+        "project_id": data.get("project_id"),
         "message_count": len(data.get("log", [])),
         "created_at": data.get("created_at"),
         "updated_at": data.get("updated_at"),
@@ -83,6 +84,7 @@ class RoomCreateRequest(BaseModel):
     members: list[str] | None = Field(default=None, max_length=50)
     mode: str = Field(default="mention")
     moderator: str | None = Field(default=None, max_length=64)
+    project_id: str | None = Field(default=None, max_length=64)
 
 
 class RoomMessageRequest(BaseModel):
@@ -114,10 +116,37 @@ async def create_room(body: RoomCreateRequest) -> dict:
     topic = body.topic.strip() or "General Team Collaboration"
 
     def _create():
-        return _service().get_or_create_room(name, topic=topic, members=members, mode=mode, moderator=moderator)
+        return _service().get_or_create_room(name, topic=topic, members=members, mode=mode, moderator=moderator, project_id=body.project_id)
 
     room = await asyncio.to_thread(_create)
     return _room_to_response(room)
+
+
+class ProjectRoomRequest(BaseModel):
+    members: list[str] = Field(..., min_length=1, max_length=50)
+
+
+@router.post("/by-project/{project_id}", summary="Get or create project team room")
+async def project_room(project_id: str, body: ProjectRoomRequest) -> dict:
+    """Solo projects (0-1 members) get no room; teams share one channel."""
+    members = _validate_members(body.members)
+
+    def _get_or_create():
+        return _service().get_or_create_project_room(project_id, members)
+
+    room = await asyncio.to_thread(_get_or_create)
+    if room is None:
+        return {"project_id": project_id, "mode": "solo", "room": None}
+    return {"project_id": project_id, "mode": "team", "room": _room_to_response(room)}
+
+
+@router.get("/by-project/{project_id}", summary="List project team rooms")
+async def project_rooms(project_id: str) -> dict:
+    def _list():
+        return [_room_to_response(r) for r in _service().rooms_for_project(project_id)]
+
+    rooms = await asyncio.to_thread(_list)
+    return {"project_id": project_id, "rooms": rooms, "count": len(rooms)}
 
 
 @router.get("/{name}", summary="Get room with recent messages")

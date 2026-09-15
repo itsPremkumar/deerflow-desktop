@@ -47,6 +47,7 @@ class GroupRoom:
     mode: OrchestrationMode = "mention"
     moderator: str | None = None
     kanban_board_id: str | None = None
+    project_id: str | None = None
     log: list[GroupMessage] = field(default_factory=list)
     created_at: str = field(default_factory=_now)
     updated_at: str = field(default_factory=_now)

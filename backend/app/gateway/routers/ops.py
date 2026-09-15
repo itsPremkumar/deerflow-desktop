@@ -186,3 +186,34 @@ async def ops_resources() -> ResourcesResponse:
         disk=_disk_snapshot(),
         load_average=load_average,
     )
+
+
+class AutonomyAdviceResponse(BaseModel):
+    """How many workers may run and which model class fits right now."""
+
+    recommendation: str = Field(..., description="scale_up|hold|scale_down|stand_down")
+    max_workers: int = Field(..., description="Ceiling on parallel workers from current headroom")
+    model_class: str = Field(..., description="strong|standard|light|none — which model tier fits")
+    reasons: list[str] = Field(default_factory=list, description="Human-readable causes")
+    reading: dict = Field(default_factory=dict, description="Raw resource reading behind the advice")
+
+
+@router.get(
+    "/ops/advice",
+    response_model=AutonomyAdviceResponse,
+    summary="Autonomy advice",
+    description="Turn the resource snapshot into a worker/model decision: scale_up, hold, scale_down, or stand_down.",
+)
+async def ops_advice(current_workers: int = 1) -> AutonomyAdviceResponse:
+    """Return resource-driven autonomy advice for the orchestrator."""
+    import asyncio as _asyncio
+
+    def _advise():
+        from deerflow.ops.monitor import advise, read_resources
+
+        reading = read_resources()
+        advice = advise(reading, current_workers=max(0, current_workers))
+        return advice, reading
+
+    advice, reading = await _asyncio.to_thread(_advise)
+    return AutonomyAdviceResponse(recommendation=advice.recommendation, max_workers=advice.max_workers, model_class=advice.model_class, reasons=advice.reasons, reading=reading.to_dict())

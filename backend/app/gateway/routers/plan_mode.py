@@ -65,3 +65,58 @@ async def dispatch_plan_mode(payload: PlanDispatchRequest, request: Request):
         "plan": plan.to_dict(),
         "dispatch": dispatch_res.to_dict(),
     }
+
+
+class InterviewStartRequest(BaseModel):
+    objective: str = Field(..., min_length=3, description="The goal to interview about.")
+    known: dict = Field(default_factory=dict, description="Already-known facts keyed by gap area.")
+
+
+class InterviewReviewRequest(BaseModel):
+    plan: dict = Field(..., description="The plan artifact under review.")
+    reviewer: str = Field(..., min_length=1, max_length=64)
+    verdict: str = Field(..., description="approve|request_changes|reject")
+    comments: str = Field(default="", max_length=10000)
+
+
+@router.post("/interview/questions")
+async def interview_questions(payload: InterviewStartRequest) -> dict:
+    """Derive gap questions that must be answered before planning is safe."""
+    from deerflow.planning.interview import derive_gap_questions, new_plan
+
+    questions = await asyncio.to_thread(derive_gap_questions, payload.objective, known=payload.known)
+    plan = new_plan(payload.objective)
+    return {"plan": plan.to_dict(), "questions": [q.to_dict() for q in questions]}
+
+
+@router.post("/interview/review")
+async def interview_review(payload: InterviewReviewRequest) -> dict:
+    """Record one review round (cap 3); approval pins the plan hash."""
+    if payload.verdict not in ("approve", "request_changes", "reject"):
+        from fastapi import HTTPException
+
+        raise HTTPException(status_code=422, detail="verdict must be approve|request_changes|reject.")
+
+    def _review():
+        from deerflow.planning.interview import PlanArtifact, record_review
+
+        steps = payload.plan.get("steps", [])
+        risks = payload.plan.get("risks", [])
+        plan = PlanArtifact(
+            plan_id=str(payload.plan.get("plan_id", "pln-unknown")),
+            objective=str(payload.plan.get("objective", "")),
+            steps=steps,
+            risks=risks,
+            review_rounds=int(payload.plan.get("review_rounds", 0)),
+            reviews=list(payload.plan.get("reviews", [])),
+            status=payload.plan.get("status", "draft"),
+            plan_hash=str(payload.plan.get("plan_hash", "")),
+        )
+        return record_review(plan, payload.reviewer, verdict=payload.verdict, comments=payload.comments).to_dict()
+
+    try:
+        return await asyncio.to_thread(_review)
+    except ValueError as exc:
+        from fastapi import HTTPException
+
+        raise HTTPException(status_code=409, detail=str(exc)) from exc

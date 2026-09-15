@@ -75,6 +75,7 @@ class GroupChatService:
         members: Sequence[str] | None = None,
         mode: OrchestrationMode = "mention",
         moderator: str | None = None,
+        project_id: str | None = None,
     ) -> GroupRoom:
         """Fetch existing room or auto-provision a new room and all missing bot members."""
         key = name.lower().strip()
@@ -90,6 +91,9 @@ class GroupChatService:
                         bot_registry.get_or_create(m_clean)
                         if m_clean not in room.members:
                             room.members.append(m_clean)
+                    self._save()
+                if project_id and not room.project_id:
+                    room.project_id = project_id
                     self._save()
                 return room
 
@@ -110,10 +114,45 @@ class GroupChatService:
                 members=clean_members,
                 mode=mode,
                 moderator=assigned_moderator,
+                project_id=project_id,
             )
             self._rooms[key] = room
             self._save()
             return room
+
+    def get_or_create_project_room(self, project_id: str, members: Sequence[str] | None = None) -> GroupRoom | None:
+        """Bind a room to a project. Solo projects (0-1 members) get no room.
+
+        Returns the room for multi-agent projects, None for solo work.
+        """
+        with self._lock:
+            for room in self._rooms.values():
+                if room.project_id == project_id:
+                    if members:
+                        bot_registry = get_bot_registry()
+                        for m in members:
+                            m_clean = m.lower().strip()
+                            bot_registry.get_or_create(m_clean)
+                            if m_clean not in room.members:
+                                room.members.append(m_clean)
+                        self._save()
+                    return room
+            unique = sorted({m.lower().strip() for m in (members or [])})
+            if len(unique) < 2:
+                return None
+        # Outside the lock: get_or_create_room takes it again (non-reentrant).
+        return self.get_or_create_room(
+            f"project-{project_id}",
+            topic=f"Project {project_id} team channel",
+            members=unique,
+            mode="moderated",
+            moderator=unique[0],
+            project_id=project_id,
+        )
+
+    def rooms_for_project(self, project_id: str) -> list[GroupRoom]:
+        with self._lock:
+            return [r for r in self._rooms.values() if r.project_id == project_id]
 
     def get_room(self, name: str) -> GroupRoom | None:
         with self._lock:

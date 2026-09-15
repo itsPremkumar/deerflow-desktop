@@ -18,8 +18,38 @@ KNOWN_CHANNEL_COMMANDS: frozenset[str] = frozenset(
         "/models",
         "/memory",
         "/help",
+        "/plan",
+        "/swarm",
+        "/team",
+        "/project",
+        "/approve",
+        "/reject",
+        "/standup",
     }
 )
+
+COMMAND_DESCRIPTIONS: dict[str, str] = {
+    "/agent": "Spawn, inspect, or manage autonomous agents",
+    "/bootstrap": "Bootstrap the workspace from a goal",
+    "/goal": "Show or manage the active mission goal",
+    "/new": "Start a new conversation thread",
+    "/status": "Mission, agents, models, and runtime status",
+    "/models": "List available models",
+    "/memory": "Query or store memory",
+    "/help": "Show available channel commands",
+    "/plan": "Interview, draft, and approve an execution plan",
+    "/swarm": "Create or inspect an agent swarm",
+    "/team": "Project team presence and rooms",
+    "/project": "Project state, decisions, and events",
+    "/approve": "Approve a pending approval request",
+    "/reject": "Reject a pending approval request",
+    "/standup": "Team activity digest across projects",
+}
+
+
+def describe_channel_commands() -> list[dict[str, str]]:
+    """Shared command catalog: every channel adapter serves this set."""
+    return [{"command": cmd, "description": COMMAND_DESCRIPTIONS.get(cmd, "")} for cmd in sorted(KNOWN_CHANNEL_COMMANDS)]
 
 
 def _is_leading_mention_token(token: str) -> bool:

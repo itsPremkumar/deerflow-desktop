@@ -512,9 +512,7 @@ async def list_skill_proposals(
     summary="Propose A Skill",
     description="Propose a skill as SKILL.md markdown. Scanned immediately (blockers fail without storing); an admin reviews before anything takes effect.",
 )
-async def create_skill_proposal(
-    request: Request, body: SkillProposalCreateRequest, config: AppConfig = Depends(get_config)
-) -> SkillProposalResponse:
+async def create_skill_proposal(request: Request, body: SkillProposalCreateRequest, config: AppConfig = Depends(get_config)) -> SkillProposalResponse:
     user_id = get_effective_user_id()
     try:
         validate_proposal_name(body.name)
@@ -552,9 +550,7 @@ def _stage_proposal_archive(proposal: SkillProposal) -> Path:
     summary="Approve And Install A Proposed Skill",
     description="Admin-only: re-scan, install into the proposer's custom skills, and mark installed. Blocked re-scans fail without state changes.",
 )
-async def approve_skill_proposal(
-    proposal_id: str, request: Request, config: AppConfig = Depends(get_config)
-) -> SkillProposalResponse:
+async def approve_skill_proposal(proposal_id: str, request: Request, config: AppConfig = Depends(get_config)) -> SkillProposalResponse:
     await require_admin_user(request, detail=_ADMIN_REQUIRED_DETAIL)
     admin_id = get_effective_user_id()
     store = _proposal_store()
@@ -587,9 +583,7 @@ async def approve_skill_proposal(
             raise HTTPException(status_code=400, detail={"message": str(exc), "skill_name": exc.skill_name, "findings": exc.findings}) from exc
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
-        updated = store.set_status_any(
-            proposal_id, INSTALLED, reviewed_by=admin_id, installed_skill=install.skill_name
-        )
+        updated = store.set_status_any(proposal_id, INSTALLED, reviewed_by=admin_id, installed_skill=install.skill_name)
     finally:
         if staging is not None:
             await asyncio.to_thread(shutil.rmtree, staging, True)
@@ -605,9 +599,7 @@ async def approve_skill_proposal(
     summary="Reject A Proposed Skill",
     description="Admin-only: reject with an optional reason. Rejected proposals stay readable but inert.",
 )
-async def reject_skill_proposal(
-    proposal_id: str, request: Request, body: SkillProposalReviewRequest
-) -> SkillProposalResponse:
+async def reject_skill_proposal(proposal_id: str, request: Request, body: SkillProposalReviewRequest) -> SkillProposalResponse:
     await require_admin_user(request, detail=_ADMIN_REQUIRED_DETAIL)
     admin_id = get_effective_user_id()
     store = _proposal_store()
@@ -1003,3 +995,77 @@ async def update_skill(skill_name: str, body: SkillUpdateRequest, request: Reque
     except Exception as e:
         logger.error(f"Failed to update skill {skill_name}: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Failed to update skill: {str(e)}")
+
+
+class SkillTierRequest(BaseModel):
+    reviewer: str = Field(default="operator", max_length=64)
+    tier: str = Field(default="trusted", max_length=16)
+
+
+@router.get(
+    "/skills/tiers",
+    summary="List Skill Trust Tiers",
+    description="Show trust tier and quarantine state for reviewed skills.",
+)
+async def list_skill_tiers() -> dict:
+    def _do():
+        from deerflow.skills.tiers import get_tier_registry
+
+        return [r.to_dict() for r in get_tier_registry().list()]
+
+    return {"tiers": await asyncio.to_thread(_do)}
+
+
+@router.post(
+    "/skills/tiers/quarantine",
+    summary="Quarantine Skill",
+    description="Mark a fresh community skill as quarantined so it cannot load until reviewed.",
+)
+async def quarantine_skill(request: Request, skill_name: str = Query(...)) -> dict:
+    await require_admin_user(request, detail=_ADMIN_REQUIRED_DETAIL)
+
+    def _do():
+        from deerflow.skills.tiers import get_tier_registry
+
+        return get_tier_registry().quarantine(skill_name).to_dict()
+
+    return await asyncio.to_thread(_do)
+
+
+@router.post(
+    "/skills/tiers/{skill_name}/graduate",
+    summary="Graduate Skill",
+    description="Pass review: lift quarantine and assign a trust tier.",
+)
+async def graduate_skill(skill_name: str, request: Request, body: SkillTierRequest) -> dict:
+    await require_admin_user(request, detail=_ADMIN_REQUIRED_DETAIL)
+    if body.tier not in ("trusted", "builtin"):
+        raise HTTPException(status_code=422, detail="tier must be trusted|builtin.")
+
+    def _do():
+        from deerflow.skills.tiers import get_tier_registry
+
+        rec = get_tier_registry().graduate(skill_name, reviewer=body.reviewer, tier=body.tier)
+        return rec.to_dict() if rec else None
+
+    result = await asyncio.to_thread(_do)
+    if result is None:
+        raise HTTPException(status_code=404, detail=f"Skill '{skill_name}' has no tier record.")
+    return result
+
+
+@router.get(
+    "/skills/tiers/{skill_name}/loadable",
+    summary="Check Skill Loadable",
+    description="Whether a skill may load into a live agent (known, unquarantined, tier-sufficient).",
+)
+async def skill_loadable(skill_name: str, min_tier: str = Query(default="community")) -> dict:
+    if min_tier not in ("builtin", "trusted", "community"):
+        raise HTTPException(status_code=422, detail="min_tier must be builtin|trusted|community.")
+
+    def _do():
+        from deerflow.skills.tiers import get_tier_registry
+
+        return get_tier_registry().loadable(skill_name, min_tier=min_tier)
+
+    return {"skill_name": skill_name, "loadable": await asyncio.to_thread(_do)}
