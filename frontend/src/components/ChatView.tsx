@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, lazy, Suspense } from "react";
 import { ThreadSidebar } from "@/components/ThreadSidebar";
 import { MessageItem } from "@/components/MessageItem";
 import { Composer } from "@/components/Composer";
@@ -9,30 +9,45 @@ import { ChatMessage, Thread, AIModel } from "@/types/chat";
 import { BotProfile } from "@/types/bots";
 import { fetchThreads, createThread, fetchThreadHistory, fetchAvailableModels } from "@/lib/api";
 import { fetchBots } from "@/lib/bots";
-import { fetchFeatures, FeatureFlags } from "@/lib/workspace";
+import { fetchFeatures, fetchOpsStatus, FeatureFlags } from "@/lib/workspace";
 import { fetchMe, UserInfo } from "@/lib/auth";
 import { listThreadRuns, cancelRun } from "@/lib/runs";
 import { rateMessage } from "@/lib/feedback";
 import { suggestionsEnabled, suggestFollowUps, polishDraft } from "@/lib/assist";
+import { listCommands, executeCommand, SlashCommand } from "@/lib/commands";
 import { uploadFiles } from "@/lib/files";
 import { fetchGoal, setGoal, clearGoal, compactThread, fetchTokenUsage, TokenUsage } from "@/lib/threads-ext";
 import { BotGallery } from "@/components/bots/BotGallery";
 import { BotDetailPanel } from "@/components/bots/BotDetailPanel";
 import { ActiveBotPicker } from "@/components/bots/ActiveBotPicker";
-import { BotOpsSection } from "@/components/sections/BotOpsSection";
-import { RunsSection } from "@/components/sections/RunsSection";
-import { FilesSection } from "@/components/sections/FilesSection";
-import { ScheduledSection } from "@/components/sections/ScheduledSection";
-import { SubagentsSection } from "@/components/sections/SubagentsSection";
-import { SkillsSection } from "@/components/sections/SkillsSection";
-import { MemorySection } from "@/components/sections/MemorySection";
-import { ProjectsSection } from "@/components/sections/ProjectsSection";
-import { DashboardSection } from "@/components/sections/DashboardSection";
-import { AgentsSection } from "@/components/sections/AgentsSection";
-import { TeamOpsSection } from "@/components/sections/TeamOpsSection";
-import { ChannelsSection } from "@/components/sections/ChannelsSection";
-import { AuthSection } from "@/components/sections/AuthSection";
-import { Sparkles, Activity, Shrink, Target, X } from "lucide-react";
+import { SkeletonList } from "@/components/ui";
+import { Sparkles, Activity, Shrink, Target, X, ClipboardList } from "lucide-react";
+
+// Sections load on demand so the first paint stays light.
+const BotOpsSection = lazy(() => import("@/components/sections/BotOpsSection").then((m) => ({ default: m.BotOpsSection })));
+const RunsSection = lazy(() => import("@/components/sections/RunsSection").then((m) => ({ default: m.RunsSection })));
+const FilesSection = lazy(() => import("@/components/sections/FilesSection").then((m) => ({ default: m.FilesSection })));
+const ScheduledSection = lazy(() => import("@/components/sections/ScheduledSection").then((m) => ({ default: m.ScheduledSection })));
+const SubagentsSection = lazy(() => import("@/components/sections/SubagentsSection").then((m) => ({ default: m.SubagentsSection })));
+const SkillsSection = lazy(() => import("@/components/sections/SkillsSection").then((m) => ({ default: m.SkillsSection })));
+const MemorySection = lazy(() => import("@/components/sections/MemorySection").then((m) => ({ default: m.MemorySection })));
+const ProjectsSection = lazy(() => import("@/components/sections/ProjectsSection").then((m) => ({ default: m.ProjectsSection })));
+const DashboardSection = lazy(() => import("@/components/sections/DashboardSection").then((m) => ({ default: m.DashboardSection })));
+const AgentsSection = lazy(() => import("@/components/sections/AgentsSection").then((m) => ({ default: m.AgentsSection })));
+const TeamOpsSection = lazy(() => import("@/components/sections/TeamOpsSection").then((m) => ({ default: m.TeamOpsSection })));
+const ChannelsSection = lazy(() => import("@/components/sections/ChannelsSection").then((m) => ({ default: m.ChannelsSection })));
+const SystemSection = lazy(() => import("@/components/sections/SystemSection").then((m) => ({ default: m.SystemSection })));
+const AuthSection = lazy(() => import("@/components/sections/AuthSection").then((m) => ({ default: m.AuthSection })));
+
+function SectionFallback() {
+  return (
+    <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-5 w-full">
+      <div className="max-w-6xl mx-auto">
+        <SkeletonList rows={4} />
+      </div>
+    </div>
+  );
+}
 
 export default function ChatView() {
   const [threads, setThreads] = useState<Thread[]>([]);
@@ -69,6 +84,9 @@ export default function ChatView() {
   const [suggestionsOn, setSuggestionsOn] = useState(false);
   const [polishing, setPolishing] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [planMode, setPlanMode] = useState(false);
+  const [slashCommands, setSlashCommands] = useState<SlashCommand[]>([]);
+  const [gatewayOk, setGatewayOk] = useState<boolean | null>(null);
 
   const flash = (msg: string) => {
     setNotice(msg);
@@ -96,6 +114,10 @@ export default function ChatView() {
       setUser(me);
       setUserLoading(false);
       setSuggestionsOn(suggOn);
+      // Lightweight liveness probe for the header status pill.
+      fetchOpsStatus().then(() => setGatewayOk(true)).catch(() => setGatewayOk(false));
+      // Shortcut commands for the "/" palette (quiet if unavailable).
+      listCommands().then(setSlashCommands).catch(() => setSlashCommands([]));
     }
     init();
   }, []);
@@ -229,6 +251,7 @@ export default function ChatView() {
           config: {
             configurable: {
               model_name: selectedModel,
+              ...(planMode ? { is_plan_mode: true } : {}),
             },
           },
         }),
@@ -305,7 +328,59 @@ export default function ChatView() {
     }
   };
 
-  const handleSubmit = () => sendMessage(input);
+  const handleSubmit = () => {
+    const text = input.trim();
+    // Slash shortcuts run directly instead of starting an agent run.
+    if (text.startsWith("/")) {
+      runSlash(text);
+      return;
+    }
+    sendMessage(input);
+  };
+
+  /** Execute a "/command" and show its result right in the chat. */
+  const runSlash = async (command: string) => {
+    let currentThreadId = activeThreadId;
+    if (!currentThreadId) {
+      try {
+        currentThreadId = await createThread(command.slice(0, 30));
+      } catch {
+        currentThreadId = null;
+      }
+      if (currentThreadId) {
+        setActiveThreadId(currentThreadId);
+        setThreads([{ thread_id: currentThreadId, title: command.slice(0, 30), created_at: new Date().toISOString(), updated_at: new Date().toISOString() }, ...threads]);
+      }
+    }
+    const userMsg: ChatMessage = {
+      id: `user-${Date.now()}`,
+      role: "user",
+      content: command,
+      createdAt: new Date().toISOString(),
+    };
+    setMessages((prev) => [...prev, userMsg]);
+    setInput("");
+    setIsLoading(true);
+    try {
+      const out = await executeCommand(command, currentThreadId ? { thread_id: currentThreadId } : undefined);
+      setMessages((prev) => [
+        ...prev,
+        { id: `asst-${Date.now()}`, role: "assistant", content: out, createdAt: new Date().toISOString() },
+      ]);
+    } catch (e) {
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: `asst-${Date.now()}`,
+          role: "assistant",
+          content: `Couldn't run that shortcut: ${e instanceof Error ? e.message : "unknown error"}`,
+          createdAt: new Date().toISOString(),
+        },
+      ]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   /** Stop button: halt the stream, then cancel the run server-side (best effort). */
   const handleStop = async () => {
@@ -448,10 +523,15 @@ export default function ChatView() {
               <span className="text-xs font-semibold text-foreground truncate max-w-52">
                 {threads.find((t) => t.thread_id === activeThreadId)?.title || "Active Workspace"}
               </span>
-              <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 font-medium hidden sm:inline-flex items-center gap-1">
-                <span className="size-1.5 rounded-full bg-emerald-500" />
-                Connected
-              </span>
+              <button
+                type="button"
+                onClick={() => setView("system")}
+                title={gatewayOk === false ? "Server unreachable — open System to diagnose" : "Server status — open System control center"}
+                className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 font-medium hidden sm:inline-flex items-center gap-1 hover:bg-emerald-500/20"
+              >
+                <span className={`size-1.5 rounded-full ${gatewayOk === false ? "bg-destructive" : gatewayOk ? "bg-emerald-500" : "bg-amber-400"}`} />
+                {gatewayOk === false ? "Offline" : gatewayOk ? "Connected" : "Checking…"}
+              </button>
               <div className="flex-1" />
               <ActiveBotPicker bots={bots} activeBot={activeBot} onPick={setActiveBot} />
               <span className="hidden lg:inline text-xs text-muted-foreground">
@@ -496,7 +576,9 @@ export default function ChatView() {
         ) : null}
 
         {view === "bots" && botsTab === "ops" ? (
-          <BotOpsSection bots={bots} onRefreshBots={refreshBots} />
+          <Suspense fallback={<SectionFallback />}>
+            <BotOpsSection bots={bots} onRefreshBots={refreshBots} />
+          </Suspense>
         ) : view === "bots" ? (
           <BotGallery
             bots={bots}
@@ -507,29 +589,57 @@ export default function ChatView() {
             onRefresh={refreshBots}
           />
         ) : view === "runs" ? (
-          <RunsSection threadId={activeThreadId} />
+          <Suspense fallback={<SectionFallback />}>
+            <RunsSection threadId={activeThreadId} />
+          </Suspense>
         ) : view === "files" ? (
-          <FilesSection threadId={activeThreadId} />
+          <Suspense fallback={<SectionFallback />}>
+            <FilesSection threadId={activeThreadId} />
+          </Suspense>
         ) : view === "scheduled" ? (
-          <ScheduledSection bots={bots} />
+          <Suspense fallback={<SectionFallback />}>
+            <ScheduledSection bots={bots} />
+          </Suspense>
         ) : view === "subagents" ? (
-          <SubagentsSection />
+          <Suspense fallback={<SectionFallback />}>
+            <SubagentsSection threadId={activeThreadId} />
+          </Suspense>
         ) : view === "skills" ? (
-          <SkillsSection />
+          <Suspense fallback={<SectionFallback />}>
+            <SkillsSection />
+          </Suspense>
         ) : view === "memory" ? (
-          <MemorySection />
+          <Suspense fallback={<SectionFallback />}>
+            <MemorySection />
+          </Suspense>
         ) : view === "projects" ? (
-          <ProjectsSection onOpenThread={openThread} />
+          <Suspense fallback={<SectionFallback />}>
+            <ProjectsSection onOpenThread={openThread} />
+          </Suspense>
         ) : view === "dashboard" ? (
-          <DashboardSection onOpenThread={openThread} />
+          <Suspense fallback={<SectionFallback />}>
+            <DashboardSection onOpenThread={openThread} />
+          </Suspense>
         ) : view === "agents" ? (
-          <AgentsSection enabled={features.agentsApi} />
+          <Suspense fallback={<SectionFallback />}>
+            <AgentsSection enabled={features.agentsApi} />
+          </Suspense>
         ) : view === "team" ? (
-          <TeamOpsSection threadId={activeThreadId} mcpTasksAvailable={features.mcpTasks} />
+          <Suspense fallback={<SectionFallback />}>
+            <TeamOpsSection threadId={activeThreadId} mcpTasksAvailable={features.mcpTasks} />
+          </Suspense>
         ) : view === "channels" ? (
-          <ChannelsSection />
+          <Suspense fallback={<SectionFallback />}>
+            <ChannelsSection />
+          </Suspense>
+        ) : view === "system" ? (
+          <Suspense fallback={<SectionFallback />}>
+            <SystemSection threadId={activeThreadId} browserActive={features.browserControl} />
+          </Suspense>
         ) : view === "account" ? (
-          <AuthSection user={user} loading={userLoading} onChanged={async () => { setUser(await fetchMe()); }} />
+          <Suspense fallback={<SectionFallback />}>
+            <AuthSection user={user} loading={userLoading} onChanged={async () => { setUser(await fetchMe()); }} />
+          </Suspense>
         ) : (
           <>
             {/* Active-bot banner */}
@@ -691,6 +801,15 @@ export default function ChatView() {
                   <button type="button" onClick={handleCompact} className="inline-flex items-center gap-1 hover:text-foreground px-1.5 py-1 rounded-lg hover:bg-muted" title="Summarize older messages to free context">
                     <Shrink className="size-3.5" /> Compact context
                   </button>
+                  <button
+                    type="button"
+                    onClick={() => setPlanMode((v) => !v)}
+                    title={planMode ? "Plan mode ON: the agent plans complex work with checklists before acting" : "Turn on plan mode for careful multi-step work"}
+                    className={`inline-flex items-center gap-1 px-1.5 py-1 rounded-lg hover:bg-muted ${planMode ? "text-primary font-semibold" : ""}`}
+                    aria-pressed={planMode}
+                  >
+                    <ClipboardList className="size-3.5" /> Plan {planMode ? "on" : "off"}
+                  </button>
                   <button type="button" onClick={() => setSuggestionsOn((v) => !v)} className="hover:text-foreground px-1.5 py-1 rounded-lg hover:bg-muted" title="Toggle follow-up question suggestions">
                     Suggestions {suggestionsOn ? "on" : "off"}
                   </button>
@@ -713,6 +832,7 @@ export default function ChatView() {
                 polishing={polishing}
                 onAttach={handleAttach}
                 uploading={uploading}
+                slashCommands={slashCommands}
               />
             </footer>
           </>

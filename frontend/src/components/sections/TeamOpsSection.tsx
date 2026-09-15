@@ -2,11 +2,13 @@
 
 import React, { useEffect, useState } from "react";
 import { listGroups, createGroup, postGroupMessage, groupMessages, startGroupRun, listSwarms, createSwarm, swarmAction, listMcpTasks, listJobs, cancelJob, companyStatus, executiveDigest, companyKpis } from "@/lib/teamops";
+import { listKanbanTasks, moveKanbanTask, kanbanEvents, KANBAN_COLUMNS, KanbanTask, KanbanStatus } from "@/lib/kanban";
+import { fetchRoster, registerRosterAgent, sendAgentMessage, fetchInbox, setRosterStatus, RosterAgent, InboxMessage } from "@/lib/inbox";
 import { Section, EmptyState, ErrorBox, Notice, Btn, Badge, Field, SkeletonList, inputCls } from "@/components/ui";
 import { errMsg } from "@/lib/http";
 import { Plus, Send, Play, RefreshCw, Ban } from "lucide-react";
 
-type SubTab = "groups" | "swarms" | "jobs" | "company";
+type SubTab = "groups" | "inbox" | "swarms" | "jobs" | "company";
 
 export function TeamOpsSection(props: { threadId: string | null; mcpTasksAvailable: boolean }) {
   const [tab, setTab] = useState<SubTab>("groups");
@@ -85,6 +87,7 @@ export function TeamOpsSection(props: { threadId: string | null; mcpTasksAvailab
 
   const tabs: Array<{ id: SubTab; label: string }> = [
     { id: "groups", label: `Group chats (${groups.length})` },
+    { id: "inbox", label: "Agent inbox" },
     { id: "swarms", label: `Swarms (${swarms.length})` },
     { id: "jobs", label: `Jobs (${jobs.length})` },
     { id: "company", label: "Company" },
@@ -123,7 +126,7 @@ export function TeamOpsSection(props: { threadId: string | null; mcpTasksAvailab
           <div className="rounded-2xl border border-border/60 bg-card p-4">
             <Field label="New group room" hint="Comma-separated member bot names, e.g. researcher, reviewer.">
               <div className="flex flex-col sm:flex-row gap-2">
-                <input value={groupName} onChange={(e) => setGroupName(e.target.value)} placeholder="Room name…" className={inputCls} aria-label="Group room name" />
+                <input value={groupName} onChange={(e) => setGroupName(e.target.value)} placeholder="Room nameâ€¦" className={inputCls} aria-label="Group room name" />
                 <input value={groupMembers} onChange={(e) => setGroupMembers(e.target.value)} placeholder="researcher, reviewer" className={inputCls} aria-label="Group members" />
                 <Btn onClick={() => groupName.trim() && act(() => createGroup(groupName.trim(), groupMembers.split(",").map((m) => m.trim()).filter(Boolean)).then(() => { setGroupName(""); setGroupMembers(""); }), "Room created.")} disabled={!groupName.trim()}>
                   <Plus className="size-3.5" /> Create
@@ -145,7 +148,7 @@ export function TeamOpsSection(props: { threadId: string | null; mcpTasksAvailab
                   <div className="px-4 pb-4 border-t border-border/50 pt-3 space-y-2">
                     <div className="space-y-1.5 max-h-56 overflow-y-auto">
                       {(groupMsgs[g.name] || []).length === 0 ? (
-                        <p className="text-[11px] text-muted-foreground">No messages yet — say hello below.</p>
+                        <p className="text-[11px] text-muted-foreground">No messages yet â€” say hello below.</p>
                       ) : (
                         (groupMsgs[g.name] || []).slice(-20).map((m, i) => (
                           <div key={i} className="text-[11px] rounded-lg bg-muted/40 px-2.5 py-1.5">
@@ -156,13 +159,13 @@ export function TeamOpsSection(props: { threadId: string | null; mcpTasksAvailab
                       )}
                     </div>
                     <div className="flex gap-2">
-                      <input value={groupDraft} onChange={(e) => setGroupDraft(e.target.value)} onKeyDown={(e) => e.key === "Enter" && groupDraft.trim() && act(() => postGroupMessage(g.name, groupDraft.trim()).then(() => setGroupDraft("")).then(() => groupMessages(g.name)).then((ms) => setGroupMsgs((p) => ({ ...p, [g.name]: ms }))))} placeholder="Message the room…" className={inputCls} aria-label={`Message ${g.name}`} />
+                      <input value={groupDraft} onChange={(e) => setGroupDraft(e.target.value)} onKeyDown={(e) => e.key === "Enter" && groupDraft.trim() && act(() => postGroupMessage(g.name, groupDraft.trim()).then(() => setGroupDraft("")).then(() => groupMessages(g.name)).then((ms) => setGroupMsgs((p) => ({ ...p, [g.name]: ms }))))} placeholder="Message the roomâ€¦" className={inputCls} aria-label={`Message ${g.name}`} />
                       <Btn onClick={() => groupDraft.trim() && act(() => postGroupMessage(g.name, groupDraft.trim()).then(() => setGroupDraft("")).then(() => groupMessages(g.name)).then((ms) => setGroupMsgs((p) => ({ ...p, [g.name]: ms }))))}>
                         <Send className="size-3.5" />
                       </Btn>
                     </div>
                     <div className="flex gap-2">
-                      <input value={groupObjective} onChange={(e) => setGroupObjective(e.target.value)} placeholder="Autonomous goal, e.g. Draft the launch plan…" className={inputCls} aria-label="Autonomous run objective" />
+                      <input value={groupObjective} onChange={(e) => setGroupObjective(e.target.value)} placeholder="Autonomous goal, e.g. Draft the launch planâ€¦" className={inputCls} aria-label="Autonomous run objective" />
                       <Btn variant="ghost" onClick={() => groupObjective.trim() && act(() => startGroupRun(g.name, groupObjective.trim()).then(() => setGroupObjective("")), "Autonomous run started.")} disabled={!groupObjective.trim()}>
                         <Play className="size-3.5" /> Auto-run
                       </Btn>
@@ -178,7 +181,7 @@ export function TeamOpsSection(props: { threadId: string | null; mcpTasksAvailab
           <div className="rounded-2xl border border-border/60 bg-card p-4">
             <Field label="Launch a swarm" hint="Many workers in parallel on one objective.">
               <div className="flex gap-2">
-                <input value={swarmObjective} onChange={(e) => setSwarmObjective(e.target.value)} onKeyDown={(e) => e.key === "Enter" && swarmObjective.trim() && act(() => createSwarm(swarmObjective.trim()).then(() => setSwarmObjective("")), "Swarm launched.")} placeholder="Objective…" className={inputCls} />
+                <input value={swarmObjective} onChange={(e) => setSwarmObjective(e.target.value)} onKeyDown={(e) => e.key === "Enter" && swarmObjective.trim() && act(() => createSwarm(swarmObjective.trim()).then(() => setSwarmObjective("")), "Swarm launched.")} placeholder="Objectiveâ€¦" className={inputCls} />
                 <Btn onClick={() => swarmObjective.trim() && act(() => createSwarm(swarmObjective.trim()).then(() => setSwarmObjective("")), "Swarm launched.")} disabled={!swarmObjective.trim()}>
                   <Play className="size-3.5" /> Launch
                 </Btn>
@@ -212,7 +215,7 @@ export function TeamOpsSection(props: { threadId: string | null; mcpTasksAvailab
             <div className="rounded-2xl border border-border/60 bg-card p-4">
               <p className="text-xs font-semibold mb-1.5">Long-running tool tasks in this chat ({mcpTasks.length})</p>
               {mcpTasks.length === 0 ? (
-                <p className="text-[11px] text-muted-foreground">None — durable tool work appears here.</p>
+                <p className="text-[11px] text-muted-foreground">None â€” durable tool work appears here.</p>
               ) : (
                 mcpTasks.slice(0, 10).map((t, i) => (
                   <p key={i} className="text-[11px] font-mono rounded-lg bg-muted/40 px-2.5 py-1.5 mb-1 break-all">
@@ -239,8 +242,11 @@ export function TeamOpsSection(props: { threadId: string | null; mcpTasksAvailab
             ))
           )}
         </div>
+      ) : tab === "inbox" ? (
+        <InboxPanel threadId={props.threadId} onError={setError} />
       ) : (
         <div className="space-y-3">
+          <KanbanBoard onError={setError} />
           <CompanyDigest digest={digest} />
           <div className="rounded-2xl border border-border/60 bg-card p-4">
             <p className="text-xs font-semibold mb-2">Key figures ({kpis.length})</p>
@@ -250,7 +256,7 @@ export function TeamOpsSection(props: { threadId: string | null; mcpTasksAvailab
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                 {kpis.slice(0, 12).map((k, i) => (
                   <div key={i} className="rounded-xl bg-muted/40 p-2.5">
-                    <p className="text-sm font-bold">{String(k.value ?? k.current ?? "—")}</p>
+                    <p className="text-sm font-bold">{String(k.value ?? k.current ?? "â€”")}</p>
                     <p className="text-[10px] text-muted-foreground">{String(k.name ?? k.label ?? k.metric ?? `KPI ${i + 1}`)}</p>
                   </div>
                 ))}
@@ -283,6 +289,189 @@ function CompanyStatusBox() {
     <div className="rounded-2xl border border-border/60 bg-card p-4">
       <p className="text-xs font-semibold mb-2">Company status</p>
       <pre className="text-[11px] font-mono whitespace-pre-wrap max-h-56 overflow-y-auto rounded-xl bg-muted/40 p-3">{JSON.stringify(status, null, 2).slice(0, 3000)}</pre>
+    </div>
+  );
+}
+
+function KanbanBoard(props: { onError: (m: string) => void }) {
+  const [tasks, setTasks] = useState<KanbanTask[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const load = async () => {
+    setLoading(true);
+    try {
+      setTasks(await listKanbanTasks());
+    } catch (e) {
+      props.onError(errMsg(e));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const move = async (t: KanbanTask, dir: 1 | -1) => {
+    const order: KanbanStatus[] = ["ready", "in_progress", "review", "done"];
+    const next = order[Math.min(3, Math.max(0, order.indexOf(t.status as KanbanStatus) + dir))];
+    if (!next || next === t.status) return;
+    try {
+      await moveKanbanTask(t.id, next, `Moved by UI from ${t.status}`);
+      await load();
+    } catch (e) {
+      props.onError(errMsg(e));
+    }
+  };
+
+  if (loading) return <SkeletonList rows={2} />;
+  if (tasks.length === 0) return null;
+
+  return (
+    <div className="rounded-2xl border border-border/60 bg-card p-4">
+      <div className="flex items-center gap-2 mb-3">
+        <p className="text-xs font-semibold flex-1">Work board ({tasks.length})</p>
+        <Btn variant="ghost" onClick={load}>
+          <RefreshCw className="size-3.5" /> Refresh
+        </Btn>
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
+        {KANBAN_COLUMNS.map((col) => {
+          const items = tasks.filter((t) => t.status === col.id);
+          return (
+            <div key={col.id} className="rounded-xl bg-muted/40 p-2 space-y-1.5">
+              <p className="text-[11px] font-bold px-1">{col.label} ({items.length})</p>
+              <p className="text-[10px] text-muted-foreground px-1 -mt-1">{col.hint}</p>
+              {items.slice(0, 12).map((t) => (
+                <div key={t.id} className="rounded-lg bg-card border border-border/60 p-2">
+                  <p className="text-[11px] font-medium leading-snug">{t.title || t.id.slice(0, 20)}</p>
+                  {t.assignee && <p className="text-[10px] text-muted-foreground mt-0.5">?? {t.assignee}</p>}
+                  <div className="flex gap-1 mt-1.5">
+                    <button type="button" onClick={() => move(t, -1)} disabled={t.status === "ready"} className="text-[10px] px-1.5 py-0.5 rounded bg-muted hover:bg-muted/70 disabled:opacity-30 font-semibold" aria-label="Move back">
+                      ?
+                    </button>
+                    <button type="button" onClick={() => move(t, 1)} disabled={t.status === "done"} className="text-[10px] px-1.5 py-0.5 rounded bg-muted hover:bg-muted/70 disabled:opacity-30 font-semibold" aria-label="Move forward">
+                      ?
+                    </button>
+                  </div>
+                </div>
+              ))}
+              {items.length === 0 && <p className="text-[10px] text-muted-foreground px-1 py-2">Empty</p>}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function InboxPanel(props: { threadId: string | null; onError: (m: string) => void }) {
+  const [roster, setRoster] = useState<RosterAgent[]>([]);
+  const [who, setWho] = useState("");
+  const [msgs, setMsgs] = useState<InboxMessage[]>([]);
+  const [showRegister, setShowRegister] = useState(false);
+  const [regName, setRegName] = useState("");
+  const [sendTo, setSendTo] = useState("");
+  const [sendText, setSendText] = useState("");
+
+  const loadRoster = async () => {
+    if (!props.threadId) return;
+    try {
+      const r = await fetchRoster(props.threadId);
+      setRoster(r);
+      if (!who && r.length > 0) setWho(r[0].name);
+    } catch (e) {
+      props.onError(errMsg(e));
+    }
+  };
+
+  const loadInbox = async (agent: string) => {
+    if (!props.threadId || !agent) return;
+    try {
+      setMsgs(await fetchInbox(props.threadId, agent));
+    } catch (e) {
+      props.onError(errMsg(e));
+    }
+  };
+
+  useEffect(() => {
+    setRoster([]);
+    setMsgs([]);
+    setWho("");
+    loadRoster();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [props.threadId]);
+
+  useEffect(() => {
+    if (who) loadInbox(who);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [who]);
+
+  if (!props.threadId) {
+    return <EmptyState title="Pick a chat first" hint="The agent inbox lives inside a conversation." />;
+  }
+
+  return (
+    <div className="space-y-2">
+      <div className="rounded-2xl border border-border/60 bg-card p-4">
+        <div className="flex items-center gap-2 mb-2">
+          <p className="text-xs font-semibold flex-1">Who's in this chat ({roster.length})</p>
+          <Btn variant="ghost" onClick={loadRoster}>
+            <RefreshCw className="size-3.5" /> Refresh
+          </Btn>
+          <Btn variant="ghost" onClick={() => setShowRegister((v) => !v)}>
+            <Plus className="size-3.5" /> Add agent
+          </Btn>
+        </div>
+        {showRegister && (
+          <div className="flex gap-2 mb-2">
+            <input value={regName} onChange={(e) => setRegName(e.target.value)} onKeyDown={(e) => e.key === "Enter" && regName.trim() && props.threadId && registerRosterAgent(props.threadId, regName.trim()).then(() => { setRegName(""); setShowRegister(false); loadRoster(); }).catch((e) => props.onError(errMsg(e)))} placeholder="Agent name, e.g. researcherï¿½" className={inputCls} aria-label="Agent name" />
+            <Btn onClick={() => regName.trim() && props.threadId && registerRosterAgent(props.threadId, regName.trim()).then(() => { setRegName(""); setShowRegister(false); loadRoster(); }).catch((e) => props.onError(errMsg(e)))}>Add</Btn>
+          </div>
+        )}
+        {roster.length === 0 ? (
+          <p className="text-[11px] text-muted-foreground">Nobody registered yet ï¿½ add the agents working here.</p>
+        ) : (
+          <div className="flex gap-1.5 flex-wrap">
+            {roster.map((a) => (
+              <button key={a.name} type="button" onClick={() => setWho(a.name)} className={`text-[11px] px-2.5 py-1.5 rounded-lg border font-medium ${who === a.name ? "border-primary bg-primary/10 text-primary" : "border-border/70 text-muted-foreground hover:text-foreground"}`}>
+                {a.name} ï¿½ {a.status}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {who && (
+        <div className="rounded-2xl border border-border/60 bg-card p-4 space-y-2">
+          <p className="text-xs font-semibold">Inbox: {who} ({msgs.length})</p>
+          <div className="space-y-1.5 max-h-56 overflow-y-auto">
+            {msgs.length === 0 ? (
+              <p className="text-[11px] text-muted-foreground">No messages ï¿½ write one below.</p>
+            ) : (
+              msgs.slice(-20).map((m) => (
+                <div key={m.id} className="text-[11px] rounded-lg bg-muted/40 px-2.5 py-1.5">
+                  <span className="font-semibold">{m.from || "?"} ? {m.to || "all"}: </span>
+                  {m.content.slice(0, 500)}
+                </div>
+              ))
+            )}
+          </div>
+          <div className="flex flex-col sm:flex-row gap-2">
+            <select value={sendTo} onChange={(e) => setSendTo(e.target.value)} className={`${inputCls} sm:max-w-40`} aria-label="Send to">
+              <option value="">Everyone</option>
+              {roster.filter((a) => a.name !== who).map((a) => (
+                <option key={a.name} value={a.name}>{a.name}</option>
+              ))}
+            </select>
+            <input value={sendText} onChange={(e) => setSendText(e.target.value)} onKeyDown={(e) => e.key === "Enter" && sendText.trim() && props.threadId && sendAgentMessage(props.threadId, who, sendTo || "all", sendText.trim()).then(() => { setSendText(""); loadInbox(who); }).catch((er) => props.onError(errMsg(er)))} placeholder={`Message as ${who}ï¿½`} className={inputCls} aria-label="Agent message" />
+            <Btn onClick={() => sendText.trim() && props.threadId && sendAgentMessage(props.threadId, who, sendTo || "all", sendText.trim()).then(() => { setSendText(""); loadInbox(who); }).catch((er) => props.onError(errMsg(er)))}>
+              <Send className="size-3.5" /> Send
+            </Btn>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

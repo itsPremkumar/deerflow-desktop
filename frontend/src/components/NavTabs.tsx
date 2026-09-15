@@ -16,6 +16,7 @@ import {
   Users,
   Plug,
   UserRound,
+  ServerCog,
 } from "lucide-react";
 
 export type WorkspaceView =
@@ -32,6 +33,7 @@ export type WorkspaceView =
   | "agents"
   | "team"
   | "channels"
+  | "system"
   | "account";
 
 export const WORKSPACE_TABS: Array<{ id: WorkspaceView; label: string; icon: React.ReactNode; blurb: string }> = [
@@ -48,6 +50,7 @@ export const WORKSPACE_TABS: Array<{ id: WorkspaceView; label: string; icon: Rea
   { id: "agents", label: "Agents", icon: <Sparkles className="size-3.5" />, blurb: "Custom personas" },
   { id: "team", label: "Team Ops", icon: <Users className="size-3.5" />, blurb: "Groups, swarms & jobs" },
   { id: "channels", label: "Channels", icon: <Plug className="size-3.5" />, blurb: "Chat apps & integrations" },
+  { id: "system", label: "System", icon: <ServerCog className="size-3.5" />, blurb: "Live status, shortcuts, apps" },
   { id: "account", label: "Account", icon: <UserRound className="size-3.5" />, blurb: "Sign in & API tokens" },
 ];
 

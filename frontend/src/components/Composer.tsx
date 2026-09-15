@@ -1,8 +1,9 @@
 ﻿"use client";
 
-import React, { useRef, useEffect } from "react";
-import { Send, Square, Wand2, Paperclip } from "lucide-react";
+import React, { useRef, useEffect, useState } from "react";
+import { Send, Square, Wand2, Paperclip, Terminal } from "lucide-react";
 import { AIModel } from "@/types/chat";
+import { SlashCommand } from "@/lib/commands";
 
 interface ComposerProps {
   input: string;
@@ -19,6 +20,8 @@ interface ComposerProps {
   /** Attach files to the active conversation. */
   onAttach?: (files: FileList) => void;
   uploading?: boolean;
+  /** All shortcut commands (for the "/" palette). */
+  slashCommands?: SlashCommand[];
 }
 
 export function Composer({
@@ -34,9 +37,11 @@ export function Composer({
   polishing,
   onAttach,
   uploading,
+  slashCommands,
 }: ComposerProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const [palIndex, setPalIndex] = useState(0);
 
   useEffect(() => {
     if (textareaRef.current) {
@@ -45,7 +50,33 @@ export function Composer({
     }
   }, [input]);
 
+  const paletteOpen = input.startsWith("/") && !isLoading && (slashCommands?.length ?? 0) > 0;
+  const query = input.slice(1).split(/\s+/)[0].toLowerCase();
+  const hints = paletteOpen
+    ? (slashCommands || [])
+        .filter((c) => !query || c.name.toLowerCase().includes(query) || c.description.toLowerCase().includes(query))
+        .slice(0, 7)
+    : [];
+
+  useEffect(() => {
+    setPalIndex(0);
+  }, [query]);
+
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (hints.length > 0 && (e.key === "ArrowDown" || e.key === "ArrowUp")) {
+      e.preventDefault();
+      setPalIndex((i) => (e.key === "ArrowDown" ? (i + 1) % hints.length : (i - 1 + hints.length) % hints.length));
+      return;
+    }
+    if (e.key === "Tab" && hints.length > 0) {
+      e.preventDefault();
+      setInput(`/${hints[palIndex].name} `);
+      return;
+    }
+    if (e.key === "Escape" && hints.length > 0) {
+      setInput("");
+      return;
+    }
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       if (!isLoading && input.trim()) {
@@ -56,13 +87,37 @@ export function Composer({
 
   return (
     <div className="w-full max-w-4xl mx-auto p-3">
+      {/* Slash-command palette */}
+      {hints.length > 0 && (
+        <div className="mb-2 rounded-2xl border border-border bg-card shadow-lg overflow-hidden" role="listbox" aria-label="Shortcut commands">
+          {hints.map((c, i) => (
+            <button
+              key={c.name}
+              type="button"
+              role="option"
+              aria-selected={i === palIndex}
+              onClick={() => setInput(`/${c.name} `)}
+              onMouseEnter={() => setPalIndex(i)}
+              className={`w-full flex items-center gap-2 px-3 py-2 text-left text-xs transition-colors ${i === palIndex ? "bg-primary/10" : "hover:bg-muted/50"}`}
+            >
+              <Terminal className="size-3.5 text-primary shrink-0" />
+              <span className="font-mono font-semibold">/{c.name}</span>
+              <span className="text-muted-foreground truncate">{c.description || "Run this shortcut"}</span>
+            </button>
+          ))}
+          <p className="px-3 py-1.5 text-[10px] text-muted-foreground border-t border-border/40">
+            ↑↓ choose • Tab fill • Enter run • type <span className="font-mono">/help</span> to see all
+          </p>
+        </div>
+      )}
+
       <div className="rounded-2xl border border-border bg-card shadow-sm focus-within:ring-1 focus-within:ring-primary/40 focus-within:border-primary/50 transition-all p-2.5">
         <textarea
           ref={textareaRef}
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="Ask anything, design architectures, run tools…"
+          placeholder="Ask anything… or type / for shortcuts"
           rows={1}
           aria-label="Message the agent"
           className="w-full resize-none bg-transparent px-3 py-2 text-sm focus:outline-none placeholder:text-muted-foreground max-h-48 text-foreground"
@@ -150,7 +205,8 @@ export function Composer({
       </div>
       <div className="text-[11px] text-center text-muted-foreground mt-2">
         <kbd className="px-1 py-0.5 rounded bg-muted text-[10px] font-mono">Enter</kbd> to send,{" "}
-        <kbd className="px-1 py-0.5 rounded bg-muted text-[10px] font-mono">Shift + Enter</kbd> for new line
+        <kbd className="px-1 py-0.5 rounded bg-muted text-[10px] font-mono">Shift + Enter</kbd> for new line,{" "}
+        <kbd className="px-1 py-0.5 rounded bg-muted text-[10px] font-mono">/</kbd> for shortcuts
       </div>
     </div>
   );

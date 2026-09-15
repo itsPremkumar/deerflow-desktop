@@ -2,9 +2,10 @@
 
 import React, { useEffect, useState } from "react";
 import { fetchConsoleStats, fetchConsoleRuns, fetchConsoleUsage, fetchOpsVersion, ConsoleStats, ConsoleRun } from "@/lib/workspace";
+import { supervisionFleet, supervisionAnomalies, recoverWorker } from "@/lib/supervision";
 import { Section, EmptyState, ErrorBox, StatCard, Btn, Badge, SkeletonList } from "@/components/ui";
 import { errMsg } from "@/lib/http";
-import { RefreshCw } from "lucide-react";
+import { RefreshCw, ShieldCheck } from "lucide-react";
 
 function Bar(props: { label: string; value: number; max: number }) {
   const pct = props.max > 0 ? Math.min(100, Math.round((props.value / props.max) * 100)) : 0;
@@ -61,7 +62,7 @@ export function DashboardSection(props: { onOpenThread: (id: string) => void }) 
   return (
     <Section
       title="Usage & activity"
-      hint="How much the team has worked, which models it used, and what it cost. Needs a SQL database backend — shows an error on in-memory deployments."
+      hint="How much the team has worked, which models it used, and what it cost. Needs a SQL database backend â€” shows an error on in-memory deployments."
       actions={
         <>
           {version && <Badge tone="gray">server {version}</Badge>}
@@ -85,7 +86,7 @@ export function DashboardSection(props: { onOpenThread: (id: string) => void }) 
             <StatCard label="Tokens" value={stats.tokens.toLocaleString()} />
             <StatCard
               label="Cost"
-              value={stats.cost !== null ? `${stats.cost.toFixed(2)}${stats.currency ? ` ${stats.currency}` : ""}` : "—"}
+              value={stats.cost !== null ? `${stats.cost.toFixed(2)}${stats.currency ? ` ${stats.currency}` : ""}` : "â€”"}
               sub={stats.cost === null ? "no pricing set" : undefined}
             />
           </div>
@@ -117,9 +118,10 @@ export function DashboardSection(props: { onOpenThread: (id: string) => void }) 
             </div>
           </div>
 
+          <WatchdogBlock />
+
           <div className="rounded-2xl border border-border/60 bg-card p-4">
-            <p className="text-xs font-semibold mb-2">Recent runs</p>
-            {runs.length === 0 ? (
+            <p className="text-xs font-semibold mb-2">Recent runs</p>            {runs.length === 0 ? (
               <p className="text-[11px] text-muted-foreground">No runs recorded yet.</p>
             ) : (
               <div className="space-y-1.5">
@@ -139,5 +141,57 @@ export function DashboardSection(props: { onOpenThread: (id: string) => void }) 
         </>
       )}
     </Section>
+  );
+}
+
+function WatchdogBlock() {
+  const [fleet, setFleet] = React.useState<Record<string, unknown> | null>(null);
+  const [anomalies, setAnomalies] = React.useState<Array<Record<string, unknown>>>([]);
+  const [loaded, setLoaded] = React.useState(false);
+  const [msg, setMsg] = React.useState<string | null>(null);
+
+  const load = async () => {
+    const [f, a] = await Promise.all([supervisionFleet(), supervisionAnomalies()]);
+    setFleet(f);
+    setAnomalies(a);
+    setLoaded(true);
+  };
+
+  React.useEffect(() => {
+    load().catch(() => setLoaded(true));
+  }, []);
+
+  if (!loaded) return null;
+  if (!fleet && anomalies.length === 0) return null;
+
+  return (
+    <div className="rounded-2xl border border-border/60 bg-card p-4 space-y-2">
+      <div className="flex items-center gap-2">
+        <ShieldCheck className="size-4 text-emerald-500" />
+        <p className="text-xs font-semibold flex-1">Safety watchdog</p>
+        <Badge tone={anomalies.length > 0 ? undefined : "green"}>
+          {anomalies.length > 0 ? `${anomalies.length} issue${anomalies.length > 1 ? "s" : ""}` : "all healthy"}
+        </Badge>
+      </div>
+      {msg && <p className="text-[11px] text-emerald-600">{msg}</p>}
+      {anomalies.length === 0 ? (
+        <p className="text-[11px] text-muted-foreground">Workers are reporting in normally. Frozen or looping workers appear here with a one-tap fix.</p>
+      ) : (
+        <div className="space-y-1.5">
+          {anomalies.slice(0, 8).map((a, i) => {
+            const worker = String(a.worker_id ?? a.worker ?? "worker");
+            return (
+              <div key={i} className="flex items-center gap-2 rounded-xl bg-muted/40 px-3 py-2 flex-wrap">
+                <span className="text-[11px] font-mono font-semibold flex-1 min-w-32">{worker}</span>
+                <span className="text-[11px] text-muted-foreground flex-1 min-w-40">{String(a.anomaly_type ?? a.type ?? a.description ?? "anomaly").slice(0, 120)}</span>
+                <Btn variant="ghost" onClick={() => recoverWorker(worker).then((m) => { setMsg(`Recovery started for ${worker}.`); setAnomalies((prev) => prev.filter((_, j) => j !== i)); }).catch((e) => setMsg(errMsg(e)))}>
+                  Fix it
+                </Btn>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
   );
 }
