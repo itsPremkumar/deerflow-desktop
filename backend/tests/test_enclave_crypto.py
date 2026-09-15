@@ -1,6 +1,6 @@
 import pytest
 
-from deerflow.security.astra import CheckpointCrypto, CheckpointIntegrityError
+from deerflow.security.enclave import CheckpointCrypto, CheckpointIntegrityError
 
 
 def test_aes_gcm_encrypt_decrypt_roundtrip():

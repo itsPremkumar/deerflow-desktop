@@ -13,7 +13,7 @@ from langgraph.types import Command
 
 from deerflow.subagents.config import SubagentConfig
 
-ralph_module = importlib.import_module("deerflow.tools.builtins.ralph_loop_tool")
+ralph_module = importlib.import_module("deerflow.tools.builtins.self_improvement_tool")
 
 
 # NOTE: backend/tests/conftest.py pre-mocks ``deerflow.subagents.executor``

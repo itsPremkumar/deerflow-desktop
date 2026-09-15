@@ -2,7 +2,7 @@ import os
 
 import pytest
 
-from deerflow.security.astra import BoundaryViolationError, TaskBoundaryPolicy
+from deerflow.security.enclave import BoundaryViolationError, TaskBoundaryPolicy
 
 
 def test_boundary_validates_enclave_path(tmp_path):

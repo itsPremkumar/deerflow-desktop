@@ -1,11 +1,11 @@
 import json
 
-from deerflow.tools.builtins.nvidia_avo_tool import run_nvidia_avo_step
+from deerflow.tools.builtins.variation_operator_tool import run_variation_operator_step
 
 
-def test_nvidia_avo_tool_actions():
+def test_variation_operator_tool_actions():
     # 1. Action: knowledge_query
-    q_res_str = run_nvidia_avo_step.invoke({
+    q_res_str = run_variation_operator_step.invoke({
         "action": "knowledge_query",
         "query_text": "branchless accumulator",
     })
@@ -15,7 +15,7 @@ def test_nvidia_avo_tool_actions():
     assert "Branchless" in q_data["results"][0]["title"]
 
     # 2. Action: vary (successful baseline initialization)
-    vary_res_str = run_nvidia_avo_step.invoke({
+    vary_res_str = run_variation_operator_step.invoke({
         "action": "vary",
         "hypothesis": "Establish initial baseline",
         "modification": "Initial kernel implementation",
@@ -29,7 +29,7 @@ def test_nvidia_avo_tool_actions():
     v1_id = vary_data["version_id"]
 
     # 3. Action: vary (failed correctness -> strictly zero score and rejected)
-    fail_res_str = run_nvidia_avo_step.invoke({
+    fail_res_str = run_variation_operator_step.invoke({
         "action": "vary",
         "hypothesis": "Broken variation",
         "modification": "Introduced division by zero",
@@ -43,12 +43,12 @@ def test_nvidia_avo_tool_actions():
     assert fail_data["geometric_mean"] == 0.0
 
     # 4. Action: inspect_frontier
-    frontier_res_str = run_nvidia_avo_step.invoke({"action": "inspect_frontier"})
+    frontier_res_str = run_variation_operator_step.invoke({"action": "inspect_frontier"})
     frontier_data = json.loads(frontier_res_str)
     assert frontier_data["frontier_size"] >= 1
 
     # 5. Action: stats
-    stats_res_str = run_nvidia_avo_step.invoke({"action": "stats"})
+    stats_res_str = run_variation_operator_step.invoke({"action": "stats"})
     stats_data = json.loads(stats_res_str)
     assert "lineage" in stats_data
     assert "supervisor" in stats_data

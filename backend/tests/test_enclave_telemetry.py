@@ -1,5 +1,5 @@
 
-from deerflow.security.astra import DeceptionWatchdog, TrajectoryFlightRecorder
+from deerflow.security.enclave import DeceptionWatchdog, TrajectoryFlightRecorder
 
 
 def test_trajectory_flight_recorder_chain_integrity():

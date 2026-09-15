@@ -26,7 +26,7 @@ from deerflow.avo import (
 from deerflow.avo.persistence import AVOPersistenceManager
 from deerflow.avo.workspace_runner import WorkspaceAVORunner
 from deerflow.orchestration.problem_model import ProblemModelCompiler
-from deerflow.tools.builtins.nvidia_avo_tool import run_nvidia_avo_step
+from deerflow.tools.builtins.variation_operator_tool import run_variation_operator_step
 from deerflow.tools.builtins.problem_model_tool import compile_problem_model
 
 
@@ -179,7 +179,7 @@ def test_problem_model_compiler_12_factor():
 
 
 def test_nvidia_avo_tool_actions(tmp_path: Path):
-    """Test all tool actions provided by run_nvidia_avo_step and compile_problem_model."""
+    """Test all tool actions provided by run_variation_operator_step and compile_problem_model."""
     # 1. Compile problem model tool
     pm_md = compile_problem_model.invoke({"goal": "Refactor auth tokens in backend/auth.py", "as_markdown": True})
     assert "# AVO Problem Model" in pm_md
@@ -190,13 +190,13 @@ def test_nvidia_avo_tool_actions(tmp_path: Path):
     assert data["domain"] in ("backend", "security")
 
     # 2. Stats
-    stats_out = run_nvidia_avo_step.invoke({"action": "stats"})
+    stats_out = run_variation_operator_step.invoke({"action": "stats"})
     stats = json.loads(stats_out)
     assert "lineage" in stats
     assert "head_id" in stats["lineage"]
 
     # 3. Vary (in-memory candidate)
-    vary_out = run_nvidia_avo_step.invoke({
+    vary_out = run_variation_operator_step.invoke({
         "action": "vary",
         "hypothesis": "SIMD register caching",
         "modification": "AVX-512 register unroll",
@@ -208,12 +208,12 @@ def test_nvidia_avo_tool_actions(tmp_path: Path):
     assert vary_res["correctness"] is True
 
     # 4. Frontier Inspection
-    frontier_out = run_nvidia_avo_step.invoke({"action": "inspect_frontier"})
+    frontier_out = run_variation_operator_step.invoke({"action": "inspect_frontier"})
     frontier = json.loads(frontier_out)
     assert frontier["frontier_size"] >= 1
 
     # 5. Knowledge Query
-    kq_out = run_nvidia_avo_step.invoke({
+    kq_out = run_variation_operator_step.invoke({
         "action": "knowledge_query",
         "query_text": "register",
     })
@@ -221,7 +221,7 @@ def test_nvidia_avo_tool_actions(tmp_path: Path):
     assert "results" in kq
 
     # 6. Persist & Restore
-    persist_out = run_nvidia_avo_step.invoke({
+    persist_out = run_variation_operator_step.invoke({
         "action": "persist",
         "root_path": str(tmp_path),
     })
@@ -229,7 +229,7 @@ def test_nvidia_avo_tool_actions(tmp_path: Path):
     assert p_data["status"] == "persisted"
     assert (tmp_path / ".avo" / "lineage.json").exists()
 
-    restore_out = run_nvidia_avo_step.invoke({
+    restore_out = run_variation_operator_step.invoke({
         "action": "restore",
         "root_path": str(tmp_path),
     })
@@ -238,7 +238,7 @@ def test_nvidia_avo_tool_actions(tmp_path: Path):
     assert r_data["lineage_restored"] is True
 
     # 7. Supervisor Status
-    sup_out = run_nvidia_avo_step.invoke({"action": "supervisor_status"})
-    sup = json.loads(sup_out)
+    step_res = run_variation_operator_step.invoke({"action": "supervisor_status"})
+    sup = json.loads(step_res)
     assert "consecutive_stagnation" in sup
     assert "max_no_improve" in sup

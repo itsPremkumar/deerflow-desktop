@@ -1,5 +1,5 @@
 
-from deerflow.security.astra import CredentialRedactor, ScopedCredentialVault
+from deerflow.security.enclave import CredentialRedactor, ScopedCredentialVault
 
 
 def test_scoped_credential_vault_lease():

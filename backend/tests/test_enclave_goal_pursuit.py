@@ -1,7 +1,7 @@
-from deerflow.security.astra.goal_pursuit import (
+from deerflow.security.enclave.goal_pursuit import (
     AstraGoalHarness,
 )
-from deerflow.security.astra.spatiotemporal import (
+from deerflow.security.enclave.spatiotemporal import (
     BoundingBox,
     SpatialObject,
     SpatioTemporalCache,
