@@ -25,6 +25,7 @@ from app.gateway.routers import (
     browser,
     channel_connections,
     channels,
+    commands,
     company,
     console,
     deliberation,
@@ -882,6 +883,8 @@ This gateway provides runtime endpoints for agent runs plus custom endpoints for
     app.include_router(goal_integrity.router)
     app.include_router(a2a.router)
     app.include_router(company.router)
+    app.include_router(commands.router)
+    app.include_router(commands.router, prefix="/api/gateway")
 
 
     # Suggestions API is mounted at /api/threads/{thread_id}/suggestions

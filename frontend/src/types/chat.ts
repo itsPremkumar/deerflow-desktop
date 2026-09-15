@@ -1,4 +1,4 @@
-﻿export interface ToolCall {
+export interface ToolCall {
   id: string;
   name: string;
   args: Record<string, unknown>;
@@ -53,3 +53,22 @@ export interface AIModel {
   provider: string;
   description?: string;
 }
+
+export interface SlashCommandInfo {
+  command: string;
+  category: string;
+  description: string;
+  usage: string;
+  is_core: boolean;
+  is_autonomous_trigger: boolean;
+  requires_approval: boolean;
+}
+
+export interface SlashCommandResult {
+  status: string;
+  command: string;
+  output: string;
+  data: Record<string, unknown>;
+  autonomous_directives?: string[];
+}
+

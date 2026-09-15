@@ -1,4 +1,4 @@
-﻿import { ChatMessage, Thread, AIModel } from "@/types/chat";
+import { ChatMessage, Thread, AIModel, SlashCommandInfo, SlashCommandResult } from "@/types/chat";
 
 const BASE_URL = process.env.NEXT_PUBLIC_GATEWAY_URL || "/api/gateway";
 
@@ -74,3 +74,44 @@ export async function fetchAvailableModels(): Promise<AIModel[]> {
     ];
   }
 }
+
+export async function fetchCommands(category?: string, coreOnly?: boolean): Promise<SlashCommandInfo[]> {
+  try {
+    const params = new URLSearchParams();
+    if (category) params.append("category", category);
+    if (coreOnly) params.append("core_only", "true");
+    const res = await fetch(`/api/commands?${params.toString()}`);
+    if (!res.ok) return [];
+    const data = await res.json();
+    return data.commands || [];
+  } catch {
+    return [];
+  }
+}
+
+export async function searchCommands(q: string): Promise<SlashCommandInfo[]> {
+  try {
+    const res = await fetch(`/api/commands/search?q=${encodeURIComponent(q)}`);
+    if (!res.ok) return [];
+    const data = await res.json();
+    return data.commands || [];
+  } catch {
+    return [];
+  }
+}
+
+export async function executeSlashCommand(
+  command: string,
+  context?: Record<string, unknown>
+): Promise<SlashCommandResult> {
+  const res = await fetch(`/api/commands/execute`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ command, context }),
+  });
+  if (!res.ok) {
+    throw new Error(`Command execution failed with status: ${res.status}`);
+  }
+  return res.json();
+}
+

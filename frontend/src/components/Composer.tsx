@@ -1,8 +1,28 @@
-﻿"use client";
+"use client";
 
-import React, { useRef, useEffect } from "react";
-import { Send, Square, Sparkles } from "lucide-react";
-import { AIModel } from "@/types/chat";
+import React, { useRef, useEffect, useState, useMemo } from "react";
+import { Send, Square, Terminal, ChevronRight } from "lucide-react";
+import { AIModel, SlashCommandInfo } from "@/types/chat";
+import { fetchCommands } from "@/lib/api";
+
+const DEFAULT_CORE_COMMANDS: SlashCommandInfo[] = [
+  { command: "/goal", category: "mission", description: "Define and orchestrate autonomous goals", usage: "/goal <objective>", is_core: true, is_autonomous_trigger: true, requires_approval: false },
+  { command: "/plan", category: "planning", description: "Compile 8-dimensional strategic meta-plan", usage: "/plan <prompt>", is_core: true, is_autonomous_trigger: true, requires_approval: false },
+  { command: "/swarm", category: "swarm", description: "Orchestrate multi-agent specialized swarms", usage: "/swarm create <name>", is_core: true, is_autonomous_trigger: true, requires_approval: false },
+  { command: "/agent", category: "agent", description: "Spawn, inspect, or manage autonomous agents", usage: "/agent spawn <role>", is_core: true, is_autonomous_trigger: true, requires_approval: false },
+  { command: "/research", category: "research", description: "Deep multi-stage web and codebase research", usage: "/research <query>", is_core: true, is_autonomous_trigger: true, requires_approval: false },
+  { command: "/code", category: "coding", description: "Inspect, write, and refactor code modules", usage: "/code <task>", is_core: true, is_autonomous_trigger: false, requires_approval: false },
+  { command: "/memory", category: "memory", description: "Query and store episodic and semantic memory", usage: "/memory query <key>", is_core: true, is_autonomous_trigger: false, requires_approval: false },
+  { command: "/context", category: "context", description: "Inspect context tokens, budget, and prune", usage: "/context inspect", is_core: true, is_autonomous_trigger: false, requires_approval: false },
+  { command: "/skills", category: "skills", description: "Manage agent procedural skills and extensions", usage: "/skills list", is_core: true, is_autonomous_trigger: false, requires_approval: false },
+  { command: "/model", category: "model", description: "Inspect or switch active LLM reasoning model", usage: "/model switch <model_id>", is_core: true, is_autonomous_trigger: false, requires_approval: false },
+  { command: "/tools", category: "tools", description: "List and execute agentic tool calls", usage: "/tools list", is_core: true, is_autonomous_trigger: false, requires_approval: false },
+  { command: "/mcp", category: "tools", description: "Model Context Protocol servers and resources", usage: "/mcp list", is_core: true, is_autonomous_trigger: false, requires_approval: false },
+  { command: "/verify", category: "verification", description: "Run automated tests, linters, and invariants", usage: "/verify all", is_core: true, is_autonomous_trigger: false, requires_approval: false },
+  { command: "/browser", category: "browser", description: "Launch and inspect headless browser sessions", usage: "/browser open <url>", is_core: true, is_autonomous_trigger: true, requires_approval: false },
+  { command: "/learn", category: "rsi", description: "Extract and store operational learnings", usage: "/learn save", is_core: true, is_autonomous_trigger: false, requires_approval: false },
+  { command: "/session", category: "session", description: "Manage thread history, checkpoints, and rollback", usage: "/session rollback", is_core: true, is_autonomous_trigger: false, requires_approval: false },
+];
 
 interface ComposerProps {
   input: string;
@@ -26,6 +46,38 @@ export function Composer({
   onSelectModel,
 }: ComposerProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const [availableCommands, setAvailableCommands] = useState<SlashCommandInfo[]>(DEFAULT_CORE_COMMANDS);
+  const [selectedIndex, setSelectedIndex] = useState<number>(0);
+  const [isDismissed, setIsDismissed] = useState<boolean>(false);
+
+  // Load registered commands on mount
+  useEffect(() => {
+    async function load() {
+      const cmds = await fetchCommands();
+      if (cmds && cmds.length > 0) {
+        setAvailableCommands(cmds);
+      }
+    }
+    load();
+  }, []);
+
+  // Filter slash commands
+  const suggestions = useMemo(() => {
+    if (isDismissed || !input.startsWith("/") || input.includes(" ")) {
+      return [];
+    }
+    const q = input.toLowerCase();
+    return availableCommands
+      .filter((c) => c.command.toLowerCase().startsWith(q) || c.command.toLowerCase().includes(q))
+      .slice(0, 8);
+  }, [input, availableCommands, isDismissed]);
+
+  useEffect(() => {
+    if (input.startsWith("/")) {
+      setIsDismissed(false);
+    }
+    setSelectedIndex(0);
+  }, [input]);
 
   useEffect(() => {
     if (textareaRef.current) {
@@ -34,7 +86,36 @@ export function Composer({
     }
   }, [input]);
 
+  const selectCommand = (cmd: SlashCommandInfo) => {
+    setInput(`${cmd.command} `);
+    setIsDismissed(true);
+    textareaRef.current?.focus();
+  };
+
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (suggestions.length > 0) {
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        setSelectedIndex((prev) => (prev + 1) % suggestions.length);
+        return;
+      }
+      if (e.key === "ArrowUp") {
+        e.preventDefault();
+        setSelectedIndex((prev) => (prev - 1 + suggestions.length) % suggestions.length);
+        return;
+      }
+      if (e.key === "Tab" || (e.key === "Enter" && !e.shiftKey)) {
+        e.preventDefault();
+        selectCommand(suggestions[selectedIndex]);
+        return;
+      }
+      if (e.key === "Escape") {
+        e.preventDefault();
+        setIsDismissed(true);
+        return;
+      }
+    }
+
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       if (!isLoading && input.trim()) {
@@ -44,14 +125,52 @@ export function Composer({
   };
 
   return (
-    <div className="w-full max-w-4xl mx-auto p-3">
+    <div className="w-full max-w-4xl mx-auto p-3 relative">
+      {/* Slash Command Suggestions Palette */}
+      {suggestions.length > 0 && (
+        <div className="absolute bottom-full mb-2 left-3 right-3 bg-popover/95 backdrop-blur-md border border-border rounded-xl shadow-xl overflow-hidden z-50 animate-in fade-in slide-in-from-bottom-2 duration-150">
+          <div className="flex items-center justify-between px-3 py-1.5 border-b border-border/60 bg-muted/40 text-[11px] font-medium text-muted-foreground">
+            <div className="flex items-center gap-1.5">
+              <Terminal className="size-3.5 text-primary" />
+              <span>Master Slash Commands</span>
+            </div>
+            <span>Use ↑↓ to navigate • Tab to select • Esc to dismiss</span>
+          </div>
+          <div className="max-h-60 overflow-y-auto p-1 divide-y divide-border/20">
+            {suggestions.map((cmd, idx) => (
+              <button
+                key={cmd.command}
+                type="button"
+                onClick={() => selectCommand(cmd)}
+                className={`w-full text-left px-3 py-2 rounded-lg flex items-center justify-between transition-colors ${
+                  idx === selectedIndex ? "bg-accent text-accent-foreground" : "hover:bg-muted/60"
+                }`}
+              >
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <span className="font-mono text-xs font-semibold text-primary">
+                    {cmd.command}
+                  </span>
+                  <span className="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-muted/80 text-muted-foreground font-semibold">
+                    {cmd.category}
+                  </span>
+                  <span className="text-xs text-muted-foreground truncate max-w-md">
+                    {cmd.description}
+                  </span>
+                </div>
+                <ChevronRight className="size-3.5 text-muted-foreground shrink-0 opacity-60" />
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div className="rounded-2xl border border-border bg-card shadow-sm focus-within:ring-1 focus-within:ring-primary/40 focus-within:border-primary/50 transition-all p-2.5">
         <textarea
           ref={textareaRef}
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="Ask anything, design architectures, run tools..."
+          placeholder="Ask anything or type / for Master Slash Commands..."
           rows={1}
           className="w-full resize-none bg-transparent px-3 py-2 text-sm focus:outline-none placeholder:text-muted-foreground max-h-48 text-foreground"
         />
@@ -97,8 +216,9 @@ export function Composer({
         </div>
       </div>
       <div className="text-[11px] text-center text-muted-foreground mt-2">
-        DeerFlow AI Agent • Press <kbd className="px-1 py-0.5 rounded bg-muted text-[10px] font-mono">Enter</kbd> to send, <kbd className="px-1 py-0.5 rounded bg-muted text-[10px] font-mono">Shift + Enter</kbd> for new line
+        DeerFlow AI Agent • Type <kbd className="px-1 py-0.5 rounded bg-muted text-[10px] font-mono">/</kbd> for commands • <kbd className="px-1 py-0.5 rounded bg-muted text-[10px] font-mono">Enter</kbd> to send
       </div>
     </div>
   );
 }
+
