@@ -39,6 +39,8 @@ import { Sparkles, Activity, Shrink, Target, X, ClipboardList } from "lucide-rea
 
 // Sections load on demand so the first paint stays light.
 const BotOpsSection = lazy(() => import("@/components/sections/BotOpsSection").then((m) => ({ default: m.BotOpsSection })));
+const MessagesSection = lazy(() => import("@/components/sections/MessagesSection").then((m) => ({ default: m.MessagesSection })));
+const KanbanSection = lazy(() => import("@/components/sections/KanbanSection").then((m) => ({ default: m.KanbanSection })));
 const RunsSection = lazy(() => import("@/components/sections/RunsSection").then((m) => ({ default: m.RunsSection })));
 const FilesSection = lazy(() => import("@/components/sections/FilesSection").then((m) => ({ default: m.FilesSection })));
 const ScheduledSection = lazy(() => import("@/components/sections/ScheduledSection").then((m) => ({ default: m.ScheduledSection })));
@@ -879,6 +881,14 @@ export default function ChatView() {
             onChat={handleChatWithBot}
             onRefresh={refreshBots}
           />
+        ) : view === "messages" ? (
+          <Suspense fallback={<SectionFallback />}>
+            <MessagesSection threadId={activeThreadId} botNames={bots.map((b) => b.display_name || b.name)} />
+          </Suspense>
+        ) : view === "kanban" ? (
+          <Suspense fallback={<SectionFallback />}>
+            <KanbanSection bots={bots.map((b) => ({ name: b.name, display_name: b.display_name || b.name, avatar: b.avatar }))} />
+          </Suspense>
         ) : view === "runs" ? (
           <Suspense fallback={<SectionFallback />}>
             <RunsSection threadId={activeThreadId} />

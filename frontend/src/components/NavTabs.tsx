@@ -17,11 +17,15 @@ import {
   Plug,
   UserRound,
   ServerCog,
+  MessagesSquare,
+  SquareKanban,
 } from "lucide-react";
 
 export type WorkspaceView =
   | "chat"
   | "bots"
+  | "messages"
+  | "kanban"
   | "runs"
   | "files"
   | "scheduled"
@@ -39,6 +43,8 @@ export type WorkspaceView =
 export const WORKSPACE_TABS: Array<{ id: WorkspaceView; label: string; icon: React.ReactNode; blurb: string }> = [
   { id: "chat", label: "Chat", icon: <MessageSquare className="size-3.5" />, blurb: "Talk to the agent" },
   { id: "bots", label: "Bots", icon: <Bot className="size-3.5" />, blurb: "Specialist profiles & team ops" },
+  { id: "messages", label: "Messages", icon: <MessagesSquare className="size-3.5" />, blurb: "Agent chats & group rooms, WhatsApp-style" },
+  { id: "kanban", label: "Board", icon: <SquareKanban className="size-3.5" />, blurb: "Full project kanban board" },
   { id: "runs", label: "Runs", icon: <History className="size-3.5" />, blurb: "Run history per conversation" },
   { id: "files", label: "Files", icon: <FolderOpen className="size-3.5" />, blurb: "Uploads & generated files" },
   { id: "scheduled", label: "Scheduled", icon: <CalendarClock className="size-3.5" />, blurb: "Recurring background work" },
