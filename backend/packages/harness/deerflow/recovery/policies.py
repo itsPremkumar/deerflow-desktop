@@ -65,3 +65,29 @@ def decide(error: str, *, attempt: int) -> RecoveryDecision:
         wait = policy.backoff_seconds[min(attempt - 1, len(policy.backoff_seconds) - 1)]
         return RecoveryDecision(action="retry", attempt=attempt, wait_seconds=wait, reason=f"{failure}: retry {attempt}/{policy.max_attempts}")
     return RecoveryDecision(action=policy.terminal_strategy, attempt=attempt, wait_seconds=0.0, reason=f"{failure}: budget exhausted -> {policy.terminal_strategy}")
+
+
+# --- Bot-turn retry policy -------------------------------------------------
+# A retried bot turn NEVER mints a fresh session. Transient classes resume
+# as-is; context overflow runs compression first (the one sanctioned context
+# mutation); auth/quota/config/model/unknown are never auto-retried — a retry
+# cannot fix them and only burns quota.
+
+BOT_RETRY_RESUME = "resume"
+BOT_RETRY_COMPRESS_THEN_RESUME = "compress_then_resume"
+BOT_RETRY_NONE = "none"
+
+
+def bot_turn_retry_action(error: str, *, failure_reason: str | None = None) -> str:
+    """Map a bot-turn failure to resume | compress_then_resume | none."""
+    from deerflow.bots.failure_reasons import CONTEXT_OVERFLOW, is_auto_retryable
+
+    reason = failure_reason or classify_failure(error)
+    if reason == CONTEXT_OVERFLOW or classify_failure(error) == "context_overflow":
+        return BOT_RETRY_COMPRESS_THEN_RESUME
+    if is_auto_retryable(reason):
+        return BOT_RETRY_RESUME
+    text = (error or "").lower()
+    if "timeout" in text or "timed out" in text or "temporarily" in text or "unavailable" in text:
+        return BOT_RETRY_RESUME
+    return BOT_RETRY_NONE

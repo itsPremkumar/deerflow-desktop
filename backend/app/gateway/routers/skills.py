@@ -1069,3 +1069,91 @@ async def skill_loadable(skill_name: str, min_tier: str = Query(default="communi
         return get_tier_registry().loadable(skill_name, min_tier=min_tier)
 
     return {"skill_name": skill_name, "loadable": await asyncio.to_thread(_do)}
+
+
+class SkillPinRequest(BaseModel):
+    pinned: bool = True
+
+
+@router.get(
+    "/skills/usage",
+    summary="Skill Usage Telemetry",
+    description="Per-skill use counts and provenance feeding the curator.",
+)
+async def skill_usage() -> dict:
+    def _do():
+        from deerflow.skills.usage import get_skill_usage_tracker
+
+        return [r.to_dict() for r in get_skill_usage_tracker().all_stats()]
+
+    return {"usage": await asyncio.to_thread(_do)}
+
+
+@router.get(
+    "/skills/curator",
+    summary="Skill Curator Report",
+    description="Lifecycle states, pins, and last maintenance summary.",
+)
+async def skill_curator_report() -> dict:
+    def _do():
+        from deerflow.skills.curator import SkillCurator
+
+        return SkillCurator().report()
+
+    return await asyncio.to_thread(_do)
+
+
+@router.post(
+    "/skills/curator/run",
+    summary="Run Skill Curator",
+    description="Deterministic prune: stale then archive agent-created skills. Never deletes; archives are recoverable.",
+)
+async def skill_curator_run(request: Request, stale_after_days: float = Query(default=14.0, ge=1.0), archive_after_days: float = Query(default=30.0, ge=1.0)) -> dict:
+    await require_admin_user(request, detail=_ADMIN_REQUIRED_DETAIL)
+
+    def _do():
+        from deerflow.skills.curator import SkillCurator
+
+        return SkillCurator().apply_transitions(stale_after_days=stale_after_days, archive_after_days=archive_after_days)
+
+    return await asyncio.to_thread(_do)
+
+
+@router.post(
+    "/skills/{skill_name}/pin",
+    summary="Pin or Unpin Skill",
+    description="Pinned skills bypass all curator auto-transitions.",
+)
+async def skill_pin(skill_name: str, request: Request, body: SkillPinRequest) -> dict:
+    await require_admin_user(request, detail=_ADMIN_REQUIRED_DETAIL)
+
+    def _do():
+        from deerflow.skills.curator import SkillCurator
+
+        curator = SkillCurator()
+        if body.pinned:
+            curator.pin(skill_name)
+        else:
+            curator.unpin(skill_name)
+        return {"skill_name": skill_name, "pinned": body.pinned}
+
+    return await asyncio.to_thread(_do)
+
+
+@router.post(
+    "/skills/{skill_name}/restore",
+    summary="Restore Archived Skill",
+    description="Recover an archived skill back to active.",
+)
+async def skill_restore(skill_name: str, request: Request) -> dict:
+    await require_admin_user(request, detail=_ADMIN_REQUIRED_DETAIL)
+
+    def _do():
+        from deerflow.skills.curator import SkillCurator
+
+        return SkillCurator().restore(skill_name)
+
+    restored = await asyncio.to_thread(_do)
+    if not restored:
+        raise HTTPException(status_code=404, detail=f"Archived skill '{skill_name}' not found.")
+    return {"skill_name": skill_name, "restored": True}

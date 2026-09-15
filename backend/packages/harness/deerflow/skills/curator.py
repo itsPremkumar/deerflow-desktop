@@ -1,0 +1,172 @@
+"""Skill curator: background maintenance for agent-created skills.
+
+Lifecycle: active -> stale -> archived (moved to ``.archive/``, recoverable).
+Invariants: only agent-created skills are touched; never delete, only
+archive; pinned skills bypass all auto-transitions; protected builtins are
+exempt regardless of pins. Deterministic prune always runs; LLM
+consolidation stays opt-in at the caller.
+"""
+
+from __future__ import annotations
+
+import json
+import logging
+import shutil
+import threading
+import time
+from dataclasses import asdict, dataclass, field
+from pathlib import Path
+from typing import Any, Literal
+
+from deerflow.skills.usage import SkillUsageTracker
+
+logger = logging.getLogger(__name__)
+
+SkillState = Literal["active", "stale", "archived"]
+
+#: Load-bearing built-ins the curator must NEVER archive/consolidate.
+PROTECTED_BUILTIN_SKILLS: set[str] = set()
+
+
+def is_protected_builtin(skill_name: str) -> bool:
+    return skill_name in PROTECTED_BUILTIN_SKILLS
+
+
+def _skills_root() -> Path:
+    try:
+        from deerflow.config.runtime_paths import runtime_home
+
+        return runtime_home() / "skills"
+    except Exception:
+        return Path.cwd() / ".deerflow" / "skills"
+
+
+@dataclass
+class CuratorState:
+    states: dict[str, SkillState] = field(default_factory=dict)
+    pinned: list[str] = field(default_factory=list)
+    last_run_at: float | None = None
+    last_summary: str | None = None
+    run_count: int = 0
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> CuratorState:
+        filtered = {k: v for k, v in data.items() if k in cls.__dataclass_fields__}
+        states = {k: v for k, v in filtered.get("states", {}).items() if v in ("active", "stale", "archived")}
+        filtered["states"] = states
+        return cls(**filtered)
+
+
+class SkillCurator:
+    def __init__(self, skills_root: str | Path | None = None, usage: SkillUsageTracker | None = None):
+        self.root = Path(skills_root).resolve() if skills_root else _skills_root()
+        self.usage = usage or SkillUsageTracker(usage_file=self.root / ".usage.json")
+        self._state_file = self.root / ".curator.json"
+        self._lock = threading.Lock()
+        self.state = self._load_state()
+
+    def _load_state(self) -> CuratorState:
+        if not self._state_file.exists():
+            return CuratorState()
+        try:
+            return CuratorState.from_dict(json.loads(self._state_file.read_text(encoding="utf-8")))
+        except Exception:
+            logger.warning("Curator state load failed; starting fresh", exc_info=True)
+            return CuratorState()
+
+    def _save_state(self) -> None:
+        try:
+            self.root.mkdir(parents=True, exist_ok=True)
+            tmp = self._state_file.with_suffix(".tmp")
+            tmp.write_text(json.dumps(self.state.to_dict(), indent=2), encoding="utf-8")
+            tmp.replace(self._state_file)
+        except Exception:
+            logger.warning("Curator state save failed", exc_info=True)
+
+    def known_skills(self) -> list[str]:
+        if not self.root.exists():
+            return []
+        return sorted(p.name for p in self.root.iterdir() if p.is_dir() and not p.name.startswith(".") and (p / "SKILL.md").exists())
+
+    def pin(self, skill_name: str) -> None:
+        with self._lock:
+            if skill_name not in self.state.pinned:
+                self.state.pinned.append(skill_name)
+            self._save_state()
+
+    def unpin(self, skill_name: str) -> None:
+        with self._lock:
+            if skill_name in self.state.pinned:
+                self.state.pinned.remove(skill_name)
+            self._save_state()
+
+    def apply_transitions(self, *, stale_after_days: float = 14.0, archive_after_days: float = 30.0, now: float | None = None) -> dict[str, list[str]]:
+        """Deterministic prune: stale then archive. Returns what changed."""
+        moment = now if now is not None else time.time()
+        changed: dict[str, list[str]] = {"staled": [], "archived": []}
+        stale_cutoff = moment - stale_after_days * 86400.0
+        archive_cutoff = moment - archive_after_days * 86400.0
+        with self._lock:
+            for name in self.known_skills():
+                if name in self.state.pinned or is_protected_builtin(name):
+                    continue
+                stats = self.usage.stats(name)
+                if stats is None or stats.created_by != "agent":
+                    continue
+                last = stats.last_used_at or 0.0
+                current = self.state.states.get(name, "active")
+                if current == "active" and last < stale_cutoff:
+                    self.state.states[name] = "stale"
+                    changed["staled"].append(name)
+                elif current == "stale" and last < archive_cutoff:
+                    if self._archive_skill(name):
+                        self.state.states[name] = "archived"
+                        changed["archived"].append(name)
+            self.state.last_run_at = moment
+            self.state.run_count += 1
+            self.state.last_summary = f"staled={len(changed['staled'])} archived={len(changed['archived'])}"
+            self._save_state()
+        return changed
+
+    def _archive_skill(self, skill_name: str) -> bool:
+        src = self.root / skill_name
+        dest = self.root / ".archive" / skill_name
+        try:
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            if dest.exists():
+                shutil.rmtree(dest)
+            shutil.move(str(src), str(dest))
+            return True
+        except Exception:
+            logger.warning("Skill archive failed for %s", skill_name, exc_info=True)
+            return False
+
+    def restore(self, skill_name: str) -> bool:
+        """Recover an archived skill back to active."""
+        src = self.root / ".archive" / skill_name
+        dest = self.root / skill_name
+        with self._lock:
+            try:
+                if not src.exists() or dest.exists():
+                    return False
+                shutil.move(str(src), str(dest))
+                self.state.states[skill_name] = "active"
+                self._save_state()
+                return True
+            except Exception:
+                logger.warning("Skill restore failed for %s", skill_name, exc_info=True)
+                return False
+
+    def report(self) -> dict[str, Any]:
+        with self._lock:
+            return {
+                "known": self.known_skills(),
+                "states": dict(self.state.states),
+                "pinned": list(self.state.pinned),
+                "last_run_at": self.state.last_run_at,
+                "last_summary": self.state.last_summary,
+                "run_count": self.state.run_count,
+            }

@@ -645,3 +645,68 @@ async def route_task_endpoint(body: RouteTaskRequest) -> dict:
         return route_task(body.task_type).to_dict()
 
     return await asyncio.to_thread(_route)
+
+
+class DMSendRequest(BaseModel):
+    target: str = Field(..., min_length=1, max_length=128)
+    message: str = Field(..., min_length=1, max_length=16000)
+    thread_metadata: dict | None = None
+
+
+@router.post("/{name}/dm", summary="Send a fire-and-forget DM to a teammate bot")
+async def send_dm_endpoint(name: str, request: Request, body: DMSendRequest) -> dict:
+    """Bot Mode DM: roster-validated, server-side attribution, inbox delivery, no reply."""
+    await require_admin_user(request, detail=_ADMIN_REQUIRED_DETAIL)
+    key = _validate_bot_name(name)
+
+    def _send():
+        from deerflow.bots.dm import send_dm
+
+        return send_dm(key, body.target, body.message, thread_metadata=body.thread_metadata).to_dict()
+
+    return await asyncio.to_thread(_send)
+
+
+@router.get("/{name}/inbox", summary="List a bot's DM inbox")
+async def list_inbox(name: str, unread_only: bool = False, limit: int = 50) -> dict:
+    key = _validate_bot_name(name)
+    limit = max(1, min(limit, 200))
+
+    def _list():
+        from deerflow.bots.inbox import get_bot_inbox
+
+        box = get_bot_inbox(key)
+        return {"messages": [m.to_dict() for m in box.list(unread_only=unread_only, limit=limit)], "unread_count": box.unread_count()}
+
+    return await asyncio.to_thread(_list)
+
+
+@router.post("/{name}/inbox/{delivery_id}/ack", summary="Ack a DM as handled")
+async def ack_inbox_message(name: str, delivery_id: str, request: Request) -> dict:
+    await require_admin_user(request, detail=_ADMIN_REQUIRED_DETAIL)
+    key = _validate_bot_name(name)
+
+    def _ack():
+        from deerflow.bots.inbox import get_bot_inbox
+
+        msg = get_bot_inbox(key).ack(delivery_id)
+        return msg.to_dict() if msg else None
+
+    result = await asyncio.to_thread(_ack)
+    if result is None:
+        raise HTTPException(status_code=404, detail=f"DM '{delivery_id}' not found for bot '{key}'.")
+    return result
+
+
+@router.get("/{name}/dm-schema", summary="message_agent tool schema for bot chats")
+async def dm_schema(name: str) -> dict:
+    key = _validate_bot_name(name)
+
+    def _schema():
+        from deerflow.bots.dm import build_roster_snippet, message_agent_tool_schema
+        from deerflow.bots.registry import get_bot_registry
+
+        profiles = [{"name": b.name, "role": b.role} for b in get_bot_registry().list_bots() if b.name != key]
+        return {"schema": message_agent_tool_schema(), "roster_snippet": build_roster_snippet(profiles)}
+
+    return await asyncio.to_thread(_schema)
