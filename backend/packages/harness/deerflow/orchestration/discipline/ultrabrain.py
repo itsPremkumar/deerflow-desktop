@@ -1,8 +1,8 @@
-"""Ultrabrain Worker (OpenAI GPT-6 Astra Profile).
+"""Ultrabrain Worker (Enterprise Deep Algorithmic Specialist Profile).
 
-Inspired by Oh My OpenAgent (OmO / Sisyphus):
+Enterprise Algorithmic & Logical Synthesis Engine:
 - Category: ultrabrain / deep
-- Model Assignment: openai/gpt-6-astra (reasoning: max)
+- Model Assignment: openai/gpt-4o (reasoning: max)
 - Operating Philosophy: "Give it a goal, not a recipe."
 - Strengths: Hard algorithmic logic, concurrency, mathematical optimization, complex refactoring
 """
@@ -26,7 +26,7 @@ class UltrabrainSolution:
     code_implementation: str = ""
     proof_of_correctness: str = ""
     invariants_maintained: list[str] = field(default_factory=list)
-    model_family: str = "openai/gpt-6-astra"
+    model_family: str = "openai/gpt-4o"
     timestamp: float = field(default_factory=time.time)
 
     def to_dict(self) -> dict[str, Any]:
@@ -36,7 +36,7 @@ class UltrabrainSolution:
 class UltrabrainWorker:
     """Specialist worker autonomously solving hard algorithmic and logic problems."""
 
-    def __init__(self, model_id: str = "openai/gpt-6-astra"):
+    def __init__(self, model_id: str = "openai/gpt-4o"):
         self.model_id: str = model_id
 
     def solve_goal(

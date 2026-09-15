@@ -1,4 +1,4 @@
-﻿"""Intent-Driven Category Routing Matrix & Dual Fallback Engine.
+"""Intent-Driven Category Routing Matrix & Dual Fallback Engine.
 
 Inspired by oh-my-openagent (OmO) category routing:
 Agents select a Category (intent) instead of choosing hardcoded model names:
@@ -33,21 +33,21 @@ class CategorySpec:
 DEFAULT_CATEGORY_SPECS: dict[str, CategorySpec] = {
     "ultrabrain": CategorySpec(
         name="ultrabrain",
-        models=["gpt-6-astra", "claude-opus-5", "gpt-5.6-sol"],
+        models=["gpt-4o", "claude-opus-5", "gpt-5.6-sol"],
         reasoning_effort="max",
         temperature=0.2,
         description="Deep logical reasoning and complex architectural decisions.",
     ),
     "deep": CategorySpec(
         name="deep",
-        models=["gpt-6-astra", "claude-opus-5", "deepseek-r1"],
+        models=["gpt-4o", "claude-opus-5", "deepseek-r1"],
         reasoning_effort="high",
         temperature=0.3,
         description="Deep autonomous work for backend logic, algorithms, and complex refactors.",
     ),
     "visual-engineering": CategorySpec(
         name="visual-engineering",
-        models=["claude-fable-5-1", "claude-opus-5", "kimi-k3"],
+        models=["claude-3-7-sonnet", "claude-opus-5", "kimi-k3"],
         reasoning_effort="high",
         temperature=0.7,
         description="Frontend, UI/UX, responsive components, CSS styling and animations.",
@@ -61,14 +61,14 @@ DEFAULT_CATEGORY_SPECS: dict[str, CategorySpec] = {
     ),
     "writing": CategorySpec(
         name="writing",
-        models=["claude-fable-5-1", "kimi-k3", "gpt-5.6-sol"],
+        models=["claude-3-7-sonnet", "kimi-k3", "gpt-5.6-sol"],
         reasoning_effort="medium",
         temperature=0.6,
         description="Documentation, specification writing, and technical prose.",
     ),
     "artistry": CategorySpec(
         name="artistry",
-        models=["claude-fable-5-1", "kimi-k3", "claude-opus-5"],
+        models=["claude-3-7-sonnet", "kimi-k3", "claude-opus-5"],
         reasoning_effort="high",
         temperature=0.8,
         description="Highly creative and novel architectural exploration.",
@@ -78,11 +78,11 @@ DEFAULT_CATEGORY_SPECS: dict[str, CategorySpec] = {
         models=["grok-4.6", "gpt-5.6-terra", "claude-sonnet-5"],
         reasoning_effort="low",
         temperature=0.4,
-        description="General lightweight tasks.",
+        description="General lightweight routing with minimal latency.",
     ),
     "unspecified-high": CategorySpec(
         name="unspecified-high",
-        models=["gpt-6-astra", "claude-opus-5", "glm-5.3"],
+        models=["gpt-4o", "claude-opus-5", "glm-5.3"],
         reasoning_effort="high",
         temperature=0.3,
         description="General high-effort tasks.",

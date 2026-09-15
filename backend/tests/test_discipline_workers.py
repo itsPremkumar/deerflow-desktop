@@ -17,7 +17,7 @@ def test_visual_engineering_worker():
 
     assert isinstance(widget, VisualWidgetSpec)
     assert widget.component_name == "MetricsCard"
-    assert widget.model_family == "anthropic/claude-fable-5-1"
+    assert widget.model_family == "anthropic/claude-3-7-sonnet"
     assert "--primary" in widget.design_tokens
     assert widget.design_tokens["--primary"] == "#10B981"
     assert "widget-card" in widget.css_styles
@@ -37,7 +37,7 @@ def test_ultrabrain_worker():
     )
 
     assert isinstance(solution, UltrabrainSolution)
-    assert solution.model_family == "openai/gpt-6-astra"
+    assert solution.model_family == "openai/gpt-4o"
     assert "shortest paths" in solution.goal
     assert solution.time_complexity != ""
     assert solution.space_complexity != ""

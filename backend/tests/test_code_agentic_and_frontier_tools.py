@@ -103,7 +103,7 @@ class TestCodeAgenticAndFrontierTools(unittest.TestCase):
             "is_visual_or_frontend": True,
         })
         gap_data = json.loads(gap_res)
-        self.assertEqual(gap_data.get("model_family"), "anthropic/claude-fable-5-1")
+        self.assertEqual(gap_data.get("model_family"), "anthropic/claude-3-7-sonnet")
         self.assertIn("gaps_identified", gap_data)
 
         inv_res = review_plan_invariant_gate.invoke({
@@ -114,7 +114,7 @@ class TestCodeAgenticAndFrontierTools(unittest.TestCase):
         })
         inv_data = json.loads(inv_res)
         self.assertTrue(inv_data.get("approved"))
-        self.assertEqual(inv_data.get("model_family"), "openai/gpt-6-astra")
+        self.assertEqual(inv_data.get("model_family"), "openai/gpt-4o")
 
     def test_mission_hierarchy_and_work_queue(self):
         goal_res = manage_mission_hierarchy.invoke({

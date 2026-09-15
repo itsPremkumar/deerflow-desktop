@@ -7,9 +7,9 @@ from deerflow.models.performance_registry import (
 def test_model_performance_registry_recording():
     registry = ModelPerformanceRegistry()
 
-    # Record 3 runs for gpt-6-astra on coding
+    # Record 3 runs for gpt-4o on coding
     registry.record_run(
-        model_id="gpt-6-astra",
+        model_id="gpt-4o",
         task_type="coding",
         success=True,
         tool_successes=5,
@@ -19,7 +19,7 @@ def test_model_performance_registry_recording():
         verification_score=1.0,
     )
     registry.record_run(
-        model_id="gpt-6-astra",
+        model_id="gpt-4o",
         task_type="coding",
         success=True,
         tool_successes=4,
@@ -29,7 +29,7 @@ def test_model_performance_registry_recording():
         verification_score=0.9,
     )
     m = registry.record_run(
-        model_id="gpt-6-astra",
+        model_id="gpt-4o",
         task_type="coding",
         success=False,
         tool_successes=2,

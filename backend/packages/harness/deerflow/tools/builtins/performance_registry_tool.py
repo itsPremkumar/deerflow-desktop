@@ -35,7 +35,7 @@ def manage_model_performance_registry(
 
     Args:
         action: 'record_run', 'get_metrics', 'list_all', 'select_optimal_model'.
-        model_id: Identifier of model (e.g. 'gpt-6-astra', 'claude-opus-5', 'deepseek-r1').
+        model_id: Identifier of model (e.g. 'gpt-4o', 'claude-3-7-sonnet', 'deepseek-r1').
         task_type: Type of task ('coding', 'research', 'architecture', 'quick_edit').
         success: Whether the task succeeded.
         tool_successes: Number of successful tool calls.
@@ -75,7 +75,7 @@ def manage_model_performance_registry(
         elif action == "select_optimal_model":
             candidates = [c.strip() for c in candidate_models_csv.split(",") if c.strip()]
             if not candidates:
-                candidates = ["gpt-6-astra", "claude-opus-5", "deepseek-r1", "kimi-highspeed"]
+                candidates = ["gpt-4o", "claude-3-7-sonnet", "deepseek-r1", "kimi-highspeed"]
             choice = _GLOBAL_ROUTER.select_optimal_model(
                 task_type=task_type,
                 candidate_models=candidates,

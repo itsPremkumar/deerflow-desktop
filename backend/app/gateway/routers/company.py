@@ -194,9 +194,10 @@ class KanbanSyncRequest(BaseModel):
     org_id: str | None = Field(default=None, description="Organization ID")
 
 
+@router.get("/swarm/bots")
 @router.get("/hermes/bots")
 async def get_hermes_bots(org_id: str | None = None):
-    """Discovers and imports local Hermes bot profiles from ~/.hermes/bots."""
+    """Discovers and imports local specialist bot profiles."""
     engine = get_autonomous_company_engine()
     target_id = org_id or (engine.list_companies()[0].org_id if engine.list_companies() else None)
     if target_id:
@@ -213,7 +214,7 @@ async def get_hermes_bots(org_id: str | None = None):
 
 @router.post("/production-line/submit")
 async def submit_production_line_feature(payload: ProductionLineSubmitRequest):
-    """Submits a new feature into the 8-stage Hermes production line."""
+    """Submits a new feature into the 8-stage enterprise production line."""
     engine = get_autonomous_company_engine()
     prod_line = engine.get_production_line()
     run = prod_line.submit_feature(title=payload.title, feature_spec=payload.feature_spec)
@@ -234,7 +235,7 @@ async def advance_production_line_stage(payload: ProductionLineAdvanceRequest):
 
 @router.post("/kanban/sync")
 async def sync_kanban(payload: KanbanSyncRequest):
-    """Synchronizes active company projects into local Hermes SQLite kanban board."""
+    """Synchronizes active company projects into enterprise SQLite kanban board."""
     engine = get_autonomous_company_engine()
     target_id = payload.org_id or (engine.list_companies()[0].org_id if engine.list_companies() else None)
     if not target_id:

@@ -1,4 +1,4 @@
-﻿"""Tests for Intent-Driven Category Routing Matrix & Dual Fallbacks."""
+"""Tests for Intent-Driven Category Routing Matrix & Dual Fallbacks."""
 
 import pytest
 
@@ -14,7 +14,7 @@ def test_resolve_builtin_categories():
     ub = router.resolve_category("ultrabrain")
     assert ub.name == "ultrabrain"
     assert ub.reasoning_effort == "max"
-    assert ub.models[0] == "gpt-6-astra"
+    assert ub.models[0] == "gpt-4o"
 
     # Check quick
     qk = router.resolve_category("quick")
@@ -30,13 +30,13 @@ def test_proactive_availability_filtering():
 
     resolved = router.resolve_category("deep", available_models=available)
     assert resolved.models[0] == "claude-opus-5"
-    assert "gpt-6-astra" not in resolved.models
+    assert "gpt-4o" not in resolved.models
 
 
 def test_reactive_fallback_recovery():
     router = CategoryRouter()
     # Current primary fails with 429
-    fallback = router.get_reactive_fallback("ultrabrain", "gpt-6-astra")
+    fallback = router.get_reactive_fallback("ultrabrain", "gpt-4o")
     assert fallback == "claude-opus-5"
 
     # Second model fails -> falls to third

@@ -22,8 +22,8 @@ class SwarmWorkerBackend(Protocol):
         ...
 
 
-class HermesBotWorker:
-    """Worker backed by a permanent Hermes Bot profile from the BotRegistry."""
+class SpecialistBotWorker:
+    """Worker backed by a permanent Autonomous Specialist Bot profile from the BotRegistry."""
 
     def __init__(self, bot_name: str, registry: BotRegistry | None = None):
         self.bot_name = bot_name
@@ -47,6 +47,10 @@ class HermesBotWorker:
             "evidence": evidence,
             "artifacts": list(task.output_artifacts),
         }
+
+
+# Transparent alias for backward compatibility
+HermesBotWorker = SpecialistBotWorker
 
 
 class EphemeralSubagentWorker:

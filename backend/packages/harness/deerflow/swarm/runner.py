@@ -20,6 +20,7 @@ from deerflow.swarm.worker import (
     CodingWorktreeWorker,
     EphemeralSubagentWorker,
     HermesBotWorker,
+    SpecialistBotWorker,
 )
 
 logger = logging.getLogger(__name__)
@@ -54,7 +55,7 @@ class AsyncSwarmRunner:
             async with semaphore:
                 # Select worker
                 if task_node.worker_type == "permanent_bot" and task_node.assigned_worker:
-                    worker = HermesBotWorker(task_node.assigned_worker)
+                    worker = SpecialistBotWorker(task_node.assigned_worker)
                 elif task_node.worktree_path:
                     worker = CodingWorktreeWorker(repo_root=".", branch_name=f"wt-{task_node.task_id}")
                 else:

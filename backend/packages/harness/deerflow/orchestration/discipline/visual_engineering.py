@@ -1,8 +1,8 @@
-"""Visual Engineering Worker (Claude Fable 5.1 Profile).
+"""Visual Engineering Worker (Enterprise Visual Specialist Profile).
 
-Inspired by Oh My OpenAgent (OmO / Sisyphus):
+Enterprise Frontend and Generative UI Engine:
 - Category: visual-engineering
-- Model Assignment: anthropic/claude-fable-5-1 (reasoning: max)
+- Model Assignment: anthropic/claude-3-7-sonnet (reasoning: max)
 - Strengths: Frontend UI/UX, CSS design tokens, responsive layouts, generative interactive widgets
 """
 
@@ -24,7 +24,7 @@ class VisualWidgetSpec:
     interactive_js: str = ""
     design_tokens: dict[str, str] = field(default_factory=dict)
     responsive_breakpoints: dict[str, str] = field(default_factory=dict)
-    model_family: str = "anthropic/claude-fable-5-1"
+    model_family: str = "anthropic/claude-3-7-sonnet"
     timestamp: float = field(default_factory=time.time)
 
     def to_dict(self) -> dict[str, Any]:
@@ -58,7 +58,7 @@ class VisualWidgetSpec:
 class VisualEngineeringWorker:
     """Specialist worker producing high-fidelity frontend and generative UI artifacts."""
 
-    def __init__(self, model_id: str = "anthropic/claude-fable-5-1"):
+    def __init__(self, model_id: str = "anthropic/claude-3-7-sonnet"):
         self.model_id: str = model_id
 
     def build_component(

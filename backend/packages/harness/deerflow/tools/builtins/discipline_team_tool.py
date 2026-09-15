@@ -1,4 +1,4 @@
-"""Built-in Multi-Model Discipline Team LangChain Tools (OmO / Sisyphus Engine)."""
+"""Built-in Multi-Model Discipline Team LangChain Tools (Enterprise Discipline Engine)."""
 
 from __future__ import annotations
 
@@ -24,7 +24,7 @@ def consult_plan_gap_analysis(
     proposed_steps_csv: str = "",
     is_visual_or_frontend: bool = False,
 ) -> str:
-    """Run pre-planning gap analysis (powered by Claude Fable 5.1 profile) to catch edge cases and UI requirements.
+    """Run pre-planning gap analysis (powered by Enterprise Strategic Consultant profile) to catch edge cases and UI requirements.
 
     Args:
         task_title: Name/title of the planned task.
@@ -52,7 +52,7 @@ def review_plan_invariant_gate(
     constraints_csv: str = "",
     budget_cap_usd: float = 10.0,
 ) -> str:
-    """Rigorous plan invariant review (powered by OpenAI GPT-6 Astra profile) to prevent rubber-stamping and defects.
+    """Rigorous plan invariant review (powered by Enterprise Invariant Gatekeeper profile) to prevent rubber-stamping and defects.
 
     Args:
         task_goal: End goal or objective statement.
@@ -81,7 +81,7 @@ def dispatch_discipline_worker(
     context_json: str = "{}",
     constraints_csv: str = "",
 ) -> str:
-    """Dispatch work by category to the specialized model (Fable 5.1 for visual/architecture, Astra for ultrabrain/deep).
+    """Dispatch work by category to specialized discipline models (e.g. visual engineering, algorithmic ultrabrain, plan reviewer).
 
     Args:
         category: Task category ('visual-engineering', 'ultrabrain', 'deep', 'plan-consultant', 'plan-reviewer', 'explore').

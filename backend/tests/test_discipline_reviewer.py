@@ -14,7 +14,7 @@ def test_reviewer_rejects_destructive_commands():
     assert verdict.verdict_type == VerdictType.REJECT_WITH_COUNTEREXAMPLE
     assert any("destructive" in v.lower() for v in verdict.invariant_violations)
     assert len(verdict.counterexamples) > 0
-    assert verdict.model_family == "openai/gpt-6-astra"
+    assert verdict.model_family == "openai/gpt-4o"
 
 
 def test_reviewer_enforces_read_only_and_data_loss_constraints():

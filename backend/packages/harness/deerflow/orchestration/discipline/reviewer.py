@@ -1,7 +1,7 @@
-"""Plan Reviewer Specialist Agent (OpenAI GPT-6 Astra Profile).
+"""Plan Reviewer Specialist Agent (Enterprise Invariant Reviewer Profile).
 
-Inspired by Oh My OpenAgent (OmO / Sisyphus):
-- Model Assignment: openai/gpt-6-astra (reasoning: xhigh)
+Enterprise Plan Invariant Verification Gate:
+- Model Assignment: openai/gpt-4o (reasoning: xhigh)
 - Purpose: Strict plan invariant verification gate; refuses to rubber-stamp
 - Strengths: Sustained deductive logic, counterexample generation, invariant enforcement
 """
@@ -28,7 +28,7 @@ class ReviewVerdict:
     invariant_violations: list[str] = field(default_factory=list)
     counterexamples: list[str] = field(default_factory=list)
     reasoning_trace: str = ""
-    model_family: str = "openai/gpt-6-astra"
+    model_family: str = "openai/gpt-4o"
     timestamp: float = field(default_factory=time.time)
 
     def to_dict(self) -> dict[str, Any]:
@@ -40,7 +40,7 @@ class ReviewVerdict:
 class PlanReviewer:
     """Rigorous gatekeeper stress-testing plans against invariants before execution begins."""
 
-    def __init__(self, model_id: str = "openai/gpt-6-astra"):
+    def __init__(self, model_id: str = "openai/gpt-4o"):
         self.model_id: str = model_id
 
     def review_plan(

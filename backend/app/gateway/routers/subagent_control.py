@@ -2,7 +2,7 @@
 
 Provides endpoints for asynchronous subagent provisioning, real-time heartbeats,
 task lease renewal, step checkpointing, hot-replacement, parent-failure orphan adoption,
-and dynamic promotion into permanent Hermes Bots.
+and dynamic promotion into permanent Specialist Bots.
 """
 
 from __future__ import annotations
@@ -207,12 +207,12 @@ async def adopt_orphans(payload: SubagentAdoptRequest, request: Request):
 
 @router.post("/promote")
 async def promote_subagent_role(payload: SubagentPromoteRequest, request: Request):
-    """Promotes a recurring subagent role into a permanent Hermes Bot profile."""
+    """Promotes a recurring subagent role into a permanent Specialist Bot profile."""
     await require_admin_user(request, detail=_ADMIN_REQUIRED_DETAIL)
     promotion = get_subagent_promotion_manager()
 
     profile = await asyncio.to_thread(
-        promotion.promote_to_hermes_bot,
+        promotion.promote_to_specialist_bot,
         role=payload.role,
         bot_name=payload.bot_name,
         display_name=payload.display_name,

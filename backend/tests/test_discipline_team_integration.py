@@ -18,7 +18,7 @@ def test_category_team_dispatcher_routes_correctly():
         context={"component_name": "StatusDashboard", "theme": "dark"},
     )
     assert vis_res["category"] == "visual-engineering"
-    assert vis_res["model_used"] == "anthropic/claude-fable-5-1"
+    assert vis_res["model_used"] == "anthropic/claude-3-7-sonnet"
     assert "widget" in vis_res
     assert "<!DOCTYPE html>" in vis_res["rendered_html"]
 
@@ -29,7 +29,7 @@ def test_category_team_dispatcher_routes_correctly():
         constraints=["Byzantine fault tolerance"],
     )
     assert brain_res["category"] == "ultrabrain"
-    assert brain_res["model_used"] == "openai/gpt-6-astra"
+    assert brain_res["model_used"] == "openai/gpt-4o"
     assert "solution" in brain_res
     assert brain_res["reasoning_level"] == "max"
 
@@ -40,7 +40,7 @@ def test_category_team_dispatcher_routes_correctly():
         context={"proposed_steps": ["Add LRU cache", "Store entries"]},
     )
     assert consult_res["category"] == "plan-consultant"
-    assert consult_res["model_used"] == "anthropic/claude-fable-5-1"
+    assert consult_res["model_used"] == "anthropic/claude-3-7-sonnet"
     assert "gap_report" in consult_res
 
     # Plan reviewer dispatch
@@ -50,7 +50,7 @@ def test_category_team_dispatcher_routes_correctly():
         context={"proposed_steps": ["rm -rf /"]},
     )
     assert review_res["category"] == "plan-reviewer"
-    assert review_res["model_used"] == "openai/gpt-6-astra"
+    assert review_res["model_used"] == "openai/gpt-4o"
     assert review_res["verdict"]["approved"] is False
 
     # Explore dispatch
@@ -72,7 +72,7 @@ def test_consult_plan_gap_analysis_tool():
     })
     parsed = json.loads(res)
     assert "gaps_identified" in parsed
-    assert parsed["model_family"] == "anthropic/claude-fable-5-1"
+    assert parsed["model_family"] == "anthropic/claude-3-7-sonnet"
     assert parsed["readiness_score"] < 1.0
 
 
@@ -86,7 +86,7 @@ def test_review_plan_invariant_gate_tool():
     })
     parsed_rej = json.loads(res_rejected)
     assert parsed_rej["approved"] is False
-    assert parsed_rej["model_family"] == "openai/gpt-6-astra"
+    assert parsed_rej["model_family"] == "openai/gpt-4o"
 
     # Sound step approved
     res_approved = review_plan_invariant_gate.invoke({
@@ -108,5 +108,5 @@ def test_dispatch_discipline_worker_tool():
     })
     parsed = json.loads(res)
     assert parsed["category"] == "visual-engineering"
-    assert parsed["model_used"] == "anthropic/claude-fable-5-1"
+    assert parsed["model_used"] == "anthropic/claude-3-7-sonnet"
     assert "widget" in parsed

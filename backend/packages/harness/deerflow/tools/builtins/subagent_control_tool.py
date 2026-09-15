@@ -5,7 +5,7 @@ Allows AI agents and supervisors to:
 - Monitor real-time liveness, progress, and lease status
 - Record step-level checkpoints and hot-replace stalled workers
 - Adopt orphaned child subagents when a parent crashes
-- Promote proven recurring subagent roles into permanent Hermes Bots
+- Promote proven recurring subagent roles into permanent Specialist Bots
 """
 
 from __future__ import annotations
@@ -67,7 +67,7 @@ def subagent_control(
             - 'cancel': Aborts an active subagent and propagates cancellation down to child subagents.
             - 'replace': Hot-replaces a failed/stalled subagent, restoring the latest checkpoint to a new worker.
             - 'adopt': Adopts orphaned subagents whose parent agent crashed.
-            - 'promote': Promotes a recurring high-reliability subagent role into a permanent Hermes Bot.
+            - 'promote': Promotes a recurring high-reliability subagent role into a permanent Specialist Bot.
             - 'archetypes': Lists available specialist archetypes (Critic, Judge, Red-Team, Verifier, etc.).
         parent_agent_id: Identifier of the parent agent or supervisor.
         subagent_id: Unique identifier of the subagent (required for status, result, heartbeat, checkpoint, cancel, replace).
@@ -242,9 +242,9 @@ def subagent_control(
                 f"Specify `bot_name` to force promotion."
             )
 
-        promoted_profile = promotion.promote_to_hermes_bot(role=target_role, bot_name=bot_name or None)
+        promoted_profile = promotion.promote_to_specialist_bot(role=target_role, bot_name=bot_name or None)
         return (
-            f"### 🎖️ Promotion Successful: Sub-Agent -> Permanent Hermes Bot\n"
+            f"### 🎖️ Promotion Successful: Sub-Agent -> Permanent Specialist Bot\n"
             f"- **Bot Name**: `{promoted_profile['name']}`\n"
             f"- **Display Name**: {promoted_profile['display_name']}\n"
             f"- **Role**: {promoted_profile['system_role']}\n"

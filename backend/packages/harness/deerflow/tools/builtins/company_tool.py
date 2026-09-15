@@ -38,7 +38,7 @@ def company_tool(
     Args:
         action: Management action ('bootstrap', 'archetypes', 'status', 'discover_work', 'evaluate_kpis',
             'replan_strategy', 'executive_digest', 'transfer_responsibility', 'retrospective',
-            'evolution_journal', 'hermes_bots', 'production_submit', 'production_advance',
+            'evolution_journal', 'swarm_bots', 'hermes_bots', 'production_submit', 'production_advance',
             'kanban_sync', 'kanban_tasks', 'kanban_update', 'kanban_log', 'kanban_events', 'kanban_check_in',
             'group_channels', 'group_post', 'group_create', 'group_history',
             'attendance_pulse', 'attendance_check', 'roll_call', 'pause', 'resume').
@@ -181,7 +181,7 @@ def company_tool(
                 return f"Error: Organization '{target_org}' not found."
             return json.dumps([e.model_dump() for e in state.evolution_journal], indent=2)
 
-        elif action == "hermes_bots":
+        elif action in ("swarm_bots", "specialist_bots", "hermes_bots"):
             target_org = org_id or (engine.list_companies()[0].org_id if engine.list_companies() else "")
             if not target_org:
                 # If no company, list raw local bots

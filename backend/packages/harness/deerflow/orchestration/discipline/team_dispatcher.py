@@ -1,11 +1,11 @@
-"""Category Team Dispatcher (OmO / Sisyphus Multi-Model Team Engine).
+"""Category Team Dispatcher (Enterprise Multi-Model Discipline Council Engine).
 
-Inspired by Oh My OpenAgent (OmO / Sisyphus):
-- Main agent delegates by Category, not by hardcoded model name
+Enterprise Category Dispatch:
+- Main agent delegates by Category, not by hardcoded vendor models
 - Category Mapping:
-    • visual-engineering / architect / artistry / writing -> Claude Fable 5.1
-    • ultrabrain / deep / plan-reviewer -> OpenAI GPT-6 Astra
-    • explore / librarian / quick -> Fast utility models (GPT-5.6 Luna / DeepSeek Flash)
+    • visual-engineering / architect / artistry / writing -> Claude 3.7 Sonnet
+    • ultrabrain / deep / plan-reviewer -> GPT-4o
+    • explore / librarian / quick -> Fast utility models
 """
 
 from __future__ import annotations
@@ -21,29 +21,29 @@ from deerflow.orchestration.discipline.visual_engineering import VisualEngineeri
 
 
 class CategoryTeamDispatcher:
-    """Coordinates specialist workers across category domains with model-aware execution."""
+    """Routes and dispatches tasks to specialist models based on task nature."""
 
     def __init__(self):
-        self.consultant = PlanConsultant()
-        self.reviewer = PlanReviewer()
         self.visual_worker = VisualEngineeringWorker()
         self.ultrabrain_worker = UltrabrainWorker()
+        self.consultant = PlanConsultant()
+        self.reviewer = PlanReviewer()
         self.recon_worker = FastReconWorker()
 
-    def dispatch(
+    def dispatch_work(
         self,
         category: str,
         task_prompt: str,
         context: dict[str, Any] | None = None,
         constraints: list[str] | None = None,
     ) -> dict[str, Any]:
-        """Dispatch a task to the specialized model and worker for the requested category."""
-        cat = category.strip().lower()
+        """Dispatches work to the designated specialist profile and returns structured result."""
+        cat = category.lower().strip()
         ctx = context or {}
         consts = constraints or []
         t_start = time.time()
 
-        if cat in ("visual-engineering", "visual", "frontend"):
+        if cat in ("visual-engineering", "visual", "frontend", "ui", "ux"):
             component_name = ctx.get("component_name", "InteractiveComponent")
             widget = self.visual_worker.build_component(
                 component_name=component_name,
@@ -52,7 +52,7 @@ class CategoryTeamDispatcher:
             )
             result_data = {
                 "category": "visual-engineering",
-                "model_used": "anthropic/claude-fable-5-1",
+                "model_used": "anthropic/claude-3-7-sonnet",
                 "reasoning_level": "max",
                 "widget": widget.to_dict(),
                 "rendered_html": widget.render_standalone_html(),
@@ -66,7 +66,7 @@ class CategoryTeamDispatcher:
             )
             result_data = {
                 "category": "ultrabrain",
-                "model_used": "openai/gpt-6-astra",
+                "model_used": "openai/gpt-4o",
                 "reasoning_level": "max",
                 "solution": solution.to_dict(),
             }
@@ -80,7 +80,7 @@ class CategoryTeamDispatcher:
             )
             result_data = {
                 "category": "plan-consultant",
-                "model_used": "anthropic/claude-fable-5-1",
+                "model_used": "anthropic/claude-3-7-sonnet",
                 "reasoning_level": "high",
                 "gap_report": report.to_dict(),
             }
@@ -93,7 +93,7 @@ class CategoryTeamDispatcher:
             )
             result_data = {
                 "category": "plan-reviewer",
-                "model_used": "openai/gpt-6-astra",
+                "model_used": "openai/gpt-4o",
                 "reasoning_level": "xhigh",
                 "verdict": verdict.to_dict(),
             }
@@ -118,10 +118,13 @@ class CategoryTeamDispatcher:
             )
             result_data = {
                 "category": cat,
-                "model_used": "openai/gpt-6-astra",
+                "model_used": "openai/gpt-4o",
                 "reasoning_level": "high",
                 "solution": solution.to_dict(),
             }
 
         result_data["elapsed_ms"] = round((time.time() - t_start) * 1000.0, 2)
         return result_data
+
+    # Backward compatibility alias
+    dispatch = dispatch_work

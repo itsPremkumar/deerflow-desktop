@@ -12,7 +12,7 @@ def test_consultant_identifies_missing_error_and_tests():
     )
 
     assert isinstance(report, GapAnalysisReport)
-    assert report.model_family == "anthropic/claude-fable-5-1"
+    assert report.model_family == "anthropic/claude-3-7-sonnet"
     assert report.readiness_score < 1.0
     assert any("failure recovery" in g.lower() or "error" in g.lower() for g in report.gaps_identified)
     assert any("verification" in g.lower() or "test" in g.lower() for g in report.gaps_identified)

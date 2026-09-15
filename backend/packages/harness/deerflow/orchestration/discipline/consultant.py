@@ -1,7 +1,7 @@
-"""Plan Consultant Specialist Agent (Claude Fable 5.1 Profile).
+"""Plan Consultant Specialist Agent (Enterprise Strategic Reviewer Profile).
 
-Inspired by Oh My OpenAgent (OmO / Sisyphus):
-- Model Assignment: anthropic/claude-fable-5-1 (reasoning: high)
+Enterprise Pre-Planning Gap Analysis Engine:
+- Model Assignment: anthropic/claude-3-7-sonnet (reasoning: high)
 - Purpose: Pre-planning gap analysis pass before plans are finalized
 - Strengths: High compliance with complex mechanics, UI/UX contracts, and edge-case anticipation
 """
@@ -21,7 +21,7 @@ class GapAnalysisReport:
     suggested_additions: list[str] = field(default_factory=list)
     ui_specifications: list[str] = field(default_factory=list)
     readiness_score: float = 1.0  # 0.0 (incomplete) to 1.0 (production-ready)
-    model_family: str = "anthropic/claude-fable-5-1"
+    model_family: str = "anthropic/claude-3-7-sonnet"
     timestamp: float = field(default_factory=time.time)
 
     def to_dict(self) -> dict[str, Any]:
@@ -31,7 +31,7 @@ class GapAnalysisReport:
 class PlanConsultant:
     """Pre-planning advisor auditing draft plans for blindspots and UI completeness."""
 
-    def __init__(self, model_id: str = "anthropic/claude-fable-5-1"):
+    def __init__(self, model_id: str = "anthropic/claude-3-7-sonnet"):
         self.model_id: str = model_id
 
     def analyze_gaps(

@@ -1,7 +1,7 @@
 """Autonomous Agent Swarm Subsystem for DeerFlow 2.0.
 
 Provides critical-path-optimized swarm decomposition, dependency DAGs,
-hybrid workforce scheduling (Permanent Hermes Bots + Ephemeral Subagents),
+hybrid workforce scheduling (Permanent Specialist Bots + Ephemeral Subagents),
 background async execution, tri-tier memory, rate-limit governance,
 autonomous triggers, and automated succession incident recovery.
 """
@@ -33,6 +33,7 @@ from deerflow.swarm.worker import (
     CodingWorktreeWorker,
     EphemeralSubagentWorker,
     HermesBotWorker,
+    SpecialistBotWorker,
     SwarmWorkerBackend,
 )
 
@@ -42,6 +43,7 @@ __all__ = [
     "CodingWorktreeWorker",
     "EphemeralSubagentWorker",
     "HermesBotWorker",
+    "SpecialistBotWorker",
     "SwarmAggregator",
     "SwarmCoordinator",
     "SwarmDecision",

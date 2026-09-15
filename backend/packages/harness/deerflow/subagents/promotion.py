@@ -1,8 +1,8 @@
-"""Sub-Agent Promotion Engine: Promotes Recurring Ephemeral Subagents into Permanent Hermes Bots.
+"""Sub-Agent Promotion Engine: Promotes Recurring Ephemeral Subagents into Permanent Specialist Bots.
 
 Tracks subagent execution frequency, reliability score, and domain specialization.
 When a temporary role exhibits consistent high-performance across recurring tasks,
-the Promotion Engine materializes it into a permanent Hermes Bot profile with
+the Promotion Engine materializes it into a permanent Specialist Bot profile with
 persistent identity and tool configurations.
 """
 
@@ -140,7 +140,7 @@ class SubagentPromotionManager:
             logger.warning(f"Failed to save subagent metric for {role_key}: {exc}")
 
     def check_promotion_eligibility(self, role: str) -> tuple[bool, dict[str, Any]]:
-        """Checks if a role qualifies for promotion to a permanent Hermes Bot."""
+        """Checks if a role qualifies for promotion to a permanent Specialist Bot."""
         role_key = role.lower().strip()
         m = self._metrics.get(role_key)
         if not m:
@@ -165,23 +165,23 @@ class SubagentPromotionManager:
                 candidates.append(m.to_dict())
         return candidates
 
-    def promote_to_hermes_bot(
+    def promote_to_specialist_bot(
         self,
         role: str,
         bot_name: str | None = None,
         display_name: str | None = None,
         description: str | None = None,
     ) -> dict[str, Any]:
-        """Materializes the subagent role into a permanent Hermes Bot definition."""
+        """Materializes the subagent role into a permanent Specialist Bot definition."""
         role_key = role.lower().strip()
         m = self._metrics.get(role_key)
 
         clean_name = (bot_name or f"bot-{role_key.replace('_', '-')}").lower().strip()
         clean_display = display_name or f"{role.replace('_', ' ').title()} Bot"
-        clean_desc = description or f"Promoted permanent Hermes Bot specializing in {role} operations."
+        clean_desc = description or f"Promoted permanent Specialist Bot specializing in {role} operations."
 
         system_prompt = (
-            f"You are {clean_display}, a permanent Hermes Bot specialist.\n"
+            f"You are {clean_display}, a permanent Specialist Bot.\n"
             f"Role: {role}\n"
             f"Description: {clean_desc}\n\n"
             f"Historical background: Promoted from an autonomous subagent with "
@@ -208,8 +208,11 @@ class SubagentPromotionManager:
         try:
             with open(bot_file, "w", encoding="utf-8") as fp:
                 json.dump(bot_profile, fp, indent=2)
-            logger.info(f"Subagent role '{role}' successfully promoted to permanent Hermes Bot '{clean_name}'.")
+            logger.info(f"Subagent role '{role}' successfully promoted to permanent Specialist Bot '{clean_name}'.")
         except Exception as exc:
             logger.warning(f"Failed to persist promoted bot profile {bot_file}: {exc}")
 
         return bot_profile
+
+    # Backward compatibility alias
+    promote_to_hermes_bot = promote_to_specialist_bot
