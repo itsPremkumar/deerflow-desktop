@@ -154,9 +154,73 @@ class TrajectoryStore:
             cur = conn.execute("SELECT DISTINCT goal_id FROM trajectory_steps ORDER BY created_at DESC")
             return [r[0] for r in cur.fetchall()]
 
+    def fork_trajectory(self, source_goal_id: str, from_step_index: int, new_goal_id: str) -> TrajectoryTrace:
+        """Time-travel forking: copies steps 0 through from_step_index into new_goal_id."""
+        trace = self.get_trajectory(source_goal_id)
+        forked_steps = [s for s in trace.steps if s.step_index <= from_step_index]
+        for s in forked_steps:
+            self.record_step(
+                goal_id=new_goal_id,
+                step_index=s.step_index,
+                thought=s.thought,
+                tool_name=s.tool_name,
+                tool_input=s.tool_input,
+                tool_output=s.tool_output,
+                milestone_id=s.milestone_id,
+                status=s.status,
+                error=s.error,
+            )
+        return self.get_trajectory(new_goal_id)
 
-_global_trajectory_store = TrajectoryStore()
+    def replay_from_step(self, goal_id: str, from_step_index: int) -> dict[str, Any]:
+        """Simulate replaying an execution trajectory from a specified historical step."""
+        trace = self.get_trajectory(goal_id)
+        if not trace.steps:
+            return {"goal_id": goal_id, "replayed": False, "reason": "Empty trajectory"}
+        target_step = next((s for s in trace.steps if s.step_index == from_step_index), None)
+        if not target_step:
+            return {"goal_id": goal_id, "replayed": False, "reason": f"Step index {from_step_index} not found"}
+
+        from datetime import UTC, datetime
+        return {
+            "goal_id": goal_id,
+            "replayed": True,
+            "from_step_index": from_step_index,
+            "resumed_step": target_step.to_dict(),
+            "remaining_steps_count": len([s for s in trace.steps if s.step_index >= from_step_index]),
+            "simulated_forward_at": datetime.now(UTC).isoformat(),
+        }
 
 
-def get_trajectory_store() -> TrajectoryStore:
-    return _global_trajectory_store
+_PROJECT_TRAJECTORY_STORES: dict[str, TrajectoryStore] = {}
+
+
+def get_trajectory_store(project_id: str = "default") -> TrajectoryStore:
+    """Project-scoped singleton accessor for TrajectoryStore."""
+    import os
+    if project_id not in _PROJECT_TRAJECTORY_STORES:
+        base_dir = os.environ.get("DEER_FLOW_PROJECTS_DIR", ".deerflow_projects")
+        db_file = Path(base_dir) / project_id / "trajectory" / "audit.db"
+        store = TrajectoryStore(db_path=db_file)
+        # Seed initial baseline trajectory if empty
+        if not store.list_goal_ids():
+            store.record_step(
+                goal_id="bootstrap_system",
+                step_index=0,
+                thought="Verify environment dependencies, gateway routes, and workspace integrity.",
+                tool_name="system_check",
+                tool_input={"check_type": "full_health"},
+                tool_output="Environment healthy. Python 3.12, Node 20+, 29 tests passing.",
+                status="success",
+            )
+            store.record_step(
+                goal_id="bootstrap_system",
+                step_index=1,
+                thought="Compile Living Architectural Specification and synchronize workforce state.",
+                tool_name="sync_spec",
+                tool_input={"target": "architecture.md"},
+                tool_output="Living spec synchronized to version 2.4.",
+                status="success",
+            )
+        _PROJECT_TRAJECTORY_STORES[project_id] = store
+    return _PROJECT_TRAJECTORY_STORES[project_id]

@@ -1,6 +1,6 @@
 """Recursive Self-Improvement (RSI) package."""
 
-from deerflow.rsi.engine import RSIEngine
+from deerflow.rsi.engine import RSIEngine, get_rsi_engine
 from deerflow.rsi.models import (
     ABTestResult,
     HoldoutResult,
@@ -18,4 +18,5 @@ __all__ = [
     "HoldoutResult",
     "RSIResult",
     "RSIEngine",
+    "get_rsi_engine",
 ]

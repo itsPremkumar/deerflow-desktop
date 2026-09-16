@@ -843,6 +843,44 @@ async def get_war_room(project_id: str, request: Request) -> dict:
         from deerflow.projects.visual_verifier import get_visual_qa_engine
         visual_qa = [v.to_dict() for v in get_visual_qa_engine(project_id).get_history()[-3:]]
 
+        # 17. AVO Genetic Optimization Lineage & Pareto Frontier
+        try:
+            from deerflow.avo import get_avo_runner
+            avo_runner = get_avo_runner(project_id)
+            avo_lineage = {
+                "head_id": avo_runner.lineage.head_id,
+                "versions": [v.to_dict() for v in avo_runner.lineage.get_history()[-6:]],
+                "pareto_frontier": [v.to_dict() for v in avo_runner.lineage.get_pareto_frontier()[:5]],
+                "supervisor_status": avo_runner.supervisor.diagnose_state(),
+            }
+        except Exception:
+            avo_lineage = {"head_id": None, "versions": [], "pareto_frontier": [], "supervisor_status": "standby"}
+
+        # 18. Epistemic Belief Graph
+        try:
+            from deerflow.epistemics import get_epistemic_engine
+            ep_engine = get_epistemic_engine(project_id)
+            epistemic_claims = [c.to_dict() for c in ep_engine.list_all()]
+        except Exception:
+            epistemic_claims = []
+
+        # 19. Controlled RSI Closed-Loop Status
+        try:
+            from deerflow.rsi import get_rsi_engine
+            rsi_engine = get_rsi_engine(project_id)
+            rsi_status = rsi_engine.get_status()
+        except Exception:
+            rsi_status = {"stage": "idle", "active_configurations": {}, "last_cycle_summary": "standby"}
+
+        # 20. Deterministic Trajectory Store
+        try:
+            from deerflow.trajectory.store import get_trajectory_store
+            traj_store = get_trajectory_store(project_id)
+            goal_ids = traj_store.list_goal_ids()[:3]
+            trajectories = [traj_store.get_trajectory(gid).to_dict() for gid in goal_ids]
+        except Exception:
+            trajectories = []
+
         return {
             "project_id": project_id,
             "status": "active",
@@ -859,6 +897,10 @@ async def get_war_room(project_id: str, request: Request) -> dict:
             "leaderboard": leaderboard,
             "canary_history": canary_history,
             "visual_qa": visual_qa,
+            "avo_lineage": avo_lineage,
+            "epistemic_claims": epistemic_claims,
+            "rsi_status": rsi_status,
+            "trajectories": trajectories,
             "handoffs": handoffs,
             "decisions": decisions,
             "events": event_records,
@@ -988,6 +1030,289 @@ async def get_project_bot_leaderboard(project_id: str, request: Request) -> dict
             "project_id": project_id,
             "leaderboard": [e.to_dict() for e in get_benchmark_arena(project_id).get_leaderboard()],
         }
+
+    return await asyncio.to_thread(_do)
+
+
+# ---------------------------------------------------------------------------
+# Phase 7 ASI Core Endpoints: AVO, Epistemics, RSI, and Trajectories
+# ---------------------------------------------------------------------------
+
+
+class AVOIterateBody(BaseModel):
+    hypothesis: str = Field(default="Vectorize tensor operations to reduce memory latency", max_length=500)
+    modification: str = Field(default="torch.matmul -> fused_kernel", max_length=500)
+    correctness: bool = Field(default=True)
+    performance_score: float = Field(default=0.88, ge=0.0, le=1.0)
+    quality_score: float = Field(default=0.92, ge=0.0, le=1.0)
+    parent_id: str | None = None
+
+
+@router.get("/{project_id}/avo/lineage")
+@require_permission("projects", "read")
+async def get_project_avo_lineage(project_id: str, request: Request) -> dict:
+    await _require_project(project_id, request)
+
+    def _do():
+        from deerflow.avo import get_avo_runner
+
+        runner = get_avo_runner(project_id)
+        return {
+            "project_id": project_id,
+            "head_id": runner.lineage.head_id,
+            "versions": [v.to_dict() for v in runner.lineage.get_history()],
+            "pareto_frontier": [v.to_dict() for v in runner.lineage.get_pareto_frontier()],
+            "supervisor_status": runner.supervisor.diagnose_state(),
+        }
+
+    return await asyncio.to_thread(_do)
+
+
+@router.post("/{project_id}/avo/iterate")
+@require_permission("projects", "write")
+async def run_project_avo_iteration(project_id: str, body: AVOIterateBody, request: Request) -> dict:
+    await _require_project(project_id, request)
+
+    def _do():
+        from deerflow.avo import VersionRecord, get_avo_runner
+
+        runner = get_avo_runner(project_id)
+        parent = body.parent_id or runner.lineage.head_id
+
+        candidate = VersionRecord(
+            parent_id=parent,
+            hypothesis=body.hypothesis,
+            modification=body.modification,
+            correctness=body.correctness,
+            performance_score=body.performance_score,
+            quality_score=body.quality_score,
+        )
+        committed = runner.lineage.commit_candidate(candidate)
+        signature = f"{body.modification[:30]}_{body.correctness}"
+        stagnated, directive, diag = runner.supervisor.observe_step(
+            improved=committed,
+            signature=signature,
+            backtrack_candidate=parent,
+        )
+
+        return {
+            "version_id": candidate.version_id,
+            "committed": committed,
+            "composite_score": candidate.composite_score,
+            "current_head": runner.lineage.head_id,
+            "stagnation_detected": stagnated,
+            "diagnostic": diag,
+            "active_directive": directive.to_dict() if directive else None,
+            "pareto_frontier_size": len(runner.lineage.get_pareto_frontier()),
+        }
+
+    return await asyncio.to_thread(_do)
+
+
+class CreateClaimBody(BaseModel):
+    text: str = Field(..., min_length=3, max_length=500)
+    status: str = Field(default="hypothesis")
+    prior_confidence: float = Field(default=0.5, ge=0.0, le=1.0)
+    falsification_test: str = Field(default="", max_length=500)
+    verification_method: str = Field(default="", max_length=500)
+
+
+class AddEvidenceBody(BaseModel):
+    evidence: str = Field(..., min_length=3, max_length=1000)
+    is_supporting: bool = Field(default=True)
+    likelihood_ratio: float = Field(default=3.0, ge=1.0, le=100.0)
+
+
+@router.get("/{project_id}/epistemics/claims")
+@require_permission("projects", "read")
+async def list_project_epistemic_claims(project_id: str, request: Request) -> dict:
+    await _require_project(project_id, request)
+
+    def _do():
+        from deerflow.epistemics import get_epistemic_engine
+
+        engine = get_epistemic_engine(project_id)
+        return {
+            "project_id": project_id,
+            "claims": [c.to_dict() for c in engine.list_all()],
+            "unverified_assumptions": [c.to_dict() for c in engine.get_unverified_assumptions()],
+        }
+
+    return await asyncio.to_thread(_do)
+
+
+@router.post("/{project_id}/epistemics/claims")
+@require_permission("projects", "write")
+async def register_project_epistemic_claim(project_id: str, body: CreateClaimBody, request: Request) -> dict:
+    await _require_project(project_id, request)
+
+    def _do():
+        from deerflow.epistemics import EpistemicStatus, get_epistemic_engine
+
+        engine = get_epistemic_engine(project_id)
+        try:
+            status_enum = EpistemicStatus(body.status.lower())
+        except ValueError:
+            status_enum = EpistemicStatus.HYPOTHESIS
+
+        claim = engine.register_claim(
+            text=body.text,
+            status=status_enum,
+            prior_confidence=body.prior_confidence,
+            falsification_test=body.falsification_test,
+            verification_method=body.verification_method,
+        )
+        return claim.to_dict()
+
+    return await asyncio.to_thread(_do)
+
+
+@router.post("/{project_id}/epistemics/claims/{claim_id}/evidence")
+@require_permission("projects", "write")
+async def add_project_epistemic_evidence(project_id: str, claim_id: str, body: AddEvidenceBody, request: Request) -> dict:
+    await _require_project(project_id, request)
+
+    def _do():
+        from deerflow.epistemics import get_epistemic_engine
+
+        engine = get_epistemic_engine(project_id)
+        claim = engine.update_with_evidence(
+            claim_id=claim_id,
+            evidence=body.evidence,
+            is_supporting=body.is_supporting,
+            likelihood_ratio=body.likelihood_ratio,
+        )
+        return claim.to_dict()
+
+    try:
+        return await asyncio.to_thread(_do)
+    except KeyError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+class TriggerRSICycleBody(BaseModel):
+    bottleneck: str = Field(default="Context window saturation during long-running tasks", max_length=500)
+    target_component: str = Field(default="compaction", max_length=64)
+    force_promote: bool = Field(default=False)
+
+
+@router.get("/{project_id}/rsi/status")
+@require_permission("projects", "read")
+async def get_project_rsi_status(project_id: str, request: Request) -> dict:
+    await _require_project(project_id, request)
+
+    def _do():
+        from deerflow.rsi import get_rsi_engine
+
+        return {
+            "project_id": project_id,
+            "status": get_rsi_engine(project_id).get_status(),
+        }
+
+    return await asyncio.to_thread(_do)
+
+
+@router.post("/{project_id}/rsi/cycle")
+@require_permission("projects", "write")
+async def run_project_rsi_cycle(project_id: str, body: TriggerRSICycleBody, request: Request) -> dict:
+    await _require_project(project_id, request)
+
+    def _do():
+        from deerflow.rsi import get_rsi_engine
+
+        engine = get_rsi_engine(project_id)
+        result = engine.run_rsi_cycle(
+            bottleneck=body.bottleneck,
+            target_component=body.target_component,
+            force_promote=body.force_promote,
+        )
+        return result.to_dict()
+
+    return await asyncio.to_thread(_do)
+
+
+class RecordStepBody(BaseModel):
+    step_index: int = Field(..., ge=0)
+    thought: str = Field(default="", max_length=2000)
+    tool_name: str = Field(default="", max_length=128)
+    tool_input: dict[str, Any] = Field(default_factory=dict)
+    tool_output: str = Field(default="")
+    milestone_id: str = Field(default="", max_length=128)
+    status: str = Field(default="success", max_length=32)
+    error: str = Field(default="")
+
+
+class ReplayTrajectoryBody(BaseModel):
+    from_step_index: int = Field(default=0, ge=0)
+
+
+@router.get("/{project_id}/trajectories")
+@require_permission("projects", "read")
+async def list_project_trajectories(project_id: str, request: Request) -> dict:
+    await _require_project(project_id, request)
+
+    def _do():
+        from deerflow.trajectory.store import get_trajectory_store
+
+        store = get_trajectory_store(project_id)
+        goal_ids = store.list_goal_ids()
+        return {
+            "project_id": project_id,
+            "goals": [store.get_trajectory(gid).to_dict() for gid in goal_ids],
+        }
+
+    return await asyncio.to_thread(_do)
+
+
+@router.get("/{project_id}/trajectories/{goal_id}")
+@require_permission("projects", "read")
+async def get_project_trajectory(project_id: str, goal_id: str, request: Request) -> dict:
+    await _require_project(project_id, request)
+
+    def _do():
+        from deerflow.trajectory.store import get_trajectory_store
+
+        store = get_trajectory_store(project_id)
+        return store.get_trajectory(goal_id).to_dict()
+
+    return await asyncio.to_thread(_do)
+
+
+@router.post("/{project_id}/trajectories/{goal_id}/step")
+@require_permission("projects", "write")
+async def record_project_trajectory_step(project_id: str, goal_id: str, body: RecordStepBody, request: Request) -> dict:
+    await _require_project(project_id, request)
+
+    def _do():
+        from deerflow.trajectory.store import get_trajectory_store
+
+        store = get_trajectory_store(project_id)
+        step = store.record_step(
+            goal_id=goal_id,
+            step_index=body.step_index,
+            thought=body.thought,
+            tool_name=body.tool_name,
+            tool_input=body.tool_input,
+            tool_output=body.tool_output,
+            milestone_id=body.milestone_id,
+            status=body.status,
+            error=body.error,
+        )
+        return step.to_dict()
+
+    return await asyncio.to_thread(_do)
+
+
+@router.post("/{project_id}/trajectories/{goal_id}/replay")
+@require_permission("projects", "write")
+async def replay_project_trajectory(project_id: str, goal_id: str, body: ReplayTrajectoryBody, request: Request) -> dict:
+    await _require_project(project_id, request)
+
+    def _do():
+        from deerflow.trajectory.store import get_trajectory_store
+
+        store = get_trajectory_store(project_id)
+        return store.replay_from_step(goal_id=goal_id, from_step_index=body.from_step_index)
 
     return await asyncio.to_thread(_do)
 

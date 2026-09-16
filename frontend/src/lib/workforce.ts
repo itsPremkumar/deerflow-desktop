@@ -282,6 +282,10 @@ export interface WarRoomSnapshot {
   leaderboard?: WarRoomLeaderboardEntry[];
   canary_history?: WarRoomCanaryResult[];
   visual_qa?: Array<{ receipt_id: string; url: string; passed: boolean; visual_stability_score: number; verified_by: string; verified_at: string }>;
+  avo_lineage?: WarRoomAVOLineage;
+  epistemic_claims?: WarRoomEpistemicClaim[];
+  rsi_status?: WarRoomRSIStatus;
+  trajectories?: WarRoomTrajectoryTrace[];
   handoffs: Array<{
     handoff_id: string;
     task_id: string;
@@ -431,4 +435,106 @@ export async function restoreCheckpoint(projectId: string, checkpointId: string)
 
 export async function probeCanary(projectId: string, port = 3000, mockSuccess = true): Promise<WarRoomCanaryResult> {
   return send(`/projects/${enc(projectId)}/canary/probe`, "POST", { port, mock_success: mockSuccess });
+}
+
+// ---------------------------------------------------------------------------
+// Phase 7 ASI Core Models & API helpers
+// ---------------------------------------------------------------------------
+
+export interface WarRoomAVOVersion {
+  version_id: string;
+  parent_id: string | null;
+  hypothesis: string;
+  modification: string;
+  correctness: boolean;
+  performance_score: number;
+  quality_score: number;
+  composite_score: number;
+  trajectory_depth: number;
+  rejection_reason: string | null;
+  created_at: number;
+}
+
+export interface WarRoomAVOLineage {
+  head_id: string | null;
+  versions: WarRoomAVOVersion[];
+  pareto_frontier: WarRoomAVOVersion[];
+  supervisor_status: string;
+}
+
+export interface WarRoomEpistemicClaim {
+  claim_id: string;
+  text: string;
+  status: "fact" | "observation" | "inference" | "hypothesis" | "assumption" | "contradiction" | "speculation" | "obsolete";
+  confidence: number;
+  bayesian_prior: number;
+  bayesian_posterior: number;
+  falsification_test: string;
+  verification_method: string;
+  supporting_evidence: string[];
+  contradicting_evidence: string[];
+  is_verified?: boolean;
+}
+
+export interface WarRoomRSIStatus {
+  stage: "idle" | "bottleneck_detected" | "hypothesis_generated" | "candidate_created" | "ab_test_running" | "holdout_evaluation" | "promoted" | "rolled_back";
+  active_configurations: Record<string, Record<string, unknown>>;
+  last_cycle_summary?: string;
+}
+
+export interface WarRoomTrajectoryStep {
+  step_id: string;
+  goal_id: string;
+  step_index: number;
+  thought: string;
+  tool_name: string;
+  tool_input: Record<string, unknown>;
+  tool_output: string;
+  status: string;
+  error: string;
+  created_at: string;
+}
+
+export interface WarRoomTrajectoryTrace {
+  goal_id: string;
+  steps: WarRoomTrajectoryStep[];
+  total_steps: number;
+  created_at: string;
+}
+
+export async function triggerAVOIteration(
+  projectId: string,
+  payload: { hypothesis: string; modification: string; performance_score?: number; quality_score?: number; correctness?: boolean }
+): Promise<Record<string, unknown>> {
+  return send(`/projects/${enc(projectId)}/avo/iterate`, "POST", payload);
+}
+
+export async function registerEpistemicClaim(
+  projectId: string,
+  payload: { text: string; status?: string; prior_confidence?: number; falsification_test?: string }
+): Promise<WarRoomEpistemicClaim> {
+  return send(`/projects/${enc(projectId)}/epistemics/claims`, "POST", payload);
+}
+
+export async function addEpistemicEvidence(
+  projectId: string,
+  claimId: string,
+  payload: { evidence: string; is_supporting?: boolean; likelihood_ratio?: number }
+): Promise<WarRoomEpistemicClaim> {
+  return send(`/projects/${enc(projectId)}/epistemics/claims/${enc(claimId)}/evidence`, "POST", payload);
+}
+
+export async function triggerRSICycle(
+  projectId: string,
+  payload: { bottleneck: string; target_component?: string; force_promote?: boolean }
+): Promise<Record<string, unknown>> {
+  return send(`/projects/${enc(projectId)}/rsi/cycle`, "POST", payload);
+}
+
+export async function replayTrajectory(
+  projectId: string,
+  goalId: string,
+  fromStepIndex = 0
+): Promise<Record<string, unknown>> {
+  return send(`/projects/${enc(projectId)}/trajectories/${enc(goalId)}/replay`, "POST", { from_step_index: fromStepIndex });
 }

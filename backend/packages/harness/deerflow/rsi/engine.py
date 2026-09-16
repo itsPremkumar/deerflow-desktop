@@ -143,3 +143,21 @@ class RSIEngine:
             baseline_score=baseline_holdout,
             evidence=["Holdout suite passed 45/45 regression benchmarks."],
         )
+
+    def get_status(self) -> dict[str, Any]:
+        """Return status dictionary for UI and API hydration."""
+        return {
+            "stage": self.stage.value,
+            "active_configurations": dict(self.active_configurations),
+            "last_cycle_summary": getattr(self, "_last_summary", "RSI system stable and monitoring for bottleneck signatures."),
+        }
+
+
+_RSI_ENGINES: dict[str, RSIEngine] = {}
+
+
+def get_rsi_engine(project_id: str = "default") -> RSIEngine:
+    """Project-scoped singleton accessor for RSIEngine."""
+    if project_id not in _RSI_ENGINES:
+        _RSI_ENGINES[project_id] = RSIEngine()
+    return _RSI_ENGINES[project_id]

@@ -7,7 +7,7 @@ from .persistence import AVOPersistenceManager
 from .scoring import EvaluationVector
 from .supervisor import AVOSupervisor, StrategicPivotDirective
 from .variation_agent import AgenticVariationLoop
-from .workspace_runner import WorkspaceAVORunner
+from .workspace_runner import WorkspaceAVORunner, get_avo_runner
 
 __all__ = [
     "AVOEngine",
@@ -21,4 +21,5 @@ __all__ = [
     "KnowledgeEntry",
     "AgenticVariationLoop",
     "WorkspaceAVORunner",
+    "get_avo_runner",
 ]

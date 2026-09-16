@@ -206,3 +206,18 @@ class WorkspaceAVORunner:
             "stdout_snippet": stdout[-200:] if stdout else None,
             "stderr_snippet": stderr[-200:] if stderr else None,
         }
+
+
+_AVO_RUNNERS: dict[str, WorkspaceAVORunner] = {}
+
+
+def get_avo_runner(project_id: str = "default") -> WorkspaceAVORunner:
+    """Project-scoped singleton accessor for WorkspaceAVORunner."""
+    import os
+    if project_id not in _AVO_RUNNERS:
+        base_dir = os.environ.get("DEER_FLOW_PROJECTS_DIR", ".deerflow_projects")
+        proj_dir = Path(base_dir) / project_id
+        proj_dir.mkdir(parents=True, exist_ok=True)
+        pm = AVOPersistenceManager(proj_dir)
+        _AVO_RUNNERS[project_id] = WorkspaceAVORunner(persistence_mgr=pm, root_path=proj_dir)
+    return _AVO_RUNNERS[project_id]

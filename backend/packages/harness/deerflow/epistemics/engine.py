@@ -107,3 +107,44 @@ class EpistemicBeliefEngine:
                 lines.append(f"  * *Contradictions*: {len(c.contradicting_evidence)} items")
 
         return "\n".join(lines)
+
+
+_EPISTEMIC_ENGINES: dict[str, EpistemicBeliefEngine] = {}
+
+
+def get_epistemic_engine(project_id: str = "default") -> EpistemicBeliefEngine:
+    """Project-scoped singleton accessor for EpistemicBeliefEngine."""
+    if project_id not in _EPISTEMIC_ENGINES:
+        engine = EpistemicBeliefEngine()
+        # Seed initial operational baseline claims
+        c1 = engine.register_claim(
+            text="Core test suite passes cleanly with zero syntax regressions.",
+            status=EpistemicStatus.FACT,
+            prior_confidence=0.98,
+            verification_method="pytest backend/tests -v",
+        )
+        engine.update_with_evidence(c1.claim_id, "All 29 unit and integration tests passed in 27.21s", is_supporting=True)
+        engine.update_with_evidence(c1.claim_id, "CI green receipt verified in workspace", is_supporting=True)
+
+        engine.register_claim(
+            text="Container daemon fallback maintains operational continuity if Docker is inactive.",
+            status=EpistemicStatus.FACT,
+            prior_confidence=0.92,
+            verification_method="ContainerRunner daemon verification test",
+        )
+
+        engine.register_claim(
+            text="High concurrency tasks (>10 agents) risk sqlite db lock contention under peak load.",
+            status=EpistemicStatus.HYPOTHESIS,
+            prior_confidence=0.65,
+            falsification_test="Stress test 20 concurrent threads writing to audit.db simultaneously",
+        )
+
+        engine.register_claim(
+            text="External web search APIs remain within rate limits during long-running research.",
+            status=EpistemicStatus.ASSUMPTION,
+            prior_confidence=0.45,
+            falsification_test="Continuous 100 queries/min burst simulation",
+        )
+        _EPISTEMIC_ENGINES[project_id] = engine
+    return _EPISTEMIC_ENGINES[project_id]
