@@ -11,15 +11,21 @@ import {
   decideApproval, localEndpointHealth, fetchWarRoomData, resolveApprovalRequest,
   createCheckpoint, restoreCheckpoint, probeCanary,
   triggerAVOIteration, registerEpistemicClaim, addEpistemicEvidence, triggerRSICycle, replayTrajectory,
+  fetchSelfConfigStatus, inferSelfConfig, tuneSelfConfig,
+  fetchMetaLineage, compileNextGenBlueprint, benchmarkBlueprint, hotswapBlueprint, rollbackBlueprint,
+  fetchPerpetualStatus, startPerpetualDaemon, stopPerpetualDaemon, triggerPerpetualHeartbeat,
+  triggerPerpetualDiscovery, triggerPerpetualConsolidation, createPerpetualGoal,
   type PresenceMember, type ProjectStateSnapshot, type WarRoomSnapshot,
   type WarRoomCheckpoint, type WarRoomLeaderboardEntry, type WarRoomCanaryResult,
   type WarRoomAVOLineage, type WarRoomEpistemicClaim, type WarRoomRSIStatus, type WarRoomTrajectoryTrace,
+  type GoalAnalysisResult, type SelfConfigProfile, type AgentBlueprint, type BenchmarkScorecard,
+  type MetaLineageData, type PerpetualStatusData, type AutonomousTaskItem,
 } from "@/lib/workforce";
 import {
   RefreshCw, Send, Inbox, Users, Wrench, CalendarClock, Scale, Activity, Radio, ShieldAlert,
   Check, Ban, CheckCircle2, AlertTriangle, FileText, DollarSign, Layers, ChevronDown, ChevronRight,
   ShieldCheck, CheckSquare, Trophy, Eye, Save, RotateCcw,
-  Dna, Compass, Cpu, Play, Plus, GitFork,
+  Dna, Compass, Cpu, Play, Plus, GitFork, Zap, Sparkles, Repeat, SlidersHorizontal,
 } from "lucide-react";
 
 export interface WorkforceBot {
@@ -602,6 +608,197 @@ function WarRoomTab() {
       setApprovalNotice(`Time-travel trajectory replay simulated forward from step #${stepIndex}.`);
     } catch (e) {
       setApprovalNotice(`Trajectory replay error: ${errMsg(e)}`);
+    }
+  };
+
+  // Feature 1: Autonomous Self-Configuration Engine
+  const selfConfig = useAsync(() => fetchSelfConfigStatus(selectedProject), [selectedProject]);
+  const [inferGoalInput, setInferGoalInput] = useState("Build a self-configuring ASI harness with autonomous replication and continuous healing");
+  const [inferringConfig, setInferringConfig] = useState(false);
+  const [lastAnalysis, setLastAnalysis] = useState<GoalAnalysisResult | null>(null);
+  const [tuneBudget, setTuneBudget] = useState<number>(8192);
+  const [tuneCompaction, setTuneCompaction] = useState<number>(50000);
+  const [tuneBusy, setTuneBusy] = useState(false);
+
+  // Feature 2: Recursive Agent Meta-Compiler
+  const metaLineage = useAsync(() => fetchMetaLineage(selectedProject), [selectedProject]);
+  const [optimTarget, setOptimTarget] = useState("performance_and_reasoning");
+  const [compilingGen, setCompilingGen] = useState(false);
+  const [benchmarkingBp, setBenchmarkingBp] = useState<string | null>(null);
+  const [hotswappingBp, setHotswappingBp] = useState<string | null>(null);
+
+  // Feature 3: Perpetual Never-Ending Daemon
+  const perpetualStatus = useAsync(() => fetchPerpetualStatus(selectedProject), [selectedProject]);
+  const [perpetualBusy, setPerpetualBusy] = useState(false);
+  const [newGoalTitle, setNewGoalTitle] = useState("");
+
+  const handleInferConfig = async () => {
+    if (!inferGoalInput.trim() || inferringConfig) return;
+    setInferringConfig(true);
+    try {
+      const res = await inferSelfConfig(selectedProject, inferGoalInput.trim());
+      setLastAnalysis(res.analysis);
+      setApprovalNotice(`Auto-configuration inferred: ${res.analysis.domain.toUpperCase()} domain, ${res.analysis.suggested_mode.toUpperCase()} mode.`);
+      selfConfig.reload();
+    } catch (e) {
+      setApprovalNotice(`Self-config error: ${errMsg(e)}`);
+    } finally {
+      setInferringConfig(false);
+    }
+  };
+
+  const handleTuneConfig = async () => {
+    setTuneBusy(true);
+    try {
+      await tuneSelfConfig(selectedProject, {
+        reasoning_budget_tokens: Number(tuneBudget),
+        context_compaction_threshold: Number(tuneCompaction),
+      });
+      setApprovalNotice(`Dynamic parameters tuned: budget=${tuneBudget} tokens, compaction=${tuneCompaction} chars.`);
+      selfConfig.reload();
+    } catch (e) {
+      setApprovalNotice(`Tuning error: ${errMsg(e)}`);
+    } finally {
+      setTuneBusy(false);
+    }
+  };
+
+  const handleCompileNextGen = async () => {
+    setCompilingGen(true);
+    try {
+      const res = await compileNextGenBlueprint(selectedProject, {
+        optimization_target: optimTarget,
+      });
+      setApprovalNotice(`Meta-Compiler synthesized: ${res.name} (Gen ${res.generation}, Strategy: ${res.reasoning_strategy})`);
+      metaLineage.reload();
+    } catch (e) {
+      setApprovalNotice(`Compile error: ${errMsg(e)}`);
+    } finally {
+      setCompilingGen(false);
+    }
+  };
+
+  const handleSynthesizeSpecialist = async (domain: string) => {
+    setCompilingGen(true);
+    try {
+      const res = await compileNextGenBlueprint(selectedProject, {
+        specialist_domain: domain,
+      });
+      setApprovalNotice(`Specialist synthesized: ${res.name} for ${domain}`);
+      metaLineage.reload();
+    } catch (e) {
+      setApprovalNotice(`Specialist error: ${errMsg(e)}`);
+    } finally {
+      setCompilingGen(false);
+    }
+  };
+
+  const handleBenchmark = async (bpId: string) => {
+    setBenchmarkingBp(bpId);
+    try {
+      const res = await benchmarkBlueprint(selectedProject, bpId);
+      setApprovalNotice(`Benchmark completed: score=${res.composite_score} (Regression: ${res.passed_regression_suite ? "PASSED" : "FAILED"})`);
+      metaLineage.reload();
+    } catch (e) {
+      setApprovalNotice(`Benchmark error: ${errMsg(e)}`);
+    } finally {
+      setBenchmarkingBp(null);
+    }
+  };
+
+  const handleHotSwap = async (bpId: string, force = false) => {
+    setHotswappingBp(bpId);
+    try {
+      const res = await hotswapBlueprint(selectedProject, bpId, force);
+      if (res.success) {
+        setApprovalNotice(`Verified Hot-Swap SUCCESS! Promoted Gen ${res.generation} (${res.new_head_id}) with ${res.migrated_tasks} active tasks migrated.`);
+      } else {
+        setApprovalNotice(`Hot-Swap rejected by verification gate: ${JSON.stringify(res.telemetry)}`);
+      }
+      metaLineage.reload();
+    } catch (e) {
+      setApprovalNotice(`Hot-swap error: ${errMsg(e)}`);
+    } finally {
+      setHotswappingBp(null);
+    }
+  };
+
+  const handleRollback = async (bpId: string) => {
+    try {
+      const res = await rollbackBlueprint(selectedProject, bpId);
+      setApprovalNotice(`Rollback complete: Active head restored to ${res.active_head_id} (Gen ${res.generation})`);
+      metaLineage.reload();
+    } catch (e) {
+      setApprovalNotice(`Rollback error: ${errMsg(e)}`);
+    }
+  };
+
+  const handleToggleDaemon = async (running: boolean) => {
+    setPerpetualBusy(true);
+    try {
+      if (running) {
+        await stopPerpetualDaemon(selectedProject);
+        setApprovalNotice("Perpetual Autonomous Daemon PAUSED.");
+      } else {
+        await startPerpetualDaemon(selectedProject);
+        setApprovalNotice("Perpetual Autonomous Daemon RUNNING.");
+      }
+      perpetualStatus.reload();
+    } catch (e) {
+      setApprovalNotice(`Daemon control error: ${errMsg(e)}`);
+    } finally {
+      setPerpetualBusy(false);
+    }
+  };
+
+  const handleHeartbeat = async () => {
+    setPerpetualBusy(true);
+    try {
+      const res = await triggerPerpetualHeartbeat(selectedProject);
+      setApprovalNotice(`Heartbeat #${res.heartbeat} pulsed: State=${res.state}, Progress=${res.goal_progress_percent}%`);
+      perpetualStatus.reload();
+    } catch (e) {
+      setApprovalNotice(`Heartbeat error: ${errMsg(e)}`);
+    } finally {
+      setPerpetualBusy(false);
+    }
+  };
+
+  const handleDiscover = async () => {
+    setPerpetualBusy(true);
+    try {
+      const res = await triggerPerpetualDiscovery(selectedProject);
+      setApprovalNotice(`Autonomous Task Discovery completed: ${res.discovered_count} new tasks found.`);
+      perpetualStatus.reload();
+    } catch (e) {
+      setApprovalNotice(`Discovery error: ${errMsg(e)}`);
+    } finally {
+      setPerpetualBusy(false);
+    }
+  };
+
+  const handleConsolidate = async () => {
+    setPerpetualBusy(true);
+    try {
+      const res = (await triggerPerpetualConsolidation(selectedProject)) as { summary?: string };
+      setApprovalNotice(`Memory consolidation executed: ${res.summary || "Complete"}`);
+      perpetualStatus.reload();
+    } catch (e) {
+      setApprovalNotice(`Consolidation error: ${errMsg(e)}`);
+    } finally {
+      setPerpetualBusy(false);
+    }
+  };
+
+  const handleCreateGoal = async () => {
+    if (!newGoalTitle.trim()) return;
+    try {
+      await createPerpetualGoal(selectedProject, newGoalTitle.trim());
+      setNewGoalTitle("");
+      setApprovalNotice("New perpetual goal queued for continuous pursuit.");
+      perpetualStatus.reload();
+    } catch (e) {
+      setApprovalNotice(`Create goal error: ${errMsg(e)}`);
     }
   };
 
@@ -1306,7 +1503,365 @@ function WarRoomTab() {
             )}
           </Panel>
 
-          {/* 15. Flight Recorder Stream */}
+          {/* 15. Autonomous Perpetual Daemon & Self-Configuration Engine */}
+          <Panel
+            title="Autonomous Perpetual Daemon & Self-Configuration Engine (Zero-Human Setup)"
+            hint="Agents dynamically analyze goals, classify domains, assess risk, and self-configure models, reasoning budgets, and tools"
+            actions={
+              <div className="flex items-center gap-1.5 flex-wrap">
+                {selfConfig.data?.active_profile && (
+                  <>
+                    <Badge tone="blue">Mode: {selfConfig.data.active_profile.operating_mode}</Badge>
+                    <Badge tone="purple">Tier: {selfConfig.data.active_profile.model_tier}</Badge>
+                    <Badge tone="cyan">{selfConfig.data.active_profile.primary_model}</Badge>
+                  </>
+                )}
+                <Btn variant="ghost" onClick={() => selfConfig.reload()}>
+                  <RefreshCw className="size-3 mr-1" /> Refresh
+                </Btn>
+              </div>
+            }
+          >
+            <div className="space-y-3 text-xs">
+              {/* Intent Analysis Input */}
+              <div className="p-3 rounded-xl border border-border/60 bg-muted/20 space-y-2">
+                <label className="font-semibold text-foreground flex items-center gap-1.5">
+                  <Sparkles className="size-3.5 text-primary" /> Autonomous Goal Intent & Complexity Analyzer
+                </label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    value={inferGoalInput}
+                    onChange={(e) => setInferGoalInput(e.target.value)}
+                    placeholder="Enter any complex user goal to auto-configure..."
+                    className="flex-1 text-xs bg-card border border-border/60 rounded-lg px-3 py-1.5 font-mono"
+                  />
+                  <Btn variant="primary" disabled={inferringConfig} onClick={handleInferConfig}>
+                    <Zap className="size-3 mr-1" /> {inferringConfig ? "Analyzing..." : "Auto-Configure"}
+                  </Btn>
+                </div>
+
+                {/* Display Analysis Results */}
+                {lastAnalysis && (
+                  <div className="mt-2 p-2.5 rounded-lg bg-card border border-primary/20 space-y-1.5 font-mono text-[11px]">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-bold text-foreground">Domain:</span>
+                      <Badge tone="blue">{lastAnalysis.domain.toUpperCase()}</Badge>
+                      <span className="font-bold text-foreground ml-2">Complexity:</span>
+                      <Badge tone={lastAnalysis.complexity === "research_frontier" ? "purple" : lastAnalysis.complexity === "complex" ? "amber" : "green"}>
+                        {lastAnalysis.complexity.toUpperCase()}
+                      </Badge>
+                      <span className="font-bold text-foreground ml-2">Risk Score:</span>
+                      <Badge tone={lastAnalysis.risk_score > 0.4 ? "red" : "green"}>
+                        {(lastAnalysis.risk_score * 100).toFixed(0)}%
+                      </Badge>
+                      <span className="font-bold text-foreground ml-2">Topology:</span>
+                      <Badge tone="gray">{lastAnalysis.recommended_topology}</Badge>
+                    </div>
+                    <p className="text-muted-foreground font-sans"><strong>Intent:</strong> {lastAnalysis.intent}</p>
+                    <div className="flex items-center gap-1 flex-wrap pt-1">
+                      <span className="text-muted-foreground font-semibold">Auto-Discovered Tools:</span>
+                      {lastAnalysis.tool_whitelist.map((tool) => (
+                        <span key={tool} className="px-1.5 py-0.5 rounded bg-muted/60 text-[10px] text-foreground">
+                          {tool}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Dynamic In-Flight Tuner */}
+              <div className="p-3 rounded-xl border border-border/60 bg-muted/20 space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="font-semibold text-foreground flex items-center gap-1.5">
+                    <SlidersHorizontal className="size-3.5 text-primary" /> Dynamic In-Flight Parameter Tuner
+                  </label>
+                  <Btn variant="ghost" disabled={tuneBusy} onClick={handleTuneConfig}>
+                    {tuneBusy ? "Applying..." : "Apply Dynamic Tuning"}
+                  </Btn>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-[11px] text-muted-foreground">Reasoning Budget (Tokens): {tuneBudget}</label>
+                    <input
+                      type="range"
+                      min={1024}
+                      max={32768}
+                      step={1024}
+                      value={tuneBudget}
+                      onChange={(e) => setTuneBudget(Number(e.target.value))}
+                      className="w-full mt-1"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[11px] text-muted-foreground">Context Compaction Threshold (Chars): {tuneCompaction}</label>
+                    <input
+                      type="range"
+                      min={10000}
+                      max={120000}
+                      step={5000}
+                      value={tuneCompaction}
+                      onChange={(e) => setTuneCompaction(Number(e.target.value))}
+                      className="w-full mt-1"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </Panel>
+
+          {/* 16. Recursive Agent Meta-Compiler & Self-Replication */}
+          <Panel
+            title="Recursive Agent Meta-Compiler & Self-Replication ('Builds Its Own Next Version')"
+            hint="Synthesizes, benchmarks, verifies, and zero-downtime hot-swaps advanced next-generation agent architectures"
+            actions={
+              <div className="flex items-center gap-1.5 flex-wrap">
+                {metaLineage.data && (
+                  <Badge tone="purple">
+                    Active: Gen {metaLineage.data.active_head.generation} ({metaLineage.data.active_head.architecture_tag})
+                  </Badge>
+                )}
+                <Btn variant="primary" disabled={compilingGen} onClick={handleCompileNextGen}>
+                  <Sparkles className="size-3 mr-1" /> {compilingGen ? "Synthesizing..." : "Compile Gen N+1"}
+                </Btn>
+              </div>
+            }
+          >
+            <div className="space-y-3 text-xs">
+              {/* Active Head Card */}
+              {metaLineage.data?.active_head && (
+                <div className="p-3 rounded-xl border border-primary/30 bg-primary/5 space-y-1.5 font-mono text-[11px]">
+                  <div className="flex items-center justify-between flex-wrap gap-1">
+                    <div className="flex items-center gap-1.5">
+                      <Badge tone="green">PRODUCTION HEAD</Badge>
+                      <span className="font-bold text-foreground text-xs">{metaLineage.data.active_head.name}</span>
+                      <span className="text-muted-foreground">({metaLineage.data.active_head.blueprint_id})</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <Badge tone="blue">Strategy: {metaLineage.data.active_head.reasoning_strategy}</Badge>
+                      <Badge tone="purple">Memory: {metaLineage.data.active_head.memory_layout}</Badge>
+                      <Badge tone="cyan">Fitness: {metaLineage.data.active_scorecard.composite_score}</Badge>
+                    </div>
+                  </div>
+                  <p className="text-muted-foreground font-sans text-xs">
+                    {metaLineage.data.active_head.system_prompt_template}
+                  </p>
+                </div>
+              )}
+
+              {/* Specialist Synthesizers */}
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-[11px] font-semibold text-muted-foreground">Synthesize Specialists:</span>
+                <Btn variant="ghost" disabled={compilingGen} onClick={() => handleSynthesizeSpecialist("swe_coding")}>
+                  <Dna className="size-3 mr-1" /> SWE Specialist
+                </Btn>
+                <Btn variant="ghost" disabled={compilingGen} onClick={() => handleSynthesizeSpecialist("deep_research")}>
+                  <Compass className="size-3 mr-1" /> Research Specialist
+                </Btn>
+              </div>
+
+              {/* Generation Lineage & Benchmark Scorecards */}
+              <div className="space-y-2">
+                <span className="font-semibold text-muted-foreground text-[11px]">Generational Lineage & Pareto Frontier:</span>
+                <div className="space-y-1.5 max-h-56 overflow-y-auto font-mono text-[11px]">
+                  {metaLineage.data?.pareto_frontier.map((bp) => {
+                    const isHead = bp.blueprint_id === metaLineage.data?.active_head.blueprint_id;
+                    const isBenchmarking = benchmarkingBp === bp.blueprint_id;
+                    const isHotSwapping = hotswappingBp === bp.blueprint_id;
+
+                    return (
+                      <div
+                        key={bp.blueprint_id}
+                        className={`p-2 rounded-xl border flex items-center justify-between gap-2 flex-wrap ${
+                          isHead ? "border-primary/50 bg-primary/10" : "border-border/60 bg-muted/30"
+                        }`}
+                      >
+                        <div className="space-y-0.5 max-w-lg">
+                          <div className="flex items-center gap-1.5">
+                            <span className="font-bold text-foreground">Gen {bp.generation}</span>
+                            <span className="font-semibold text-primary">{bp.name}</span>
+                            <Badge tone="gray">{bp.reasoning_strategy}</Badge>
+                            {isHead && <Badge tone="green">ACTIVE HEAD</Badge>}
+                          </div>
+                          <p className="text-[10px] text-muted-foreground truncate max-w-md font-sans">
+                            {bp.mutation_notes}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-1.5 ml-auto">
+                          <Btn
+                            variant="ghost"
+                            disabled={isBenchmarking}
+                            onClick={() => handleBenchmark(bp.blueprint_id)}
+                            title="Run synthetic SWE & reasoning benchmarks"
+                          >
+                            <Trophy className="size-3 mr-1" /> {isBenchmarking ? "Evaluating..." : "Benchmark"}
+                          </Btn>
+                          {!isHead && (
+                            <>
+                              <Btn
+                                variant="primary"
+                                disabled={isHotSwapping}
+                                onClick={() => handleHotSwap(bp.blueprint_id, true)}
+                                title="Promote to production with zero-downtime hot-swap"
+                              >
+                                <CheckCircle2 className="size-3 mr-1" /> {isHotSwapping ? "Promoting..." : "Hot-Swap"}
+                              </Btn>
+                              <Btn
+                                variant="ghost"
+                                onClick={() => handleRollback(bp.blueprint_id)}
+                                title="Roll back active head to this generation"
+                              >
+                                <RotateCcw className="size-3 mr-1" /> Rollback
+                              </Btn>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          </Panel>
+
+          {/* 17. Perpetual Never-Ending Autonomous Daemon ("Will Never Stop") */}
+          <Panel
+            title="Perpetual Never-Ending Autonomous Daemon ('Will Never Stop')"
+            hint="Continuous goal pursuit, autonomous task discovery, stagnation & deadlock watchdog, and perpetual memory consolidation"
+            actions={
+              <div className="flex items-center gap-1.5 flex-wrap">
+                {perpetualStatus.data?.telemetry && (
+                  <>
+                    <Badge tone={perpetualStatus.data.telemetry.state === "running" ? "green" : "amber"}>
+                      State: {perpetualStatus.data.telemetry.state.toUpperCase()}
+                    </Badge>
+                    <Badge tone="cyan">Heartbeat: #{perpetualStatus.data.telemetry.heartbeat_count}</Badge>
+                  </>
+                )}
+                <Btn
+                  variant={perpetualStatus.data?.telemetry.state === "running" ? "ghost" : "primary"}
+                  disabled={perpetualBusy}
+                  onClick={() => handleToggleDaemon(perpetualStatus.data?.telemetry.state === "running")}
+                >
+                  {perpetualStatus.data?.telemetry.state === "running" ? "Pause Daemon" : "Resume Daemon"}
+                </Btn>
+                <Btn variant="ghost" disabled={perpetualBusy} onClick={handleHeartbeat}>
+                  <Play className="size-3 mr-1" /> Pulse Heartbeat
+                </Btn>
+              </div>
+            }
+          >
+            <div className="space-y-3 text-xs">
+              {/* Telemetry Vitals Grid */}
+              {perpetualStatus.data?.telemetry && (
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 font-mono">
+                  <div className="p-2 rounded-lg bg-muted/40">
+                    <span className="text-[10px] text-muted-foreground uppercase">Daemon Uptime</span>
+                    <p className="font-bold text-foreground mt-0.5">{perpetualStatus.data.telemetry.uptime_seconds}s</p>
+                  </div>
+                  <div className="p-2 rounded-lg bg-muted/40">
+                    <span className="text-[10px] text-muted-foreground uppercase">Tasks Discovered</span>
+                    <p className="font-bold text-primary mt-0.5">{perpetualStatus.data.telemetry.total_tasks_discovered}</p>
+                  </div>
+                  <div className="p-2 rounded-lg bg-muted/40">
+                    <span className="text-[10px] text-muted-foreground uppercase">Tasks Completed</span>
+                    <p className="font-bold text-emerald-500 mt-0.5">{perpetualStatus.data.telemetry.tasks_completed_count}</p>
+                  </div>
+                  <div className="p-2 rounded-lg bg-muted/40">
+                    <span className="text-[10px] text-muted-foreground uppercase">Deadlocks Resolved</span>
+                    <p className="font-bold text-purple-400 mt-0.5">{perpetualStatus.data.telemetry.stagnation_incidents_recovered}</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Active Perpetual Goal & Progress Bar */}
+              {perpetualStatus.data?.active_goal && (
+                <div className="p-3 rounded-xl border border-border/60 bg-muted/20 space-y-2">
+                  <div className="flex items-center justify-between flex-wrap gap-1">
+                    <div>
+                      <span className="font-bold text-foreground text-xs">{perpetualStatus.data.active_goal.title}</span>
+                      <p className="text-[11px] text-muted-foreground font-sans mt-0.5">{perpetualStatus.data.active_goal.description}</p>
+                    </div>
+                    <Badge tone="green">{perpetualStatus.data.active_goal.progress_percent}% Complete</Badge>
+                  </div>
+                  <div className="w-full bg-muted/60 rounded-full h-1.5 overflow-hidden">
+                    <div
+                      className="bg-primary h-1.5 transition-all duration-500"
+                      style={{ width: `${perpetualStatus.data.active_goal.progress_percent}%` }}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Add New Perpetual Goal Form */}
+              <div className="p-2.5 rounded-xl border border-border/60 bg-muted/10 space-y-1.5">
+                <label className="font-semibold text-foreground text-[11px] flex items-center gap-1.5">
+                  <Plus className="size-3 text-primary" /> Queue New Continuous Perpetual Goal
+                </label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    value={newGoalTitle}
+                    onChange={(e) => setNewGoalTitle(e.target.value)}
+                    placeholder="Enter new continuous objective (e.g. Zero-Regression Automated Refactoring)..."
+                    className="flex-1 text-xs bg-card border border-border/60 rounded-lg px-3 py-1 font-mono"
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") handleCreateGoal();
+                    }}
+                  />
+                  <Btn variant="primary" disabled={!newGoalTitle.trim() || perpetualBusy} onClick={handleCreateGoal}>
+                    <Plus className="size-3 mr-1" /> Add Goal
+                  </Btn>
+                </div>
+              </div>
+
+              {/* Autonomous Task Discovery Queue */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="font-semibold text-muted-foreground text-[11px]">Proactively Discovered Tasks Queue:</span>
+                  <div className="flex items-center gap-1.5">
+                    <Btn variant="ghost" disabled={perpetualBusy} onClick={handleDiscover}>
+                      <Zap className="size-3 mr-1" /> Discover New Tasks
+                    </Btn>
+                    <Btn variant="ghost" disabled={perpetualBusy} onClick={handleConsolidate}>
+                      <Repeat className="size-3 mr-1" /> Consolidate Memory
+                    </Btn>
+                  </div>
+                </div>
+
+                <div className="space-y-1.5 max-h-48 overflow-y-auto font-mono text-[11px]">
+                  {perpetualStatus.data?.tasks.map((task) => (
+                    <div key={task.task_id} className="p-2 rounded-lg bg-muted/30 border border-border/40 flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 truncate max-w-lg">
+                        <Badge tone={task.status === "completed" ? "green" : "blue"}>{task.status}</Badge>
+                        <Badge tone="gray">{task.source}</Badge>
+                        <span className="text-foreground font-sans truncate">{task.title}</span>
+                      </div>
+                      <span className="text-[10px] text-muted-foreground whitespace-nowrap">Priority: {task.priority}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Stagnation Watchdog Incidents */}
+              {perpetualStatus.data?.stagnation_incidents && perpetualStatus.data.stagnation_incidents.length > 0 && (
+                <div className="p-2.5 rounded-lg border border-amber-500/30 bg-amber-500/5 space-y-1 font-mono text-[11px]">
+                  <span className="font-bold text-amber-500 flex items-center gap-1">
+                    <ShieldAlert className="size-3" /> Keel Stagnation Watchdog Interventions:
+                  </span>
+                  {perpetualStatus.data.stagnation_incidents.map((inc) => (
+                    <div key={inc.incident_id} className="flex items-center gap-2 text-muted-foreground">
+                      <span>• Repeated: {inc.repeated_action}</span>
+                      <span className="text-primary font-bold">Intervention: {inc.recovery_action_taken}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </Panel>
+
+          {/* 18. Flight Recorder Stream */}
           <Panel title="Flight Recorder (Event Stream)" hint="Audit timeline of autonomous decisions and tool operations">
             {warRoom.data.events.length === 0 ? (
               <p className="text-xs text-muted-foreground">No recent events recorded for this project.</p>

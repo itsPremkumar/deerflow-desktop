@@ -113,15 +113,24 @@ export function Btn(props: {
   );
 }
 
-export function Badge(props: { children: React.ReactNode; tone?: "green" | "amber" | "gray" | "blue" }) {
+export function Badge(props: {
+  children: React.ReactNode;
+  tone?: "green" | "amber" | "gray" | "blue" | "purple" | "cyan" | "red";
+}) {
   const tone =
     props.tone === "green"
-      ? "bg-emerald-500/10 text-emerald-600"
+      ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
       : props.tone === "amber"
-        ? "bg-amber-500/10 text-amber-600"
+        ? "bg-amber-500/10 text-amber-600 dark:text-amber-400"
         : props.tone === "blue"
           ? "bg-primary/10 text-primary"
-          : "bg-muted text-muted-foreground";
+          : props.tone === "purple"
+            ? "bg-purple-500/10 text-purple-600 dark:text-purple-400"
+            : props.tone === "cyan"
+              ? "bg-cyan-500/10 text-cyan-600 dark:text-cyan-400"
+              : props.tone === "red"
+                ? "bg-red-500/10 text-red-600 dark:text-red-400"
+                : "bg-muted text-muted-foreground";
   return (
     <span className={`inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full ${tone}`}>
       {props.children}

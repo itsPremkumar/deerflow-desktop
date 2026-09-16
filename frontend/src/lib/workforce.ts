@@ -538,3 +538,272 @@ export async function replayTrajectory(
 ): Promise<Record<string, unknown>> {
   return send(`/projects/${enc(projectId)}/trajectories/${enc(goalId)}/replay`, "POST", { from_step_index: fromStepIndex });
 }
+
+// ==============================================================================
+// Autonomous Self-Configuration Interfaces & APIs
+// ==============================================================================
+
+export interface GoalAnalysisResult {
+  raw_goal: string;
+  intent: string;
+  domain: string;
+  complexity: "trivial" | "simple" | "moderate" | "complex" | "research_frontier";
+  risk_score: number;
+  estimated_turns: number;
+  suggested_mode: "direct" | "plan" | "coding" | "research" | "swarm" | "autonomous" | "recover" | "company";
+  recommended_model_tier: "fast_local" | "standard" | "reasoning_frontier" | "multi_model_ensemble";
+  recommended_topology: "solo" | "hierarchical" | "debate_council" | "parallel_mesh";
+  required_capabilities: string[];
+  tool_whitelist: string[];
+  reasoning_budget_tokens: number;
+  reflection_frequency: number;
+  context_compaction_threshold: number;
+  ambiguities: string[];
+  mitigation_strategies: string[];
+}
+
+export interface SelfConfigProfile {
+  profile_id: string;
+  project_id: string;
+  goal: string;
+  operating_mode: string;
+  model_tier: string;
+  primary_model: string;
+  fallback_model: string;
+  active_tools: string[];
+  reasoning_budget_tokens: number;
+  thought_depth: string;
+  max_turns: number;
+  context_compaction_threshold: number;
+  loop_detection_limit: number;
+  topology: string;
+  swarm_roles: string[];
+  autonomous_pivots_enabled: boolean;
+  guardrails: Record<string, unknown>;
+  updated_at: string;
+}
+
+export interface RuntimeTuningInput {
+  reasoning_budget_tokens?: number;
+  context_compaction_threshold?: number;
+  loop_detection_limit?: number;
+  primary_model?: string;
+  operating_mode?: string;
+  thought_depth?: string;
+  extra_tools?: string[];
+  disabled_tools?: string[];
+}
+
+export async function fetchSelfConfigStatus(projectId: string): Promise<{ project_id: string; active_profile: SelfConfigProfile; analyses_performed: number; last_analysis: GoalAnalysisResult | null }> {
+  return get(`/projects/${enc(projectId)}/self-config/status`);
+}
+
+export async function inferSelfConfig(
+  projectId: string,
+  goal: string,
+  context?: Record<string, unknown>
+): Promise<{ analysis: GoalAnalysisResult; recommended_profile: SelfConfigProfile }> {
+  return send(`/projects/${enc(projectId)}/self-config/infer`, "POST", { goal, context: context || {} });
+}
+
+export async function tuneSelfConfig(
+  projectId: string,
+  tuning: RuntimeTuningInput
+): Promise<SelfConfigProfile> {
+  return send(`/projects/${enc(projectId)}/self-config/tune`, "POST", tuning);
+}
+
+// ==============================================================================
+// Agent Meta-Compiler & Self-Replication Interfaces & APIs
+// ==============================================================================
+
+export interface AgentBlueprint {
+  blueprint_id: string;
+  generation: number;
+  parent_id: string | null;
+  name: string;
+  architecture_tag: string;
+  system_prompt_template: string;
+  reasoning_strategy: string;
+  memory_layout: string;
+  tool_bindings: string[];
+  reflection_frequency: number;
+  stagnation_recovery_policy: string;
+  model_tier: string;
+  hyperparameters: Record<string, unknown>;
+  specialization: string;
+  mutation_notes: string;
+  created_at: string;
+}
+
+export interface BenchmarkScorecard {
+  benchmark_id: string;
+  blueprint_id: string;
+  generation: number;
+  coding_score: number;
+  reasoning_score: number;
+  tool_accuracy_score: number;
+  token_efficiency_score: number;
+  robustness_score: number;
+  composite_score: number;
+  passed_regression_suite: boolean;
+  details: Array<{ suite: string; score: number; status: string }>;
+  evaluated_at: string;
+}
+
+export interface HotSwapOutcome {
+  success: boolean;
+  previous_head_id: string;
+  new_head_id: string;
+  generation: number;
+  migrated_tasks: number;
+  telemetry: Record<string, unknown>;
+  promoted_at: string;
+}
+
+export interface MetaLineageData {
+  project_id: string;
+  active_head: AgentBlueprint;
+  active_scorecard: BenchmarkScorecard;
+  total_generations: number;
+  blueprints_count: number;
+  pareto_frontier: AgentBlueprint[];
+  history: Array<Record<string, unknown>>;
+}
+
+export async function fetchMetaLineage(projectId: string): Promise<MetaLineageData> {
+  return get(`/projects/${enc(projectId)}/meta-compiler/lineage`);
+}
+
+export async function compileNextGenBlueprint(
+  projectId: string,
+  payload: { parent_id?: string; optimization_target?: string; mutation_notes?: string; specialist_domain?: string }
+): Promise<AgentBlueprint> {
+  return send(`/projects/${enc(projectId)}/meta-compiler/compile`, "POST", payload);
+}
+
+export async function benchmarkBlueprint(
+  projectId: string,
+  blueprintId: string,
+  baselineScore = 0.80
+): Promise<BenchmarkScorecard> {
+  return send(`/projects/${enc(projectId)}/meta-compiler/benchmark`, "POST", { blueprint_id: blueprintId, baseline_score: baselineScore });
+}
+
+export async function hotswapBlueprint(
+  projectId: string,
+  blueprintId: string,
+  force = false
+): Promise<HotSwapOutcome> {
+  return send(`/projects/${enc(projectId)}/meta-compiler/hotswap`, "POST", { blueprint_id: blueprintId, force });
+}
+
+export async function rollbackBlueprint(
+  projectId: string,
+  targetBlueprintId: string
+): Promise<{ success: boolean; active_head_id: string; generation: number }> {
+  return send(`/projects/${enc(projectId)}/meta-compiler/rollback`, "POST", { target_blueprint_id: targetBlueprintId });
+}
+
+// ==============================================================================
+// Perpetual Never-Ending Autonomous Daemon Interfaces & APIs
+// ==============================================================================
+
+export interface PerpetualGoalItem {
+  goal_id: string;
+  title: string;
+  description: string;
+  priority: number;
+  status: string;
+  progress_percent: number;
+  subtasks: string[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AutonomousTaskItem {
+  task_id: string;
+  goal_id: string;
+  title: string;
+  source: string;
+  status: string;
+  priority: number;
+  details: Record<string, unknown>;
+  created_at: string;
+}
+
+export interface StagnationIncidentItem {
+  incident_id: string;
+  detected_at: string;
+  signature: string;
+  repeated_action: string;
+  consecutive_failures: number;
+  recovery_action_taken: string;
+  resolved: boolean;
+}
+
+export interface MemoryConsolidationReportItem {
+  report_id: string;
+  timestamp: string;
+  traces_analyzed: number;
+  facts_extracted: number;
+  skills_indexed: number;
+  pruned_tokens: number;
+  summary: string;
+}
+
+export interface PerpetualDaemonTelemetry {
+  state: "stopped" | "running" | "paused" | "stagnation_recovery" | "consolidating_memory" | "discovering_tasks";
+  heartbeat_count: number;
+  uptime_seconds: number;
+  active_goals_count: number;
+  total_tasks_discovered: number;
+  tasks_completed_count: number;
+  stagnation_incidents_recovered: number;
+  consolidation_cycles_completed: number;
+  last_heartbeat_at: string;
+}
+
+export interface PerpetualStatusData {
+  project_id: string;
+  telemetry: PerpetualDaemonTelemetry;
+  active_goal: PerpetualGoalItem;
+  all_goals: PerpetualGoalItem[];
+  tasks: AutonomousTaskItem[];
+  stagnation_incidents: StagnationIncidentItem[];
+  latest_consolidation: MemoryConsolidationReportItem | null;
+}
+
+export async function fetchPerpetualStatus(projectId: string): Promise<PerpetualStatusData> {
+  return get(`/projects/${enc(projectId)}/perpetual/status`);
+}
+
+export async function startPerpetualDaemon(projectId: string): Promise<{ project_id: string; state: string }> {
+  return send(`/projects/${enc(projectId)}/perpetual/start`, "POST", {});
+}
+
+export async function stopPerpetualDaemon(projectId: string): Promise<{ project_id: string; state: string }> {
+  return send(`/projects/${enc(projectId)}/perpetual/stop`, "POST", {});
+}
+
+export async function triggerPerpetualHeartbeat(projectId: string): Promise<Record<string, unknown>> {
+  return send(`/projects/${enc(projectId)}/perpetual/heartbeat`, "POST", {});
+}
+
+export async function triggerPerpetualDiscovery(projectId: string): Promise<{ discovered_count: number; tasks: AutonomousTaskItem[] }> {
+  return send(`/projects/${enc(projectId)}/perpetual/discover`, "POST", {});
+}
+
+export async function triggerPerpetualConsolidation(projectId: string): Promise<Record<string, unknown>> {
+  return send(`/projects/${enc(projectId)}/perpetual/consolidate`, "POST", {});
+}
+
+export async function createPerpetualGoal(
+  projectId: string,
+  title: string,
+  description = "",
+  priority = 1
+): Promise<PerpetualGoalItem> {
+  return send(`/projects/${enc(projectId)}/perpetual/goals`, "POST", { title, description, priority });
+}
+

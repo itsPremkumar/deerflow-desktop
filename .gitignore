@@ -75,3 +75,7 @@ config.yaml.bak
 /electron/dist/
 /electron/node_modules/
 /electron/build/
+
+# Local project runtime stores
+.deerflow_projects/
+backend/.deerflow_projects/

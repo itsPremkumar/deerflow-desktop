@@ -1317,3 +1317,334 @@ async def replay_project_trajectory(project_id: str, goal_id: str, body: ReplayT
     return await asyncio.to_thread(_do)
 
 
+# ==============================================================================
+# Autonomous Self-Configuration Engine Endpoints
+# ==============================================================================
+
+class SelfConfigInferBody(BaseModel):
+    goal: str = Field(..., min_length=1, max_length=5000)
+    context: dict[str, Any] = Field(default_factory=dict)
+
+
+class SelfConfigTuneBody(BaseModel):
+    reasoning_budget_tokens: int | None = Field(default=None, ge=256, le=65536)
+    context_compaction_threshold: int | None = Field(default=None, ge=1000, le=200000)
+    loop_detection_limit: int | None = Field(default=None, ge=1, le=20)
+    primary_model: str | None = Field(default=None, max_length=128)
+    operating_mode: str | None = Field(default=None, max_length=64)
+    thought_depth: str | None = Field(default=None, max_length=32)
+    extra_tools: list[str] | None = Field(default=None)
+    disabled_tools: list[str] | None = Field(default=None)
+
+
+class SelfConfigApplyBody(BaseModel):
+    operating_mode: str = Field(default="autonomous")
+    model_tier: str = Field(default="reasoning_frontier")
+    primary_model: str = Field(default="claude-3-7-sonnet-thinking")
+    fallback_model: str = Field(default="gpt-4o")
+    active_tools: list[str] = Field(default_factory=list)
+    reasoning_budget_tokens: int = Field(default=8192)
+    thought_depth: str = Field(default="deep")
+    max_turns: int = Field(default=50)
+    context_compaction_threshold: int = Field(default=50000)
+    loop_detection_limit: int = Field(default=3)
+    topology: str = Field(default="hierarchical")
+
+
+@router.get("/{project_id}/self-config/status")
+@require_permission("projects", "read")
+async def get_project_self_config_status(project_id: str, request: Request) -> dict:
+    await _require_project(project_id, request)
+
+    def _do():
+        from deerflow.autoconfig import get_self_config_engine
+
+        engine = get_self_config_engine(project_id)
+        return engine.get_status()
+
+    return await asyncio.to_thread(_do)
+
+
+@router.post("/{project_id}/self-config/infer")
+@require_permission("projects", "write")
+async def infer_project_self_config(project_id: str, body: SelfConfigInferBody, request: Request) -> dict:
+    await _require_project(project_id, request)
+
+    def _do():
+        from deerflow.autoconfig import get_self_config_engine
+
+        engine = get_self_config_engine(project_id)
+        analysis = engine.analyze_goal(body.goal, body.context)
+        profile = engine.synthesize_profile(analysis, project_id)
+        return {
+            "analysis": analysis.to_dict(),
+            "recommended_profile": profile.to_dict(),
+        }
+
+    return await asyncio.to_thread(_do)
+
+
+@router.post("/{project_id}/self-config/tune")
+@require_permission("projects", "write")
+async def tune_project_self_config(project_id: str, body: SelfConfigTuneBody, request: Request) -> dict:
+    await _require_project(project_id, request)
+
+    def _do():
+        from deerflow.autoconfig import RuntimeTuningUpdate, get_self_config_engine
+
+        engine = get_self_config_engine(project_id)
+        updates = RuntimeTuningUpdate(
+            reasoning_budget_tokens=body.reasoning_budget_tokens,
+            context_compaction_threshold=body.context_compaction_threshold,
+            loop_detection_limit=body.loop_detection_limit,
+            primary_model=body.primary_model,
+            operating_mode=body.operating_mode,
+            thought_depth=body.thought_depth,
+            extra_tools=body.extra_tools,
+            disabled_tools=body.disabled_tools,
+        )
+        updated = engine.tune_profile(updates)
+        return updated.to_dict()
+
+    return await asyncio.to_thread(_do)
+
+
+# ==============================================================================
+# Agent Meta-Compiler & Self-Replication Endpoints
+# ==============================================================================
+
+class MetaCompileBody(BaseModel):
+    parent_id: str | None = Field(default=None, max_length=128)
+    optimization_target: str = Field(default="performance_and_reasoning", max_length=128)
+    mutation_notes: str = Field(default="", max_length=1000)
+    specialist_domain: str | None = Field(default=None, max_length=64)
+
+
+class MetaBenchmarkBody(BaseModel):
+    blueprint_id: str = Field(..., min_length=1, max_length=128)
+    baseline_score: float = Field(default=0.80, ge=0.0, le=1.0)
+
+
+class MetaHotSwapBody(BaseModel):
+    blueprint_id: str = Field(..., min_length=1, max_length=128)
+    force: bool = Field(default=False)
+
+
+class MetaRollbackBody(BaseModel):
+    target_blueprint_id: str = Field(..., min_length=1, max_length=128)
+
+
+@router.get("/{project_id}/meta-compiler/lineage")
+@require_permission("projects", "read")
+async def get_project_meta_compiler_lineage(project_id: str, request: Request) -> dict:
+    await _require_project(project_id, request)
+
+    def _do():
+        from deerflow.metacompiler import get_meta_compiler_lineage
+
+        store = get_meta_compiler_lineage(project_id)
+        return store.get_status()
+
+    return await asyncio.to_thread(_do)
+
+
+@router.post("/{project_id}/meta-compiler/compile")
+@require_permission("projects", "write")
+async def compile_next_gen_agent(project_id: str, body: MetaCompileBody, request: Request) -> dict:
+    await _require_project(project_id, request)
+
+    def _do():
+        from deerflow.metacompiler import AgentMetaCompiler, get_meta_compiler_lineage
+
+        store = get_meta_compiler_lineage(project_id)
+        parent = store._blueprints.get(body.parent_id) if body.parent_id else store.active_head
+        if not parent:
+            parent = store.active_head
+
+        if body.specialist_domain:
+            candidate = AgentMetaCompiler.synthesize_specialist(body.specialist_domain, parent)
+        else:
+            candidate = AgentMetaCompiler.compile_next_generation(
+                parent=parent,
+                optimization_target=body.optimization_target,
+                mutation_notes=body.mutation_notes,
+            )
+
+        store.register_blueprint(candidate)
+        return candidate.to_dict()
+
+    return await asyncio.to_thread(_do)
+
+
+@router.post("/{project_id}/meta-compiler/benchmark")
+@require_permission("projects", "write")
+async def benchmark_candidate_agent(project_id: str, body: MetaBenchmarkBody, request: Request) -> dict:
+    await _require_project(project_id, request)
+
+    def _do():
+        from deerflow.metacompiler import MetaBenchmarkHarness, get_meta_compiler_lineage
+
+        store = get_meta_compiler_lineage(project_id)
+        candidate = store._blueprints.get(body.blueprint_id)
+        if not candidate:
+            raise HTTPException(status_code=404, detail=f"Blueprint {body.blueprint_id} not found")
+
+        scorecard = MetaBenchmarkHarness.evaluate_blueprint(candidate, baseline_score=body.baseline_score)
+        store.record_benchmark(scorecard)
+        return scorecard.to_dict()
+
+    return await asyncio.to_thread(_do)
+
+
+@router.post("/{project_id}/meta-compiler/hotswap")
+@require_permission("projects", "write")
+async def hotswap_candidate_agent(project_id: str, body: MetaHotSwapBody, request: Request) -> dict:
+    await _require_project(project_id, request)
+
+    def _do():
+        from deerflow.metacompiler import get_meta_compiler_lineage
+
+        store = get_meta_compiler_lineage(project_id)
+        outcome = store.promote_blueprint(body.blueprint_id, force=body.force)
+        return outcome.to_dict()
+
+    try:
+        return await asyncio.to_thread(_do)
+    except KeyError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@router.post("/{project_id}/meta-compiler/rollback")
+@require_permission("projects", "write")
+async def rollback_agent_architecture(project_id: str, body: MetaRollbackBody, request: Request) -> dict:
+    await _require_project(project_id, request)
+
+    def _do():
+        from deerflow.metacompiler import get_meta_compiler_lineage
+
+        store = get_meta_compiler_lineage(project_id)
+        success = store.rollback(body.target_blueprint_id)
+        if not success:
+            raise HTTPException(status_code=404, detail=f"Blueprint {body.target_blueprint_id} not found")
+        return {
+            "success": True,
+            "active_head_id": store.active_head.blueprint_id,
+            "generation": store.active_head.generation,
+        }
+
+    return await asyncio.to_thread(_do)
+
+
+# ==============================================================================
+# Perpetual Never-Ending Autonomous Daemon Endpoints
+# ==============================================================================
+
+class PerpetualGoalBody(BaseModel):
+    title: str = Field(..., min_length=3, max_length=300)
+    description: str = Field(default="", max_length=2000)
+    priority: int = Field(default=1, ge=1, le=10)
+
+
+@router.get("/{project_id}/perpetual/status")
+@require_permission("projects", "read")
+async def get_project_perpetual_status(project_id: str, request: Request) -> dict:
+    await _require_project(project_id, request)
+
+    def _do():
+        from deerflow.perpetual import get_perpetual_daemon
+
+        daemon = get_perpetual_daemon(project_id)
+        return daemon.get_status()
+
+    return await asyncio.to_thread(_do)
+
+
+@router.post("/{project_id}/perpetual/start")
+@require_permission("projects", "write")
+async def start_project_perpetual_daemon(project_id: str, request: Request) -> dict:
+    await _require_project(project_id, request)
+
+    def _do():
+        from deerflow.perpetual import get_perpetual_daemon
+
+        daemon = get_perpetual_daemon(project_id)
+        daemon.start()
+        return {"project_id": project_id, "state": daemon.state.value}
+
+    return await asyncio.to_thread(_do)
+
+
+@router.post("/{project_id}/perpetual/stop")
+@require_permission("projects", "write")
+async def stop_project_perpetual_daemon(project_id: str, request: Request) -> dict:
+    await _require_project(project_id, request)
+
+    def _do():
+        from deerflow.perpetual import get_perpetual_daemon
+
+        daemon = get_perpetual_daemon(project_id)
+        daemon.stop()
+        return {"project_id": project_id, "state": daemon.state.value}
+
+    return await asyncio.to_thread(_do)
+
+
+@router.post("/{project_id}/perpetual/heartbeat")
+@require_permission("projects", "write")
+async def trigger_project_perpetual_heartbeat(project_id: str, request: Request) -> dict:
+    await _require_project(project_id, request)
+
+    def _do():
+        from deerflow.perpetual import get_perpetual_daemon
+
+        daemon = get_perpetual_daemon(project_id)
+        return daemon.step_heartbeat()
+
+    return await asyncio.to_thread(_do)
+
+
+@router.post("/{project_id}/perpetual/discover")
+@require_permission("projects", "write")
+async def trigger_project_perpetual_discovery(project_id: str, request: Request) -> dict:
+    await _require_project(project_id, request)
+
+    def _do():
+        from deerflow.perpetual import get_perpetual_daemon
+
+        daemon = get_perpetual_daemon(project_id)
+        discovered = daemon.trigger_discovery()
+        return {"discovered_count": len(discovered), "tasks": discovered}
+
+    return await asyncio.to_thread(_do)
+
+
+@router.post("/{project_id}/perpetual/consolidate")
+@require_permission("projects", "write")
+async def trigger_project_perpetual_consolidation(project_id: str, request: Request) -> dict:
+    await _require_project(project_id, request)
+
+    def _do():
+        from deerflow.perpetual import get_perpetual_daemon
+
+        daemon = get_perpetual_daemon(project_id)
+        return daemon.trigger_consolidation()
+
+    return await asyncio.to_thread(_do)
+
+
+@router.post("/{project_id}/perpetual/goals")
+@require_permission("projects", "write")
+async def create_project_perpetual_goal(project_id: str, body: PerpetualGoalBody, request: Request) -> dict:
+    await _require_project(project_id, request)
+
+    def _do():
+        from deerflow.perpetual import get_perpetual_daemon
+
+        daemon = get_perpetual_daemon(project_id)
+        goal = daemon.create_goal(title=body.title, description=body.description, priority=body.priority)
+        return goal.to_dict()
+
+    return await asyncio.to_thread(_do)
+
+
+
