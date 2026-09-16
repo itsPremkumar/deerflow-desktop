@@ -879,6 +879,30 @@ def _get_memory_context(
             agent_name=agent_name,
         )
 
+        try:
+            from deerflow.memory.cognitive import get_cognitive_memory_system
+
+            cog_sys = get_cognitive_memory_system()
+            cognitive_blocks = []
+            active_wm = cog_sys.working_mem.list_active(min_attention=0.5)
+            if active_wm:
+                wm_lines = [f"- [{item.context_tag.upper()}] {item.content}" for item in active_wm[:5]]
+                cognitive_blocks.append("### Active Cognitive Scratchpad (Working Memory)\n" + "\n".join(wm_lines))
+
+            skills = cog_sys.procedural_mem.list_skills(limit=3)
+            if skills:
+                sk_lines = [f"- {s.name}: {s.description} (Trigger: {s.trigger_pattern})" for s in skills]
+                cognitive_blocks.append("### Learned Procedural Playbooks\n" + "\n".join(sk_lines))
+
+            if cognitive_blocks:
+                cog_text = "\n\n".join(cognitive_blocks)
+                if memory_content.strip():
+                    memory_content = f"{memory_content.strip()}\n\n{cog_text}"
+                else:
+                    memory_content = cog_text
+        except Exception:
+            pass
+
         if not memory_content.strip():
             return ""
 

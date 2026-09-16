@@ -509,3 +509,335 @@ async def get_memory_status(http_request: Request) -> MemoryStatusResponse:
         ),
         data=MemoryResponse(**memory_data),
     )
+
+
+# =============================================================================
+# Multi-Tier Cognitive Memory Endpoints
+# =============================================================================
+
+
+class CognitiveRecallRequest(BaseModel):
+    """Request payload for context-aware hybrid retrieval."""
+
+    query: str = Field(..., min_length=1, description="Search query string")
+    limit: int = Field(default=10, ge=1, le=50)
+    bm25_weight: float = Field(default=0.35, ge=0.0, le=1.0)
+    vector_weight: float = Field(default=0.35, ge=0.0, le=1.0)
+    temporal_weight: float = Field(default=0.15, ge=0.0, le=1.0)
+    graph_weight: float = Field(default=0.15, ge=0.0, le=1.0)
+    min_score: float = Field(default=0.05, ge=0.0, le=1.0)
+    tier_filter: list[str] | None = None
+    as_of_timestamp: float | None = None
+
+
+class WorkingMemoryCreateRequest(BaseModel):
+    """Request payload to push an item into working memory scratchpad."""
+
+    content: str = Field(..., min_length=1)
+    context_tag: str = Field(default="scratch")
+    attention_score: float = Field(default=1.0, ge=0.0, le=1.0)
+    salience: float = Field(default=0.5, ge=0.0, le=1.0)
+    task_id: str = Field(default="default")
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class EpisodicTraceCreateRequest(BaseModel):
+    """Request payload to log an immediate episodic action trace."""
+
+    action: str = Field(..., min_length=1)
+    observation: str = Field(..., min_length=1)
+    outcome: str = Field(default="success")
+    error_context: str | None = None
+    session_id: str = Field(default="default")
+    salience: float = Field(default=0.5, ge=0.0, le=1.0)
+    tags: list[str] = Field(default_factory=list)
+
+
+class SemanticBeliefCreateRequest(BaseModel):
+    """Request payload to add a semantic belief node."""
+
+    subject: str = Field(..., min_length=1)
+    predicate: str = Field(..., min_length=1)
+    object_val: str = Field(..., min_length=1)
+    confidence: float = Field(default=0.8, ge=0.0, le=1.0)
+    salience: float = Field(default=0.7, ge=0.0, le=1.0)
+    tags: list[str] = Field(default_factory=list)
+
+
+class ProceduralSkillCreateRequest(BaseModel):
+    """Request payload to register a reusable procedural skill."""
+
+    name: str = Field(..., min_length=1)
+    description: str = Field(..., min_length=1)
+    trigger_pattern: str = Field(..., min_length=1)
+    preconditions: list[str] = Field(default_factory=list)
+    steps: list[str] = Field(default_factory=list)
+    code_snippet: str = Field(default="")
+    postconditions: list[str] = Field(default_factory=list)
+
+
+@router.get(
+    "/memory/cognitive/overview",
+    summary="Get Multi-Tier Cognitive Memory Overview",
+    description="Retrieve status, stats, and density metrics across all cognitive tiers.",
+)
+async def get_cognitive_overview() -> dict[str, Any]:
+    from deerflow.memory.cognitive import get_cognitive_memory_system
+
+    system = get_cognitive_memory_system()
+    return system.overview()
+
+
+@router.post(
+    "/memory/cognitive/recall",
+    summary="Context-Aware Hybrid Memory Recall",
+    description="Query memory fusing BM25 lexical, vector similarity, graph traversal, and temporal decay.",
+)
+async def recall_cognitive_memory(req: CognitiveRecallRequest) -> list[dict[str, Any]]:
+    from deerflow.memory.cognitive import HybridRecallQuery, get_cognitive_memory_system
+
+    system = get_cognitive_memory_system()
+    query_obj = HybridRecallQuery(
+        query=req.query,
+        limit=req.limit,
+        bm25_weight=req.bm25_weight,
+        vector_weight=req.vector_weight,
+        temporal_weight=req.temporal_weight,
+        graph_weight=req.graph_weight,
+        min_score=req.min_score,
+        tier_filter=req.tier_filter,
+        as_of_timestamp=req.as_of_timestamp,
+    )
+    results = system.recall(query_obj)
+    return [r.to_dict() for r in results]
+
+
+@router.get(
+    "/memory/cognitive/working",
+    summary="List Active Working Memory Items",
+)
+async def list_working_memory(task_id: str | None = None) -> list[dict[str, Any]]:
+    from deerflow.memory.cognitive import get_cognitive_memory_system
+
+    system = get_cognitive_memory_system()
+    items = system.working_mem.list_active(task_id=task_id, min_attention=0.0)
+    return [it.to_dict() for it in items]
+
+
+@router.post(
+    "/memory/cognitive/working",
+    summary="Add Working Memory Scratchpad Item",
+)
+async def add_working_memory(req: WorkingMemoryCreateRequest) -> dict[str, Any]:
+    from deerflow.memory.cognitive import get_cognitive_memory_system
+
+    system = get_cognitive_memory_system()
+    item = system.working_mem.add(
+        content=req.content,
+        context_tag=req.context_tag,
+        attention_score=req.attention_score,
+        salience=req.salience,
+        task_id=req.task_id,
+        metadata=req.metadata,
+    )
+    return item.to_dict()
+
+
+@router.delete(
+    "/memory/cognitive/working",
+    summary="Clear Working Memory Items",
+)
+async def clear_working_memory(task_id: str | None = None) -> dict[str, Any]:
+    from deerflow.memory.cognitive import get_cognitive_memory_system
+
+    system = get_cognitive_memory_system()
+    cleared = system.working_mem.clear(task_id=task_id)
+    return {"status": "cleared", "count": cleared}
+
+
+@router.get(
+    "/memory/cognitive/episodic",
+    summary="List Episodic Traces or Episodes",
+)
+async def list_episodic_memory(mode: str = "trace", session_id: str | None = None, limit: int = 50) -> list[dict[str, Any]]:
+    from deerflow.memory.cognitive import get_cognitive_memory_system
+
+    system = get_cognitive_memory_system()
+    if mode == "episode":
+        eps = system.episodic_mem.list_episodes(session_id=session_id, limit=limit)
+        return [e.to_dict() for e in eps]
+    traces = system.episodic_mem.list_traces(session_id=session_id, limit=limit)
+    return [t.to_dict() for t in traces]
+
+
+@router.post(
+    "/memory/cognitive/episodic",
+    summary="Record Episodic Trace",
+)
+async def record_episodic_trace(req: EpisodicTraceCreateRequest) -> dict[str, Any]:
+    from deerflow.memory.cognitive import get_cognitive_memory_system
+
+    system = get_cognitive_memory_system()
+    trace = system.episodic_mem.record_trace(
+        action=req.action,
+        observation=req.observation,
+        outcome=req.outcome,
+        session_id=req.session_id,
+        error_context=req.error_context,
+        salience=req.salience,
+        tags=req.tags,
+    )
+    return trace.to_dict()
+
+
+@router.delete(
+    "/memory/cognitive/episodic/{trace_id}",
+    summary="Delete Episodic Trace",
+)
+async def delete_episodic_trace(trace_id: str) -> dict[str, Any]:
+    from deerflow.memory.cognitive import get_cognitive_memory_system
+
+    system = get_cognitive_memory_system()
+    deleted = system.episodic_mem.delete_trace(trace_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail=f"Episodic trace '{trace_id}' not found.")
+    system.save_to_disk()
+    return {"status": "deleted", "trace_id": trace_id}
+
+
+@router.get(
+    "/memory/cognitive/semantic",
+    summary="List Semantic Belief Graph Nodes and Edges",
+)
+async def list_semantic_graph(status: str | None = None, subject: str | None = None, limit: int = 100) -> dict[str, Any]:
+    from deerflow.memory.cognitive import BeliefStatus, get_cognitive_memory_system
+
+    system = get_cognitive_memory_system()
+    st_enum = None
+    if status:
+        try:
+            st_enum = BeliefStatus(status.lower())
+        except ValueError:
+            pass
+    nodes = system.semantic_graph.list_nodes(status=st_enum, subject=subject, limit=limit)
+    return {
+        "metrics": system.semantic_graph.density_metrics(),
+        "nodes": [n.to_dict() for n in nodes],
+        "edges": [e.to_dict() for e in list(system.semantic_graph._edges.values())[:limit]],
+    }
+
+
+@router.post(
+    "/memory/cognitive/semantic",
+    summary="Add Semantic Belief",
+)
+async def add_semantic_belief(req: SemanticBeliefCreateRequest) -> dict[str, Any]:
+    from deerflow.memory.cognitive import get_cognitive_memory_system
+
+    system = get_cognitive_memory_system()
+    node = system.semantic_graph.add_belief(
+        subject=req.subject,
+        predicate=req.predicate,
+        object_val=req.object_val,
+        confidence=req.confidence,
+        salience=req.salience,
+        tags=req.tags,
+    )
+    system.save_to_disk()
+    return node.to_dict()
+
+
+@router.delete(
+    "/memory/cognitive/semantic/{node_id}",
+    summary="Delete Semantic Belief Node",
+)
+async def delete_semantic_belief(node_id: str) -> dict[str, Any]:
+    from deerflow.memory.cognitive import get_cognitive_memory_system
+
+    system = get_cognitive_memory_system()
+    deleted = system.semantic_graph.delete_node(node_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail=f"Semantic belief node '{node_id}' not found.")
+    system.save_to_disk()
+    return {"status": "deleted", "node_id": node_id}
+
+
+@router.get(
+    "/memory/cognitive/procedural",
+    summary="List Procedural Skills",
+)
+async def list_procedural_skills(limit: int = 50) -> list[dict[str, Any]]:
+    from deerflow.memory.cognitive import get_cognitive_memory_system
+
+    system = get_cognitive_memory_system()
+    skills = system.procedural_mem.list_skills(limit=limit)
+    return [s.to_dict() for s in skills]
+
+
+@router.post(
+    "/memory/cognitive/procedural",
+    summary="Register Procedural Skill",
+)
+async def register_procedural_skill(req: ProceduralSkillCreateRequest) -> dict[str, Any]:
+    from deerflow.memory.cognitive import get_cognitive_memory_system
+
+    system = get_cognitive_memory_system()
+    skill = system.procedural_mem.register_skill(
+        name=req.name,
+        description=req.description,
+        trigger_pattern=req.trigger_pattern,
+        preconditions=req.preconditions,
+        steps=req.steps,
+        code_snippet=req.code_snippet,
+        postconditions=req.postconditions,
+    )
+    system.save_to_disk()
+    return skill.to_dict()
+
+
+@router.delete(
+    "/memory/cognitive/procedural/{skill_id}",
+    summary="Delete Procedural Skill",
+)
+async def delete_procedural_skill(skill_id: str) -> dict[str, Any]:
+    from deerflow.memory.cognitive import get_cognitive_memory_system
+
+    system = get_cognitive_memory_system()
+    deleted = system.procedural_mem.delete_skill(skill_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail=f"Procedural skill '{skill_id}' not found.")
+    system.save_to_disk()
+    return {"status": "deleted", "skill_id": skill_id}
+
+
+@router.post(
+    "/memory/cognitive/consolidate",
+    summary="Trigger 3-Phase Sleep/Dream Consolidation Cycle",
+)
+async def trigger_consolidation() -> dict[str, Any]:
+    from deerflow.memory.cognitive import get_cognitive_memory_system
+
+    system = get_cognitive_memory_system()
+    report = system.consolidate()
+    return report.to_dict()
+
+
+@router.post(
+    "/memory/cognitive/reconcile",
+    summary="Trigger Epistemic Belief Conflict Reconciliation",
+)
+async def trigger_belief_reconciliation() -> dict[str, Any]:
+    from deerflow.memory.cognitive import get_cognitive_memory_system
+
+    system = get_cognitive_memory_system()
+    conflicts_detected = system.semantic_graph.detect_conflicts()
+    reconciled = system.semantic_graph.reconcile_conflicts()
+    system.save_to_disk()
+    return {
+        "reconciled_count": reconciled,
+        "conflicts_detected_count": len(conflicts_detected),
+        "details": [
+            {"n1": c[0].statement, "n2": c[1].statement, "reason": c[2]}
+            for c in conflicts_detected
+        ],
+    }

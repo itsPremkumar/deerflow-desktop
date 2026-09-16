@@ -31,6 +31,7 @@ from .code_agentic_core import (
 )
 from .code_mode_tool import code_mode_tool
 from .cognitive_compiler_tool import compile_cognitive_plan
+from .cognitive_memory_tool import cognitive_memory_tool
 
 # Cognitive Plan Mode: 8-Dimensional Strategic Evaluation & Autonomous Dispatch
 from .cognitive_plan_tool import cognitive_plan
@@ -236,6 +237,7 @@ __all__ = [
     "compile_problem_model",
     "execute_slash_command_tool",
     "identify_autonomous_command_tool",
+    "cognitive_memory_tool",
 ]
 
 
