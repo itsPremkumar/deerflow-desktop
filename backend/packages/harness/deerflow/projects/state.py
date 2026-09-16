@@ -61,6 +61,7 @@ class ProjectState:
     @classmethod
     def from_dict(cls, project_id: str, data: dict[str, Any]) -> ProjectState:
         filtered = {k: v for k, v in data.items() if k in cls.__dataclass_fields__}
+        filtered.pop("project_id", None)
         return cls(project_id=project_id, **filtered)
 
 

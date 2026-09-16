@@ -46,6 +46,11 @@ EVENT_TYPES = frozenset(
         "deployment_completed",
         "constitution_updated",
         "phase_changed",
+        "contract_created",
+        "evidence_attached",
+        "contract_rejected",
+        "contract_completed",
+        "task_postmortem_recorded",
     }
 )
 

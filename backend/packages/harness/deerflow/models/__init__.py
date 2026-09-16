@@ -1,3 +1,10 @@
 from .factory import create_chat_model
+from .workforce_router import ModelRouteDecision, ModelTier, WorkforceModelRouter, get_workforce_model_router
 
-__all__ = ["create_chat_model"]
+__all__ = [
+    "create_chat_model",
+    "ModelTier",
+    "ModelRouteDecision",
+    "WorkforceModelRouter",
+    "get_workforce_model_router",
+]

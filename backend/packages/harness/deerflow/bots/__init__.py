@@ -37,7 +37,8 @@ from deerflow.bots.kill_switch import (
     set_global_kill_switch,
 )
 from deerflow.bots.organization import generate_organization_for_goal, get_organization_chart
-from deerflow.bots.performance import get_bot_performance, record_task_outcome
+from deerflow.bots.ephemeral import EphemeralBotManager, EphemeralLease, get_ephemeral_manager
+from deerflow.bots.permissions import ROLE_PERMISSION_RINGS, ToolPermissionGate, get_permission_gate
 from deerflow.bots.profile import BotProfile, generate_default_soul
 from deerflow.bots.quality_gate import evaluate_quality_gate
 from deerflow.bots.registry import BotRegistry, get_bot_registry
@@ -45,6 +46,12 @@ from deerflow.bots.templates import BOT_STATUSES, BOT_TEMPLATES, DEPARTMENTS, ge
 from deerflow.bots.work_discovery import claim_task, match_bot_for_task
 
 __all__ = [
+    "EphemeralBotManager",
+    "EphemeralLease",
+    "get_ephemeral_manager",
+    "ToolPermissionGate",
+    "ROLE_PERMISSION_RINGS",
+    "get_permission_gate",
     "BotProfile",
     "generate_default_soul",
     "BotRegistry",

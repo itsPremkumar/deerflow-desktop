@@ -1,9 +1,12 @@
 """Project-centric workforce layer: agents as reusable workers, projects as shared workspaces."""
 
 from deerflow.projects import (
+    adr_generator,
     conflicts,
     constitution,
     context,
+    context_router,
+    contracts,
     decisions,
     events,
     evidence,
@@ -11,15 +14,20 @@ from deerflow.projects import (
     handoffs,
     locks,
     membership,
+    postmortem,
     routing,
     state,
     workspace,
+    worktree_hook,
 )
 
 __all__ = [
+    "adr_generator",
     "conflicts",
     "constitution",
     "context",
+    "context_router",
+    "contracts",
     "decisions",
     "evidence",
     "events",
@@ -27,7 +35,9 @@ __all__ = [
     "handoffs",
     "locks",
     "membership",
+    "postmortem",
     "routing",
     "state",
     "workspace",
+    "worktree_hook",
 ]

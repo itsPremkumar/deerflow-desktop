@@ -136,6 +136,8 @@ DEFAULT_ROLE_RINGS: dict[str, RolePermissionRing] = {
     "admin": RolePermissionRing(role_name="admin", allow_all=True),
 }
 
+ROLE_PERMISSION_RINGS = DEFAULT_ROLE_RINGS
+
 
 class ToolPermissionGate:
     """Evaluates whether an agent with a given role is authorized to execute a tool."""
