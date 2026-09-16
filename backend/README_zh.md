@@ -482,10 +482,6 @@ make test-live
 
 ---
 
-## 许可证
-
-请参阅项目根目录中的 [LICENSE](../LICENSE) 文件。
-
 ## 参与贡献
 
 贡献指南请参阅 [CONTRIBUTING.md](CONTRIBUTING.md)。

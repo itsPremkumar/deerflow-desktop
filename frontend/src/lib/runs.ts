@@ -72,13 +72,14 @@ export async function fetchWorkspaceChanges(threadId: string, runId: string): Pr
   }));
 }
 
-/** Ask the backend for clean regenerate input for the latest answer. Returns null when unsupported. */
-export async function prepareRegenerate(threadId: string): Promise<Record<string, unknown> | null> {
+/** Ask the backend for clean regenerate input for an assistant answer. Returns null when unsupported. */
+export async function prepareRegenerate(threadId: string, messageId: string): Promise<Record<string, unknown> | null> {
   try {
+    // Backend requires {message_id} — the target assistant message id.
     return await send<Record<string, unknown>>(
       `/threads/${encodeURIComponent(threadId)}/runs/regenerate/prepare`,
       "POST",
-      {}
+      { message_id: messageId }
     );
   } catch {
     return null;
@@ -88,13 +89,15 @@ export async function prepareRegenerate(threadId: string): Promise<Record<string
 /** Ask the backend for edit-replay input. Returns null when unsupported. */
 export async function prepareEditRegenerate(
   threadId: string,
-  message: string
+  humanMessageId: string,
+  replacementText: string
 ): Promise<Record<string, unknown> | null> {
   try {
+    // Backend requires {human_message_id, replacement_text}.
     return await send<Record<string, unknown>>(
       `/threads/${encodeURIComponent(threadId)}/runs/edit-regenerate/prepare`,
       "POST",
-      { message }
+      { human_message_id: humanMessageId, replacement_text: replacementText }
     );
   } catch {
     return null;

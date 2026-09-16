@@ -1,17 +1,39 @@
 ﻿/** @type {import('next').NextConfig} */
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+// The Gateway API runs on port 8001 by default (see start.ps1 -GatewayPort).
+// Override with DEER_FLOW_INTERNAL_GATEWAY_BASE_URL when the backend lives elsewhere.
+const gatewayBase = process.env.DEER_FLOW_INTERNAL_GATEWAY_BASE_URL || "http://127.0.0.1:8001";
+
 const nextConfig = {
+  reactStrictMode: true,
+  // Pin the tracing root to this app: a stray package-lock.json in an ancestor
+  // folder (e.g. the Windows home dir) otherwise hijacks workspace inference.
+  outputFileTracingRoot: __dirname,
   reactStrictMode: true,
   async rewrites() {
     return [
       {
         source: "/api/gateway/:path*",
-        destination: "http://127.0.0.1:8000/api/gateway/:path*",
+        destination: `${gatewayBase}/api/gateway/:path*`,
       },
       {
         source: "/api/:path*",
-        destination: "http://127.0.0.1:8000/api/:path*",
+        destination: `${gatewayBase}/api/:path*`,
       },
     ];
+  },
+  webpack: (config) => {
+    // Watchpack EINVAL on Windows system files (e.g. C:\pagefile.sys) when the
+    // watcher resolves paths near the drive root — exclude them explicitly.
+    config.watchOptions = {
+      ...config.watchOptions,
+      ignored: ["**/pagefile.sys", "**/hiberfil.sys", "**/swapfile.sys", "**/System Volume Information/**", "**/$RECYCLE.BIN/**"],
+    };
+    return config;
   },
 };
 

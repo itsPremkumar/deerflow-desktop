@@ -513,7 +513,7 @@ function WarRoomTab() {
   const handleProbeCanary = async () => {
     setCanaryBusy(true);
     try {
-      const res = await probeCanary(selectedProject, 3000, true);
+      const res = await probeCanary(selectedProject, 3000, false);
       setApprovalNotice(`Canary probe completed: ${res.status.toUpperCase()} (Latency: ${res.latency_ms}ms)`);
       warRoom.reload();
     } catch (e) {

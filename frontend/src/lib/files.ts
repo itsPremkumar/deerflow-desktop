@@ -48,10 +48,10 @@ export async function deleteUpload(threadId: string, filename: string): Promise<
   await send(`/threads/${encodeURIComponent(threadId)}/uploads/${encodeURIComponent(filename)}`, "DELETE");
 }
 
-export async function uploadLimits(): Promise<Record<string, unknown> | null> {
-  // Thread-scoped limits endpoint needs a thread; global best-effort probe:
+export async function uploadLimits(threadId: string): Promise<Record<string, unknown> | null> {
+  // Thread-scoped limits endpoint — requires a real thread id.
   try {
-    return await get<Record<string, unknown>>("/threads/_/uploads/limits");
+    return await get<Record<string, unknown>>(`/threads/${encodeURIComponent(threadId)}/uploads/limits`);
   } catch {
     return null;
   }

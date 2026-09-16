@@ -4,12 +4,21 @@ const BASE_URL = process.env.NEXT_PUBLIC_GATEWAY_URL || "/api/gateway";
 
 export async function fetchThreads(limit = 100): Promise<Thread[]> {
   try {
-    const res = await fetch(`${BASE_URL}/threads?limit=${limit}`);
+    // Backend has no GET /threads — listing lives at POST /threads/search,
+    // which returns a bare array of ThreadResponse records.
+    const res = await fetch(`${BASE_URL}/threads/search`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ limit }),
+    });
     if (!res.ok) return [];
     const data = await res.json();
-    return (data.threads || []).map((t: any) => ({
+    const list = Array.isArray(data) ? data : data.threads || [];
+    return list.map((t: any) => ({
       thread_id: t.thread_id,
-      title: t.metadata?.title || t.title || "Untitled Session",
+      // Server keeps the client-written title in metadata.title and the
+      // auto-generated display name in values.title — neither is top-level.
+      title: t.metadata?.title || t.values?.title || t.title || "Untitled Session",
       created_at: t.created_at || new Date().toISOString(),
       updated_at: t.updated_at || new Date().toISOString(),
       // Backend-owned bot association (thread metadata + assistant link).
@@ -47,24 +56,92 @@ export async function createThread(title?: string, opts?: CreateThreadOptions): 
   return data.thread_id;
 }
 
+/** Extract readable text from LangChain-style message content (string or block list). */
+function textOf(content: unknown): string {
+  if (typeof content === "string") return content;
+  if (Array.isArray(content)) {
+    return content
+      .map((b) => {
+        if (typeof b === "string") return b;
+        if (b && typeof b === "object") {
+          const blk = b as Record<string, unknown>;
+          if (typeof blk.text === "string") return blk.text;
+          if (blk.type === "tool_use") return `[tool: ${String(blk.name ?? "unknown")}]`;
+          if (blk.type === "image" || blk.type === "image_url") return "[image]";
+          return JSON.stringify(blk).slice(0, 500);
+        }
+        return "";
+      })
+      .filter(Boolean)
+      .join("\n");
+  }
+  if (content && typeof content === "object") return JSON.stringify(content);
+  return "";
+}
+
 export async function fetchThreadHistory(threadId: string): Promise<ChatMessage[]> {
   try {
-    const res = await fetch(`${BASE_URL}/threads/${threadId}/history`);
+    // GET /threads/{id}/messages returns a bare array of run-event rows:
+    // {seq, run_id, event_type, category, content: {type, content, ...}, created_at, feedback?}
+    const res = await fetch(`${BASE_URL}/threads/${threadId}/messages?limit=100`);
     if (!res.ok) return [];
     const data = await res.json();
-    const messages = data.messages || [];
-    return messages.map((m: any, idx: number) => ({
-      id: m.id || `msg-${idx}`,
-      role: m.type === "human" || m.role === "user" ? "user" : "assistant",
-      content: typeof m.content === "string" ? m.content : JSON.stringify(m.content),
-      thinking: m.additional_kwargs?.thinking || "",
-      toolCalls: (m.tool_calls || []).map((tc: any) => ({
-        id: tc.id,
-        name: tc.name,
-        args: tc.args || {},
-      })),
-      createdAt: m.created_at || new Date().toISOString(),
-    }));
+    const messages = Array.isArray(data) ? data : data.messages || [];
+    return messages.flatMap((m: any, idx: number) => {
+      // Event-store row shape (current backend).
+      if (m && typeof m === "object" && ("event_type" in m || "seq" in m)) {
+        const inner = m.content && typeof m.content === "object" ? m.content : {};
+        const t = String(inner.type || "");
+        const evt = String(m.event_type || "");
+        let role: ChatMessage["role"] = "assistant";
+        if (t === "human" || evt === "human_message") role = "user";
+        else if (t === "system") role = "system";
+        else if (t === "tool") role = "assistant";
+        const text = textOf(inner.content ?? m.content ?? "");
+        if (!text && t === "tool") return [];
+        const fb = m.feedback as { rating?: unknown } | null | undefined;
+        const rating = fb?.rating === 1 || fb?.rating === -1 ? fb.rating : undefined;
+        return [
+          {
+            id: String(inner.id || (m.seq !== undefined ? `seq-${m.seq}` : `msg-${idx}`)),
+            role,
+            content: text,
+            thinking: inner.additional_kwargs?.thinking || "",
+            toolCalls: [
+              ...((inner.tool_calls || []) as any[]).map((tc: any) => ({
+                id: tc.id,
+                name: tc.name,
+                args: tc.args || {},
+              })),
+              ...((inner.invalid_tool_calls || []) as any[]).map((tc: any) => ({
+                id: tc.id || `invalid-${idx}`,
+                name: tc.name || "invalid_tool",
+                args: tc.args || {},
+                status: "failed" as const,
+              })),
+            ],
+            createdAt: m.created_at || inner.created_at || new Date().toISOString(),
+            runId: m.run_id || undefined,
+            rating,
+          } as ChatMessage,
+        ];
+      }
+      // Legacy LangChain message shape (kept for cached/offline data).
+      return [
+        {
+          id: m.id || `msg-${idx}`,
+          role: m.type === "human" || m.role === "user" ? "user" : "assistant",
+          content: typeof m.content === "string" ? m.content : JSON.stringify(m.content),
+          thinking: m.additional_kwargs?.thinking || "",
+          toolCalls: (m.tool_calls || []).map((tc: any) => ({
+            id: tc.id,
+            name: tc.name,
+            args: tc.args || {},
+          })),
+          createdAt: m.created_at || new Date().toISOString(),
+        } as ChatMessage,
+      ];
+    });
   } catch (err) {
     console.error("Failed to fetch thread history:", err);
     return [];
@@ -83,12 +160,9 @@ export async function fetchAvailableModels(): Promise<AIModel[]> {
       description: m.description || "",
     }));
   } catch {
-    return [
-      { id: "default", name: "Default Frontier Agent", provider: "Config" },
-      { id: "claude-3-7-sonnet", name: "Claude 3.7 Sonnet", provider: "Anthropic" },
-      { id: "gpt-4o", name: "GPT-4o", provider: "OpenAI" },
-      { id: "deepseek", name: "DeepSeek Reasoning", provider: "DeepSeek" },
-    ];
+    // Live data only: no fabricated model list. Callers fall back to the
+    // server-resolved "default" model until the Gateway is reachable.
+    return [];
   }
 }
 

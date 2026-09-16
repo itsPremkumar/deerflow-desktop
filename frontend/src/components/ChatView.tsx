@@ -8,9 +8,9 @@ import { NavTabs, WorkspaceView } from "@/components/NavTabs";
 import { ChatMessage, Thread, AIModel } from "@/types/chat";
 import { BotProfile } from "@/types/bots";
 import { fetchThreads, createThread, fetchThreadHistory, fetchAvailableModels, autoTriggerCommand } from "@/lib/api";
+import { GATEWAY_BASE } from "@/lib/http";
 import { fetchBots, touchBot } from "@/lib/bots";
 import { fetchFeatures, fetchOpsStatus, FeatureFlags } from "@/lib/workspace";
-import { fetchMe, UserInfo } from "@/lib/auth";
 import { listThreadRuns, cancelRun } from "@/lib/runs";
 import { rateMessage } from "@/lib/feedback";
 import { suggestionsEnabled, suggestFollowUps, polishDraft } from "@/lib/assist";
@@ -32,10 +32,11 @@ import {
 import { uploadFiles } from "@/lib/files";
 import { fetchGoal, setGoal, clearGoal, compactThread, fetchTokenUsage, TokenUsage } from "@/lib/threads-ext";
 import { BotGallery } from "@/components/bots/BotGallery";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { BotDetailPanel } from "@/components/bots/BotDetailPanel";
 import { ActiveBotPicker } from "@/components/bots/ActiveBotPicker";
 import { SkeletonList } from "@/components/ui";
-import { Sparkles, Activity, Shrink, Target, X, ClipboardList } from "lucide-react";
+import { Sparkles, Activity, Shrink, Target, ClipboardList } from "lucide-react";
 
 // Sections load on demand so the first paint stays light.
 const BotOpsSection = lazy(() => import("@/components/sections/BotOpsSection").then((m) => ({ default: m.BotOpsSection })));
@@ -54,7 +55,6 @@ const TeamOpsSection = lazy(() => import("@/components/sections/TeamOpsSection")
 const ChannelsSection = lazy(() => import("@/components/sections/ChannelsSection").then((m) => ({ default: m.ChannelsSection })));
 const SystemSection = lazy(() => import("@/components/sections/SystemSection").then((m) => ({ default: m.SystemSection })));
 const WorkforceSection = lazy(() => import("@/components/sections/WorkforceSection").then((m) => ({ default: m.WorkforceSection })));
-const AuthSection = lazy(() => import("@/components/sections/AuthSection").then((m) => ({ default: m.AuthSection })));
 
 function SectionFallback() {
   return (
@@ -88,9 +88,6 @@ export default function ChatView() {
 
   // Platform state
   const [features, setFeatures] = useState<FeatureFlags>({ agentsApi: false, browserControl: false, mcpTasks: false, subagentBatches: false });
-  const [user, setUser] = useState<UserInfo | null>(null);
-  const [userLoading, setUserLoading] = useState(true);
-  const [guestDismissed, setGuestDismissed] = useState(false);
 
   // Conversation helpers
   const [goal, setGoalText] = useState<string | null>(null);
@@ -123,12 +120,11 @@ export default function ChatView() {
       } catch {
         /* fresh start */
       }
-      const [tList, mList, bList, feats, me, suggOn] = await Promise.all([
+      const [tList, mList, bList, feats, suggOn] = await Promise.all([
         fetchThreads(),
         fetchAvailableModels(),
         fetchBots(),
         fetchFeatures(),
-        fetchMe(),
         suggestionsEnabled(),
       ]);
       const merged = mergeThreads(tList);
@@ -139,8 +135,6 @@ export default function ChatView() {
       setBots(bList);
       setBotsLoading(false);
       setFeatures(feats);
-      setUser(me);
-      setUserLoading(false);
       setSuggestionsOn(suggOn);
       // Lightweight liveness probe for the header status pill.
       fetchOpsStatus().then(() => setGatewayOk(true)).catch(() => setGatewayOk(false));
@@ -420,7 +414,7 @@ export default function ChatView() {
     abortRef.current = controller;
 
     try {
-      const res = await fetch(`/api/gateway/threads/${threadId}/runs/stream`, {
+      const res = await fetch(`${GATEWAY_BASE}/threads/${threadId}/runs/stream`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         signal: controller.signal,
@@ -848,23 +842,13 @@ export default function ChatView() {
           )}
         </header>
 
-        {!userLoading && !user && !guestDismissed && (
-          <div className="shrink-0 px-4 pt-2">
-            <div className="max-w-4xl mx-auto flex items-center gap-2 rounded-xl border border-border/60 bg-card px-3 py-2 text-xs">
-              <span className="flex-1">Browsing as guest. <button type="button" onClick={() => setView("account")} className="text-primary font-semibold hover:underline">Sign in</button> for personal memory and admin actions.</span>
-              <button type="button" onClick={() => setGuestDismissed(true)} className="p-1 rounded hover:bg-muted text-muted-foreground" aria-label="Dismiss">
-                <X className="size-3.5" />
-              </button>
-            </div>
-          </div>
-        )}
-
         {notice && (
           <div className="shrink-0 px-4 pt-2">
             <div className="max-w-4xl mx-auto rounded-xl border border-primary/30 bg-primary/5 px-3 py-2 text-xs">{notice}</div>
           </div>
         )}
 
+        <ErrorBoundary resetKey={view} label={view}>
         {view === "bots" ? (
           <div className="shrink-0 px-4 sm:px-6 pt-3">
             <div className="max-w-6xl mx-auto flex gap-1 rounded-xl bg-muted/60 p-1 w-fit">
@@ -958,10 +942,6 @@ export default function ChatView() {
         ) : view === "system" ? (
           <Suspense fallback={<SectionFallback />}>
             <SystemSection threadId={activeThreadId} browserActive={features.browserControl} />
-          </Suspense>
-        ) : view === "account" ? (
-          <Suspense fallback={<SectionFallback />}>
-            <AuthSection user={user} loading={userLoading} onChanged={async () => { setUser(await fetchMe()); }} />
           </Suspense>
         ) : (
           <>
@@ -1160,6 +1140,7 @@ export default function ChatView() {
             </footer>
           </>
         )}
+        </ErrorBoundary>
       </main>
 
       <BotDetailPanel bot={inspectedBot} onClose={() => setInspectedBot(null)} onChat={handleChatWithBot} />

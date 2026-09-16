@@ -32,36 +32,50 @@ function serverDetail(body: unknown, fallback: string): string {
   return fallback;
 }
 
+/** Default ceiling for API calls so a hung backend cannot freeze the UI forever. */
+export const DEFAULT_TIMEOUT_MS = 60000;
+
 /** Low-level request. Throws ApiError with the server's detail message on failure. */
-export async function req<T = unknown>(path: string, init?: RequestInit): Promise<T> {
+export async function req<T = unknown>(path: string, init?: RequestInit, timeoutMs = DEFAULT_TIMEOUT_MS): Promise<T> {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+  // Honor a caller-provided signal too: aborting either side aborts the request.
+  const onCallerAbort = () => ctrl.abort();
+  init?.signal?.addEventListener("abort", onCallerAbort);
   let res: Response;
   try {
-    res = await fetch(`${GATEWAY_BASE}${path}`, init);
+    res = await fetch(`${GATEWAY_BASE}${path}`, { ...init, signal: ctrl.signal });
   } catch (err) {
+    if (ctrl.signal.aborted && !init?.signal?.aborted) {
+      throw new ApiError(0, `Request timed out after ${Math.round(timeoutMs / 1000)}s — the server may be busy.`);
+    }
     throw new ApiError(0, err instanceof Error ? `Network error: ${err.message}` : "Network error");
+  } finally {
+    clearTimeout(timer);
+    init?.signal?.removeEventListener("abort", onCallerAbort);
   }
   const body = await parseBody(res);
   if (!res.ok) throw new ApiError(res.status, serverDetail(body, `Request failed (${res.status})`));
   return body as T;
 }
 
-export function get<T = unknown>(path: string): Promise<T> {
-  return req<T>(path);
+export function get<T = unknown>(path: string, timeoutMs?: number): Promise<T> {
+  return req<T>(path, undefined, timeoutMs);
 }
 
-export function send<T = unknown>(path: string, method: string, payload?: unknown): Promise<T> {
+export function send<T = unknown>(path: string, method: string, payload?: unknown, timeoutMs?: number): Promise<T> {
   return req<T>(path, {
     method,
     headers: { "Content-Type": "application/json" },
     body: payload === undefined ? undefined : JSON.stringify(payload),
-  });
+  }, timeoutMs);
 }
 
 /** Human-friendly message for catch blocks. */
 export function errMsg(err: unknown): string {
   if (err instanceof ApiError) {
     if (err.status === 0) return err.message;
-    if (err.status === 401) return "Please sign in first (Account tab).";
+    if (err.status === 401) return "Not allowed — this action needs different permissions.";
     if (err.status === 403) return "Not allowed — this action needs admin rights or a feature flag.";
     if (err.status === 404) return "Not found — it may have been deleted.";
     return err.message;

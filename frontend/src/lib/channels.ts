@@ -39,7 +39,8 @@ export interface ChannelProvider {
 
 export async function listProviders(): Promise<ChannelProvider[]> {
   try {
-    const d = await get<unknown>("/channel-connections/providers");
+    // Backend: GET /api/channels/providers -> {enabled, providers}
+    const d = await get<unknown>("/channels/providers");
     return asList(d, ["providers", "data"]).map((p) => ({
       id: String(pick(p, ["id", "provider"], "")),
       name: String(pick(p, ["name", "display_name"], "")),
@@ -60,7 +61,8 @@ export interface ChannelConnection {
 
 export async function listConnections(): Promise<ChannelConnection[]> {
   try {
-    const d = await get<unknown>("/channel-connections/connections");
+    // Backend: GET /api/channels/connections -> {connections}
+    const d = await get<unknown>("/channels/connections");
     return asList(d, ["connections", "data"]).map((c, i) => ({
       id: String(pick(c, ["id", "connection_id"], `conn-${i}`)),
       provider: String(pick(c, ["provider"], "")),
@@ -73,11 +75,13 @@ export async function listConnections(): Promise<ChannelConnection[]> {
 }
 
 export async function connectProvider(provider: string): Promise<Record<string, unknown>> {
-  return send<Record<string, unknown>>(`/channel-connections/${encodeURIComponent(provider)}/connect`, "POST", {});
+  // Backend: POST /api/channels/{provider}/connect -> {mode, url?, code, instruction, ...}
+  return send<Record<string, unknown>>(`/channels/${encodeURIComponent(provider)}/connect`, "POST", {});
 }
 
 export async function disconnectConnection(connectionId: string): Promise<void> {
-  await send(`/channel-connections/connections/${encodeURIComponent(connectionId)}`, "DELETE");
+  // Backend: DELETE /api/channels/connections/{connection_id} (204)
+  await send(`/channels/connections/${encodeURIComponent(connectionId)}`, "DELETE");
 }
 
 export async function larkStatus(): Promise<Record<string, unknown> | null> {
