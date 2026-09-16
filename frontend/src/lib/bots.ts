@@ -31,131 +31,22 @@ function normalizeBot(raw: Record<string, unknown>): BotProfile {
   };
 }
 
-/** Offline fallback so the Bots UI is useful without a live Gateway. */
-export function fallbackBots(): BotProfile[] {
-  const now = new Date().toISOString();
-  const make = (b: Partial<BotProfile> & { name: string }): BotProfile =>
-    normalizeBot({
-      display_name: b.name,
-      role: "Specialist Agent",
-      toolsets: [],
-      skills: [],
-      avatar: "",
-      status: "active",
-      version: 1,
-      department: "engineering",
-      responsibilities: [],
-      capabilities: [],
-      reputation_score: 1,
-      task_stats: {},
-      routines: [],
-      created_at: now,
-      updated_at: now,
-      ...b,
-    });
-  return [
-    make({
-      name: "architect",
-      display_name: "Architect",
-      role: "System Architect & Technical Lead",
-      avatar: "🏗️",
-      department: "engineering",
-      reports_to: "cto",
-      responsibilities: ["System design", "Interface boundaries", "Scalability", "Design documentation"],
-      capabilities: ["system_design", "refactoring", "boundary_enforcement"],
-      skills: ["code-review", "architecture"],
-      toolsets: ["filesystem", "git", "shell"],
-      reputation_score: 0.97,
-      task_stats: { total: 128, succeeded: 124, failed: 4 },
-    }),
-    make({
-      name: "coder",
-      display_name: "Coder",
-      role: "Software Engineer & Backend Developer",
-      avatar: "💻",
-      department: "engineering",
-      reports_to: "architect",
-      responsibilities: ["Feature implementation", "Bug fixing", "Algorithm development"],
-      capabilities: ["python", "typescript", "backend", "code_generation"],
-      skills: ["testing", "debugging"],
-      toolsets: ["filesystem", "shell", "git"],
-      reputation_score: 0.94,
-      task_stats: { total: 342, succeeded: 321, failed: 21 },
-    }),
-    make({
-      name: "researcher",
-      display_name: "Researcher",
-      role: "Deep Researcher & Synthesis Specialist",
-      avatar: "🔍",
-      department: "product",
-      reports_to: "product-manager",
-      responsibilities: ["Information discovery", "Fact verification", "Market & tech research", "Synthesis"],
-      capabilities: ["web_search", "document_synthesis", "fact_checking"],
-      skills: ["deep-research", "fact-check"],
-      toolsets: ["web", "browser"],
-      reputation_score: 0.96,
-      task_stats: { total: 215, succeeded: 207, failed: 8 },
-    }),
-    make({
-      name: "reviewer",
-      display_name: "Reviewer",
-      role: "Code & Quality Reviewer",
-      avatar: "🧭",
-      department: "qa",
-      reports_to: "architect",
-      responsibilities: ["Code review", "Standards enforcement", "Security auditing"],
-      capabilities: ["code_audit", "style_enforcement", "security_review"],
-      skills: ["code-review"],
-      toolsets: ["filesystem", "git"],
-      reputation_score: 0.92,
-      task_stats: { total: 187, succeeded: 176, failed: 11 },
-    }),
-    make({
-      name: "tester",
-      display_name: "Tester",
-      role: "QA & Automated Verification Specialist",
-      avatar: "🧪",
-      department: "qa",
-      reports_to: "qa",
-      responsibilities: ["Unit test execution", "Edge case validation", "Quality gate evaluation"],
-      capabilities: ["pytest", "test_automation", "failure_triage"],
-      skills: ["qa", "e2e-testing"],
-      toolsets: ["shell", "filesystem"],
-      reputation_score: 0.9,
-      task_stats: { total: 156, succeeded: 144, failed: 12 },
-    }),
-    make({
-      name: "security",
-      display_name: "Security",
-      role: "Security & Vulnerability Analyst",
-      avatar: "🛡️",
-      department: "security",
-      reports_to: "cto",
-      responsibilities: ["Vulnerability scanning", "Permission boundaries", "Credential safety"],
-      capabilities: ["vulnerability_analysis", "credential_auditing", "risk_mitigation"],
-      skills: ["security-audit"],
-      toolsets: ["filesystem", "shell"],
-      reputation_score: 0.98,
-      task_stats: { total: 89, succeeded: 88, failed: 1 },
-    }),
-  ];
-}
-
 export async function fetchBots(params?: { status?: string; department?: string }): Promise<BotProfile[]> {
+  // Live data only: an unreachable backend or an empty fleet returns [],
+  // and the UI shows its honest empty state. No fabricated bots.
   try {
     const qs = new URLSearchParams();
     if (params?.status) qs.set("status", params.status);
     if (params?.department) qs.set("department", params.department);
     const suffix = qs.toString() ? `?${qs.toString()}` : "";
     const res = await fetch(`${BASE_URL}/bots${suffix}`);
-    if (!res.ok) return fallbackBots();
+    if (!res.ok) return [];
     const data = await res.json();
     const list = Array.isArray(data.bots) ? data.bots : [];
-    if (list.length === 0) return fallbackBots();
     return list.map((b: Record<string, unknown>) => normalizeBot(b));
   } catch (err) {
     console.error("Failed to fetch bots:", err);
-    return fallbackBots();
+    return [];
   }
 }
 

@@ -433,7 +433,7 @@ export async function restoreCheckpoint(projectId: string, checkpointId: string)
   return send(`/projects/${enc(projectId)}/checkpoints/${enc(checkpointId)}/restore`, "POST", {});
 }
 
-export async function probeCanary(projectId: string, port = 3000, mockSuccess = true): Promise<WarRoomCanaryResult> {
+export async function probeCanary(projectId: string, port = 3000, mockSuccess = false): Promise<WarRoomCanaryResult> {
   return send(`/projects/${enc(projectId)}/canary/probe`, "POST", { port, mock_success: mockSuccess });
 }
 

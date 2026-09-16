@@ -15,8 +15,9 @@ export async function suggestFollowUps(
   messages: Array<{ role: string; content: string }>,
   n = 3
 ): Promise<string[]> {
+  // Backend route: POST /api/threads/{thread_id}/suggestions {messages, n} -> {suggestions}
   const d = await send<Record<string, unknown>>(
-    `/suggestions/threads/${encodeURIComponent(threadId)}/suggestions`,
+    `/threads/${encodeURIComponent(threadId)}/suggestions`,
     "POST",
     { messages: messages.slice(-8), n }
   );

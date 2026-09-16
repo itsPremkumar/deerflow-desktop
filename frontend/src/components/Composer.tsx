@@ -218,11 +218,15 @@ export function Composer({
               title="Language model for this chat"
               aria-label="Language model"
             >
-              {models.map((m) => (
-                <option key={m.id} value={m.id}>
-                  {m.name}
-                </option>
-              ))}
+              {models.length === 0 ? (
+                <option value="default">Default model</option>
+              ) : (
+                models.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.name}
+                  </option>
+                ))
+              )}
             </select>
             {onAttach && (
               <>
