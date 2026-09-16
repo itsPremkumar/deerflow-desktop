@@ -658,6 +658,7 @@ class DMSendRequest(BaseModel):
     target: str = Field(..., min_length=1, max_length=128)
     message: str = Field(..., min_length=1, max_length=16000)
     thread_metadata: dict | None = None
+    thread_id: str | None = Field(default=None, max_length=64)
 
 
 @router.post("/{name}/dm", summary="Send a fire-and-forget DM to a teammate bot")
@@ -666,10 +667,27 @@ async def send_dm_endpoint(name: str, request: Request, body: DMSendRequest) -> 
     await require_admin_user(request, detail=_ADMIN_REQUIRED_DETAIL)
     key = _validate_bot_name(name)
 
+    metadata = dict(body.thread_metadata or {})
+    if body.thread_id:
+        # Server-resolved identity beats caller-supplied metadata: a thread
+        # carrying a botName proves a bot-chat context.
+        from app.gateway.deps import get_thread_store
+
+        try:
+            row = await get_thread_store(request).get(body.thread_id)
+        except Exception:
+            row = None
+        thread_meta = None
+        if row is not None:
+            get_row = getattr(row, "get", None)
+            thread_meta = get_row("metadata") if callable(get_row) else getattr(row, "metadata", None)
+        if isinstance(thread_meta, dict) and thread_meta.get("botName"):
+            metadata = {**metadata, "botName": thread_meta["botName"]}
+
     def _send():
         from deerflow.bots.dm import send_dm
 
-        return send_dm(key, body.target, body.message, thread_metadata=body.thread_metadata).to_dict()
+        return send_dm(key, body.target, body.message, thread_metadata=metadata).to_dict()
 
     return await asyncio.to_thread(_send)
 

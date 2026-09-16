@@ -108,8 +108,8 @@ class SkillCurator:
                 self.state.pinned.remove(skill_name)
             self._save_state()
 
-    def apply_transitions(self, *, stale_after_days: float = 14.0, archive_after_days: float = 30.0, now: float | None = None) -> dict[str, list[str]]:
-        """Deterministic prune: stale then archive. Returns what changed."""
+    def apply_transitions(self, *, stale_after_days: float = 14.0, archive_after_days: float = 30.0, now: float | None = None, dry_run: bool = False) -> dict[str, list[str]]:
+        """Deterministic prune: stale then archive. Dry-run computes without mutating."""
         moment = now if now is not None else time.time()
         changed: dict[str, list[str]] = {"staled": [], "archived": []}
         stale_cutoff = moment - stale_after_days * 86400.0
@@ -124,16 +124,20 @@ class SkillCurator:
                 last = stats.last_used_at or 0.0
                 current = self.state.states.get(name, "active")
                 if current == "active" and last < stale_cutoff:
-                    self.state.states[name] = "stale"
+                    if not dry_run:
+                        self.state.states[name] = "stale"
                     changed["staled"].append(name)
                 elif current == "stale" and last < archive_cutoff:
-                    if self._archive_skill(name):
+                    if dry_run:
+                        changed["archived"].append(name)
+                    elif self._archive_skill(name):
                         self.state.states[name] = "archived"
                         changed["archived"].append(name)
-            self.state.last_run_at = moment
-            self.state.run_count += 1
-            self.state.last_summary = f"staled={len(changed['staled'])} archived={len(changed['archived'])}"
-            self._save_state()
+            if not dry_run:
+                self.state.last_run_at = moment
+                self.state.run_count += 1
+                self.state.last_summary = f"staled={len(changed['staled'])} archived={len(changed['archived'])}"
+                self._save_state()
         return changed
 
     def _archive_skill(self, skill_name: str) -> bool:
@@ -196,6 +200,22 @@ class SkillCurator:
                 "last_summary": self.state.last_summary,
                 "run_count": self.state.run_count,
             }
+
+
+def run_curator_maintenance(*, stale_after_days: float = 14.0, archive_after_days: float = 30.0, dry_run: bool = False) -> dict[str, Any]:
+    """One scheduled maintenance pass: gate on cadence, then prune.
+
+    The single callable a scheduled task invokes (e.g. the ``skill-curator``
+    blueprint). Returns the transition report; dry-run reports without
+    mutating anything.
+    """
+    from deerflow.skills.usage import get_skill_usage_tracker
+
+    curator = SkillCurator(usage=get_skill_usage_tracker())
+    if not should_run_curator(curator.state.last_run_at):
+        return {"skipped": True, "reason": "cadence interval has not elapsed", "report": curator.report()}
+    changed = curator.apply_transitions(stale_after_days=stale_after_days, archive_after_days=archive_after_days, dry_run=dry_run)
+    return {"skipped": False, "dry_run": dry_run, "transitions": changed, "report": curator.report()}
 
 
 def should_run_curator(

@@ -33,6 +33,15 @@ class LearningForkConfig(BaseModel):
         le=32000,
         description="Max characters of conversation digest fed to the fork (newest-first).",
     )
+    defer_when_busy: bool = Field(
+        default=False,
+        description="Queue the review instead of running it inline; drained when idle (review queue). Off by default — immediate fork.",
+    )
+    defer_max_age_seconds: float = Field(
+        default=1800.0,
+        ge=60.0,
+        description="Aged-out queued reviews dispatch regardless of idleness after this long.",
+    )
 
     model_config = ConfigDict(extra="forbid")
 

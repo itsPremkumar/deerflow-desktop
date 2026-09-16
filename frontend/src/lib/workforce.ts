@@ -131,3 +131,117 @@ export async function interviewQuestions(objective: string): Promise<{ plan: Rec
 export async function checkCompletion(projectId: string, evidence: Array<Record<string, unknown>>, taskKind = "code"): Promise<{ passed: boolean; missing: string[] }> {
   return send(`/projects/${enc(projectId)}/completion-check`, "POST", { evidence, task_kind: taskKind });
 }
+
+export interface DMInboxMessage {
+  delivery_id: string;
+  sender: string;
+  recipient: string;
+  body: string;
+  status: string;
+  created_at: number;
+}
+
+export async function fetchInbox(botName: string, unreadOnly = false): Promise<{ messages: DMInboxMessage[]; unread_count: number }> {
+  return get(`/bots/${enc(botName)}/inbox?unread_only=${unreadOnly ? "true" : "false"}`);
+}
+
+export async function sendDM(botName: string, target: string, message: string): Promise<Record<string, unknown>> {
+  return send(`/bots/${enc(botName)}/dm`, "POST", { target, message });
+}
+
+export async function ackDM(botName: string, deliveryId: string): Promise<Record<string, unknown>> {
+  return send(`/bots/${enc(botName)}/inbox/${enc(deliveryId)}/ack`, "POST", {});
+}
+
+export async function fetchBotChat(botName: string): Promise<{ canonical_thread_id: string; unread_count: number; recent: DMInboxMessage[] }> {
+  return get(`/bots/${enc(botName)}/chat`);
+}
+
+export async function fetchConstitution(projectId: string): Promise<{ present: boolean; markdown?: string; sha16?: string }> {
+  return get(`/projects/${enc(projectId)}/constitution`);
+}
+
+export async function fetchLocks(projectId: string): Promise<{ locks: Array<Record<string, unknown>>; pending_requests: Array<Record<string, unknown>> }> {
+  return get(`/projects/${enc(projectId)}/locks`);
+}
+
+export async function acquireLock(projectId: string, input: { scope: string; path: string; owner_bot: string; reason?: string }): Promise<Record<string, unknown>> {
+  return send(`/projects/${enc(projectId)}/locks`, "POST", input);
+}
+
+export async function releaseLock(projectId: string, lockId: string, requesterBot: string): Promise<Record<string, unknown>> {
+  return send(`/projects/${enc(projectId)}/locks/${enc(lockId)}?requester_bot=${enc(requesterBot)}`, "DELETE");
+}
+
+export async function fetchHandoffs(projectId: string): Promise<Array<Record<string, unknown>>> {
+  const d = await get<{ handoffs: Array<Record<string, unknown>> }>(`/projects/${enc(projectId)}/handoffs`);
+  return d.handoffs || [];
+}
+
+export async function acceptHandoff(projectId: string, handoffId: string, toBot: string): Promise<Record<string, unknown>> {
+  return send(`/projects/${enc(projectId)}/handoffs/${enc(handoffId)}/accept`, "POST", { to_bot: toBot });
+}
+
+export async function fetchSkillUsage(): Promise<Array<Record<string, unknown>>> {
+  const d = await get<{ usage: Array<Record<string, unknown>> }>(`/skills/usage`);
+  return d.usage || [];
+}
+
+export async function fetchCuratorReport(): Promise<Record<string, unknown>> {
+  return get(`/skills/curator`);
+}
+
+export async function runCurator(dryRun = true): Promise<Record<string, unknown>> {
+  return send(`/skills/curator/run?dry_run=${dryRun ? "true" : "false"}&suggest_merges=true`, "POST", {});
+}
+
+export async function fetchSkillTiers(): Promise<Array<Record<string, unknown>>> {
+  const d = await get<{ tiers: Array<Record<string, unknown>> }>(`/skills/tiers`);
+  return d.tiers || [];
+}
+
+export async function fetchBlueprints(): Promise<Array<Record<string, unknown>>> {
+  const d = await get<{ blueprints: Array<Record<string, unknown>> }>(`/scheduled-tasks/blueprints`);
+  return d.blueprints || [];
+}
+
+export async function launchBlueprint(blueprintId: string, values: Record<string, string>): Promise<Record<string, unknown>> {
+  return send(`/scheduled-tasks/blueprints/${enc(blueprintId)}/launch`, "POST", { values });
+}
+
+export async function fetchIncidents(taskId: string): Promise<Array<Record<string, unknown>>> {
+  const d = await get<{ incidents: Array<Record<string, unknown>> }>(`/scheduled-tasks/${enc(taskId)}/incidents`);
+  return d.incidents || [];
+}
+
+export async function fetchBenchmarkSuites(): Promise<Array<Record<string, unknown>>> {
+  const d = await get<{ suites: Array<Record<string, unknown>> }>(`/benchmarks/suites`);
+  return d.suites || [];
+}
+
+export async function fetchConsoleInsights(days = 7): Promise<{ digest: string; report: Record<string, unknown> }> {
+  return get(`/console/insights?days=${days}`);
+}
+
+export async function listCouncilCases(status?: string): Promise<Array<Record<string, unknown>>> {
+  const d = await get<{ cases: Array<Record<string, unknown>> }>(`/council/cases${status ? `?status=${enc(status)}` : ""}`);
+  return d.cases || [];
+}
+
+export async function fetchPolicies(): Promise<Array<Record<string, unknown>>> {
+  const d = await get<{ policies: Array<Record<string, unknown>> }>(`/policy/policies`);
+  return d.policies || [];
+}
+
+export async function fetchPendingApprovals(): Promise<Array<Record<string, unknown>>> {
+  const d = await get<{ approvals: Array<Record<string, unknown>> }>(`/policy/approvals?status=pending`);
+  return d.approvals || [];
+}
+
+export async function decideApproval(requestId: string, approved: boolean): Promise<Record<string, unknown>> {
+  return send(`/policy/approvals/${enc(requestId)}/decide`, "POST", { approved });
+}
+
+export async function localEndpointHealth(baseUrl: string): Promise<{ reachable: boolean; models: string[]; reason: string }> {
+  return get(`/models/local/health?base_url=${enc(baseUrl)}`);
+}

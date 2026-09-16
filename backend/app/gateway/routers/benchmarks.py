@@ -12,7 +12,9 @@ router = APIRouter(prefix="/api/benchmarks", tags=["benchmarks"])
 
 def _ensure_demo_suite() -> None:
     from deerflow.benchmarks import BenchmarkCase, BenchmarkSuite, get_benchmark_runner
+    from deerflow.benchmarks.suites import register_eval_suites
 
+    register_eval_suites()
     runner = get_benchmark_runner()
     if any(s["name"] == "workforce-smoke" for s in runner.list_suites()):
         return

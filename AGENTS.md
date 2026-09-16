@@ -113,6 +113,26 @@ Scheduled-task note:
 - Scheduled background runs are intentionally non-interactive: the lead-agent toolset excludes `ask_clarification` when `context.non_interactive=true`. That key, `disable_clarification`, and `github_token` are honored only for internally-authenticated callers; client-supplied copies are dropped from both `body.context` and `body.config`.
 - Busy scheduled occurrences are persisted as `queued`; `launching` is a short lease-fenced claim, `running` remains the normal Gateway run lifecycle, and `scheduler.queue_timeout_seconds` bounds the durable wait. Do not reintroduce skip-on-overlap or count waiting rows against `max_concurrent_runs`.
 
+Workforce layer note (Bot Mode + self-improvement + projects):
+- Harness: `packages/harness/deerflow/projects/` (membership, locks, constitution,
+  events/state, decisions, context, routing, workspace, handoffs, evidence, goals,
+  conflicts — file-backed under `runtime_home()/projects/`, see its `AGENTS.md`),
+  `bots/dm.py` + `bots/inbox.py` (fire-and-forget DMs, server-side attribution),
+  `skills/usage.py` + `skills/curator.py` + `skills/authoring.py` (telemetry,
+  lifecycle, `/learn` bar), `learning/review_queue.py` (idle-deferred fork reviews),
+  `deliberation/moa.py`, `scheduler/{wake_gate,blueprints,incidents,guards}.py`.
+- Per-turn injections (bot roster, repo context files) ride
+  `DynamicContextMiddleware` reminders keyed off explicit runtime context
+  (`bot_name`, `repo_root`) — never the static system prompt (prefix-cache rule).
+- Gateway: `/api/projects/{id}/*`, `/api/bots/{name}/dm|inbox|chat`,
+  `/api/skills/curator|usage|tiers`, `/api/council/*`, `/api/policy/*`,
+  `/api/missions`, `/api/benchmarks`, `/api/evolution`,
+  `/api/compat/openai/chat/completions`, `/api/threads/{id}/undo`,
+  `/api/console/insights`, `/api/ops/advice`, `/api/models/local/health`,
+  Signal channel (`app/channels/signal.py`, self-hosted REST wrapper).
+- Frontend: `src/lib/workforce.ts` client + `WorkforceSection` (inbox, presence,
+  curator, automation, oversight, insights tabs) behind the `workforce` NavTab.
+
 ## Commands: Root vs. Module
 
 **Root `make` targets drive the whole stack** (run from the repo root):

@@ -8,7 +8,7 @@ exceptions are isolated and never affect the primary run.
 """
 
 import logging
-from typing import TYPE_CHECKING, override
+from typing import TYPE_CHECKING, Any, override
 
 from langchain.agents import AgentState
 from langchain.agents.middleware import AgentMiddleware
@@ -75,11 +75,13 @@ class LearningForkMiddleware(AgentMiddleware[LearningForkMiddlewareState]):
         learning_fork_config: LearningForkConfig | None = None,
         memory_manager: "MemoryManager | None" = None,
         proposal_store: "SkillProposalStore | None" = None,
+        review_queue: Any | None = None,
     ) -> None:
         super().__init__()
         self._config = learning_fork_config or get_learning_fork_config()
         self._memory_manager = memory_manager
         self._proposal_store = proposal_store
+        self._review_queue = review_queue
 
     def _resolve_thread_context(self, state: LearningForkMiddlewareState, runtime: Runtime) -> tuple[str, str, list] | None:
         """Extract thread_id, user_id, and messages from state/runtime."""
@@ -157,13 +159,55 @@ class LearningForkMiddleware(AgentMiddleware[LearningForkMiddlewareState]):
             config_data = get_config()
             lead_model_name = config_data.get("configurable", {}).get("model_name")
 
-        fork_model = self._create_fork_model(lead_model_name)
-        if fork_model is None:
-            return None
-
         digest = _build_digest(messages, self._config.digest_chars)
         if not digest.strip():
             return None
+
+        if self._config.defer_when_busy:
+            # Defer: coalesce into the review queue, run when idle.
+            from deerflow.learning.review_queue import get_review_queue
+
+            queue = self._review_queue or get_review_queue(max_age_seconds=self._config.defer_max_age_seconds)
+            queue.defer(thread_id, {"digest": digest, "user_id": user_id, "trace_id": trace_id, "model_name": lead_model_name})
+            logger.debug("LearningFork: review deferred for thread %s", thread_id)
+            return None
+
+        await self._execute_fork(thread_id, user_id, trace_id, digest, lead_model_name)
+        return None
+
+    async def drain_deferred(self, is_idle=None) -> list[str]:
+        """Run due queued reviews (idle or aged-out). Returns drained thread ids."""
+        from deerflow.learning.review_queue import get_review_queue
+
+        queue = self._review_queue or get_review_queue(max_age_seconds=self._config.defer_max_age_seconds)
+
+        async def _run(entry) -> None:
+            snapshot = entry.snapshot or {}
+            await self._execute_fork(
+                entry.session_id,
+                snapshot.get("user_id", ""),
+                snapshot.get("trace_id", ""),
+                snapshot.get("digest", ""),
+                snapshot.get("model_name"),
+            )
+
+        drained: list[str] = []
+        for session_id in queue.pending_ids():
+            entry = queue.pop_if_due(session_id, is_idle=is_idle() if callable(is_idle) else True)
+            if entry is None:
+                continue
+            try:
+                await _run(entry)
+                drained.append(session_id)
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("LearningFork: deferred review failed for %s: %s", session_id, exc)
+        return drained
+
+    async def _execute_fork(self, thread_id: str, user_id: str, trace_id: str, digest: str, lead_model_name: str | None) -> None:
+        """Run one fork invocation over a digest (immediate or dequeued)."""
+        fork_model = self._create_fork_model(lead_model_name)
+        if fork_model is None:
+            return
 
         # Build a minimal toolset with only whitelisted tools
         from deerflow.tools.builtins import add_memory, propose_skill_tool, recall_memory
@@ -239,6 +283,7 @@ class LearningForkMiddleware(AgentMiddleware[LearningForkMiddlewareState]):
             "learning_fork_model": self._config.model_name,
             "learning_fork_max_proposals": self._config.max_proposals_per_run,
             "learning_fork_digest_chars": self._config.digest_chars,
+            "learning_fork_defer_when_busy": self._config.defer_when_busy,
         }
 
 
@@ -247,10 +292,12 @@ def build_learning_fork_middleware(
     learning_fork_config: LearningForkConfig | None = None,
     memory_manager: "MemoryManager | None" = None,
     proposal_store: "SkillProposalStore | None" = None,
+    review_queue: Any | None = None,
 ) -> LearningForkMiddleware:
     """Factory for the learning fork middleware."""
     return LearningForkMiddleware(
         learning_fork_config=learning_fork_config,
         memory_manager=memory_manager,
         proposal_store=proposal_store,
+        review_queue=review_queue,
     )

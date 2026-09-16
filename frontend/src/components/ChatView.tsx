@@ -53,6 +53,7 @@ const AgentsSection = lazy(() => import("@/components/sections/AgentsSection").t
 const TeamOpsSection = lazy(() => import("@/components/sections/TeamOpsSection").then((m) => ({ default: m.TeamOpsSection })));
 const ChannelsSection = lazy(() => import("@/components/sections/ChannelsSection").then((m) => ({ default: m.ChannelsSection })));
 const SystemSection = lazy(() => import("@/components/sections/SystemSection").then((m) => ({ default: m.SystemSection })));
+const WorkforceSection = lazy(() => import("@/components/sections/WorkforceSection").then((m) => ({ default: m.WorkforceSection })));
 const AuthSection = lazy(() => import("@/components/sections/AuthSection").then((m) => ({ default: m.AuthSection })));
 
 function SectionFallback() {
@@ -949,6 +950,10 @@ export default function ChatView() {
         ) : view === "channels" ? (
           <Suspense fallback={<SectionFallback />}>
             <ChannelsSection />
+          </Suspense>
+        ) : view === "workforce" ? (
+          <Suspense fallback={<SectionFallback />}>
+            <WorkforceSection bots={bots.map((b) => ({ name: b.name, display_name: b.display_name || b.name }))} />
           </Suspense>
         ) : view === "system" ? (
           <Suspense fallback={<SectionFallback />}>

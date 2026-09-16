@@ -58,6 +58,21 @@ def test_curator_schedule_gating():
     assert curator_interval_hours() > 0
 
 
+def test_consolidation_threshold_sensitivity():
+    near_dupes = {
+        "a": "Deploy services with docker build push restart verify logs monitor alerts",
+        "b": "Deploy services with docker build push restart verify logs monitor checks",
+    }
+    assert find_consolidation_candidates(near_dupes, similarity=0.5) == [["a", "b"]]
+    assert find_consolidation_candidates(near_dupes, similarity=0.99) == []
+    cousins = {
+        "a": "Deploy services with docker containers and registries",
+        "b": "Bake sourdough bread with flour water salt starter",
+    }
+    assert find_consolidation_candidates(cousins, similarity=0.5) == []
+    assert find_consolidation_candidates({}, similarity=0.5) == []
+
+
 def test_consolidation_candidates_and_proposals():
     bodies = {
         "deploy-a": "Deploy services with docker build push restart verify logs monitor alerts",

@@ -51,6 +51,15 @@ working product:
 
 - **Multi-agent teamwork** — bot mode, multi-agent group chat, collaborative
   kanban, inter-agent messaging, and background process handles.
+- **Bot Mode DMs** — fire-and-forget `message_agent` DMs with roster
+  validation, server-side attribution, and per-bot inboxes; SOUL protocol
+  guarantee keeps custom SOULs DM-capable (`/api/bots/{name}/dm`, Workforce tab).
+- **Self-improving skills** — usage telemetry, idle curator lifecycle
+  (active → stale → archived, never deleted), `/learn` authoring bar, and
+  quarantine trust tiers (`/api/skills/curator/*`, Workforce tab).
+- **Project workforce layer** — agent↔project membership, presence, resource
+  locks, constitution, ADR memory, handoffs, evidence-gated completion, and a
+  project event bus (`/api/projects/{id}/*`, Workforce tab).
 - **Continuous execution harness** — goal engine, context engine, tool-call
   repair, trajectory tracking, canvas, and safety guardrails.
 - **Planning** — autonomous one-prompt planner, planning-gate hardening,
@@ -77,7 +86,12 @@ working product:
 ### Production operations
 
 - Authenticated operator endpoints: `GET /api/ops/version`,
-  `GET /api/ops/status` (uptime, server time, docs flag).
+  `GET /api/ops/status` (uptime, server time, docs flag),
+  `GET /api/ops/resources`, `GET /api/ops/advice` (autonomy recommendation).
+- OpenAI-compatible chat surface: `POST /api/compat/openai/chat/completions`
+  (non-streaming; reuses thread + run lifecycle).
+- Cron safety: wake-gate preflights, schedule blueprints, incident tracking
+  with auto-pause (`/api/scheduled-tasks/blueprints`, `…/incidents`).
 - Baseline security headers on every Gateway and frontend response
   (HSTS for HTTPS only).
 - `python scripts/prod_check.py` pre-flight gate (versions, config files,

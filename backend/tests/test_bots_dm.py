@@ -206,3 +206,23 @@ def test_dm_delivery_matrix(sender, target, message, ctx, expected):
     assert ack.status == expected
     if expected == "delivered":
         assert ack.delivery_id and ack.target_kind == "local"
+
+
+def test_roster_reminder_injected_only_for_bot_runtime(tmp_path, monkeypatch):
+    from types import SimpleNamespace
+
+    from deerflow.agents.middlewares.dynamic_context_middleware import DynamicContextMiddleware
+
+    monkeypatch.setenv("DEER_FLOW_HOME", str(tmp_path))
+    import deerflow.bots.registry as bot_reg
+
+    monkeypatch.setattr(bot_reg, "_global_registry", None)
+    monkeypatch.setattr(bot_reg, "_global_registry_path", None)
+    monkeypatch.setattr("deerflow.agents.lead_agent.prompt._get_memory_context", lambda *a, **k: "")
+    monkeypatch.setattr("deerflow.runtime.user_context.resolve_runtime_user_id", lambda runtime: "u1")
+
+    middleware = DynamicContextMiddleware(agent_name=None, app_config=None)
+    bot_reminder, _ = middleware._build_full_reminder(SimpleNamespace(context={"bot_name": "coder"}, config={}))
+    assert "message_agent" in bot_reminder and "reviewer" in bot_reminder
+    plain_reminder, _ = middleware._build_full_reminder(SimpleNamespace(context={}, config={}))
+    assert "message_agent" not in plain_reminder

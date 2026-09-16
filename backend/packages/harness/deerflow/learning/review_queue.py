@@ -54,6 +54,21 @@ class ReviewQueue:
         with self._lock:
             return list(self._slots.values())
 
+    def pending_ids(self) -> list[str]:
+        with self._lock:
+            return list(self._slots.keys())
+
+    def pop_if_due(self, session_id: str, *, is_idle: bool = True, now: float | None = None) -> QueuedReview | None:
+        """Pop one entry when idle, aged-out, or forced. None when not due."""
+        moment = now if now is not None else time.time()
+        with self._lock:
+            entry = self._slots.get(session_id)
+            if entry is None:
+                return None
+            if not (is_idle or entry.age(moment) >= self.max_age_seconds):
+                return None
+            return self._slots.pop(session_id)
+
     def drop(self, session_id: str) -> bool:
         with self._lock:
             return self._slots.pop(session_id, None) is not None
@@ -88,3 +103,16 @@ class ReviewQueue:
             except Exception:
                 logger.warning("Deferred review handler failed for %s", entry.session_id, exc_info=True)
         return drained
+
+
+_queue: ReviewQueue | None = None
+_queue_lock = threading.Lock()
+
+
+def get_review_queue(*, max_age_seconds: float = DEFAULT_MAX_AGE_SECONDS) -> ReviewQueue:
+    """Process-wide review queue (in-memory, best-effort like the fork)."""
+    global _queue
+    with _queue_lock:
+        if _queue is None:
+            _queue = ReviewQueue(max_age_seconds=max_age_seconds)
+        return _queue

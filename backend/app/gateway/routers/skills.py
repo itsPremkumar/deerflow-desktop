@@ -1108,15 +1108,17 @@ async def skill_curator_report() -> dict:
     summary="Run Skill Curator",
     description="Deterministic prune: stale then archive agent-created skills. Never deletes; archives are recoverable.",
 )
-async def skill_curator_run(request: Request, stale_after_days: float = Query(default=14.0, ge=1.0), archive_after_days: float = Query(default=30.0, ge=1.0), suggest_merges: bool = Query(default=False)) -> dict:
+async def skill_curator_run(
+    request: Request, stale_after_days: float = Query(default=14.0, ge=1.0), archive_after_days: float = Query(default=30.0, ge=1.0), suggest_merges: bool = Query(default=False), dry_run: bool = Query(default=False)
+) -> dict:
     await require_admin_user(request, detail=_ADMIN_REQUIRED_DETAIL)
 
     def _do():
         from deerflow.skills.curator import SkillCurator
 
         curator = SkillCurator()
-        changed = curator.apply_transitions(stale_after_days=stale_after_days, archive_after_days=archive_after_days)
-        result: dict = {"transitions": changed}
+        changed = curator.apply_transitions(stale_after_days=stale_after_days, archive_after_days=archive_after_days, dry_run=dry_run)
+        result: dict = {"transitions": changed, "dry_run": dry_run}
         if suggest_merges:
             result["merge_suggestions"] = curator.suggest_merges()
         return result

@@ -815,6 +815,9 @@ class TestChannelManager:
         from app.channels.manager import ChannelManager
         from app.gateway.internal_auth import INTERNAL_OWNER_USER_ID_HEADER_NAME
 
+        # Auth enabled (no auth-disabled owner): bound owner must win.
+        monkeypatch.setattr("app.channels.manager._auth_disabled_owner_user_id", lambda: None)
+
         class MockResponse:
             def raise_for_status(self):
                 return None
@@ -862,6 +865,9 @@ class TestChannelManager:
 
     def test_handle_chat_calls_channel_receive_file_for_inbound_files(self, monkeypatch):
         from app.channels.manager import ChannelManager
+
+        # Auth enabled (no auth-disabled owner): bound owner must win.
+        monkeypatch.setattr("app.channels.manager._auth_disabled_owner_user_id", lambda: None)
 
         async def go():
             bus = MessageBus()
@@ -2954,6 +2960,9 @@ class TestChannelManager:
         """
         from app.channels.manager import ChannelManager
 
+        # Auth enabled (no auth-disabled owner): bound owner must win.
+        monkeypatch.setattr("app.channels.manager._auth_disabled_owner_user_id", lambda: None)
+
         captured: dict[str, object] = {}
 
         def spy_load_agent_config(name, *, user_id=None):
@@ -3145,6 +3154,9 @@ class TestChannelManager:
     def test_handle_command_agent_list_is_owner_scoped(self, monkeypatch):
         from app.channels.manager import ChannelManager
 
+        # Auth enabled (no auth-disabled owner): bound owner must win.
+        monkeypatch.setattr("app.channels.manager._auth_disabled_owner_user_id", lambda: None)
+
         seen_user_ids = []
 
         def fake_list_custom_agents(*, user_id=None):
@@ -3185,6 +3197,9 @@ class TestChannelManager:
 
     def test_handle_command_agent_use_starts_pinned_conversation(self, monkeypatch):
         from app.channels.manager import ChannelManager
+
+        # Auth enabled (no auth-disabled owner): bound owner must win.
+        monkeypatch.setattr("app.channels.manager._auth_disabled_owner_user_id", lambda: None)
 
         loaded = []
 
@@ -5706,6 +5721,9 @@ class TestHandleChatWithArtifacts:
     def test_bound_owner_artifacts_resolve_from_owner_outputs_bucket(self, tmp_path, monkeypatch):
         from app.channels.manager import ChannelManager
         from deerflow.config.paths import Paths
+
+        # Auth enabled (no auth-disabled owner): bound owner must win.
+        monkeypatch.setattr("app.channels.manager._auth_disabled_owner_user_id", lambda: None)
 
         paths = Paths(tmp_path)
         monkeypatch.setattr("deerflow.config.paths.get_paths", lambda: paths)

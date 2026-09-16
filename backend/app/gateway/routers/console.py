@@ -513,3 +513,53 @@ async def console_usage(
         total_cost=total_cost,
         currency=_pricing_currency(pricing),
     )
+
+
+@router.get(
+    "/insights",
+    summary="Session Insights Digest",
+    description="Run records aggregated into totals, per-model tables, daily bars, and top skills, plus a text digest. Cost comes from /usage pricing; this digest focuses on activity.",
+)
+@require_permission("runs", "read")
+async def console_insights(
+    request: Request,
+    days: int = Query(default=30, ge=1, le=90),
+) -> dict:
+    """Aggregate recent runs through the insights summarizer."""
+    from deerflow.learning.insights import format_text, summarize
+
+    sf = _session_factory_or_503()
+    user_id = await get_current_user(request)
+    window_start_utc = datetime.now(UTC) - timedelta(days=days)
+
+    stmt = select(RunRow).where(RunRow.operation_kind == "run", RunRow.created_at >= window_start_utc)
+    if user_id:
+        stmt = stmt.where(RunRow.user_id == user_id)
+
+    async with sf() as session:
+        rows = (await session.execute(stmt)).scalars().all()
+
+    records = [
+        {
+            "timestamp": _as_utc(row.created_at).timestamp() if _as_utc(row.created_at) else None,
+            "model": row.model_name,
+            "input_tokens": row.total_input_tokens or 0,
+            "output_tokens": row.total_output_tokens or 0,
+            "cost_usd": 0.0,
+            "status": row.status,
+        }
+        for row in rows
+    ]
+    report = await asyncio.to_thread(summarize, records, days=days)
+
+    def _skills():
+        from deerflow.skills.usage import get_skill_usage_tracker
+
+        stats = get_skill_usage_tracker().all_stats()
+        ranked = sorted(stats, key=lambda s: -s.uses)[:10]
+        return [{"skill": s.name, "uses": s.uses} for s in ranked]
+
+    top_skills = await asyncio.to_thread(_skills)
+    report["top_skills"] = [(s["skill"], s["uses"]) for s in top_skills]
+    digest = await asyncio.to_thread(format_text, report, days=days)
+    return {"report": report, "digest": digest}

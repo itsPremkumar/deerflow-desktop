@@ -18,11 +18,24 @@ from app.gateway.app import create_app
 from deerflow.commands import command_registry
 
 
+@pytest.fixture(autouse=True)
+def _isolated_lifecycle_home(tmp_path, monkeypatch):
+    """Keep spawn records out of the developer's real DEER_FLOW_HOME.
+
+    The lifecycle manager persists every spawn to disk and reloads them on
+    construction; without isolation, repeated runs accumulate RUNNING records
+    until the per-parent cap rejects new spawns.
+    """
+    monkeypatch.setenv("DEER_FLOW_HOME", str(tmp_path))
+    import deerflow.subagents.lifecycle as lifecycle_mod
+
+    monkeypatch.setattr(lifecycle_mod, "_GLOBAL_LIFECYCLE_MANAGER", None)
+    yield
+
+
 def test_skill_creator_handlers():
     # 1. Create skill
-    res_create = command_registry.execute(
-        "/skill:create test-parser description: Extract structured invoice data from scanned documents"
-    )
+    res_create = command_registry.execute("/skill:create test-parser description: Extract structured invoice data from scanned documents")
     assert res_create.status == "success"
     assert "test-parser" in res_create.output
     assert res_create.data.get("skill_name") == "test-parser"
