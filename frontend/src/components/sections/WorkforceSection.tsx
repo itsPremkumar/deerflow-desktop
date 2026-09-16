@@ -8,13 +8,15 @@ import {
   fetchInbox, sendDM, ackDM, fetchPresence, fetchProjectState, fetchSkillUsage,
   fetchCuratorReport, runCurator, fetchBlueprints, launchBlueprint, fetchBenchmarkSuites,
   runBenchmarkSuite, fetchConsoleInsights, fetchOpsAdvice, listCouncilCases, fetchPendingApprovals,
-  decideApproval, localEndpointHealth, fetchWarRoomData, resolveApprovalRequest, type PresenceMember, type ProjectStateSnapshot,
-  type WarRoomSnapshot,
+  decideApproval, localEndpointHealth, fetchWarRoomData, resolveApprovalRequest,
+  createCheckpoint, restoreCheckpoint, probeCanary,
+  type PresenceMember, type ProjectStateSnapshot, type WarRoomSnapshot,
+  type WarRoomCheckpoint, type WarRoomLeaderboardEntry, type WarRoomCanaryResult,
 } from "@/lib/workforce";
 import {
   RefreshCw, Send, Inbox, Users, Wrench, CalendarClock, Scale, Activity, Radio, ShieldAlert,
   Check, Ban, CheckCircle2, AlertTriangle, FileText, DollarSign, Layers, ChevronDown, ChevronRight,
-  ShieldCheck, CheckSquare,
+  ShieldCheck, CheckSquare, Trophy, Eye, Save, RotateCcw,
 } from "lucide-react";
 
 export interface WorkforceBot {
@@ -449,6 +451,9 @@ function WarRoomTab() {
   const [approvalNotice, setApprovalNotice] = useState<string | null>(null);
   const [expandedSpecKey, setExpandedSpecKey] = useState<string | null>(null);
   const [expandedContractId, setExpandedContractId] = useState<string | null>(null);
+  const [checkpointTag, setCheckpointTag] = useState<string>("v1.0.0-snapshot");
+  const [checkpointBusy, setCheckpointBusy] = useState<boolean>(false);
+  const [canaryBusy, setCanaryBusy] = useState<boolean>(false);
 
   useEffect(() => {
     listProjects().then((p) => {
@@ -475,11 +480,55 @@ function WarRoomTab() {
     }
   };
 
+  const handleCreateCheckpoint = async () => {
+    if (!checkpointTag.trim() || checkpointBusy) return;
+    setCheckpointBusy(true);
+    try {
+      const res = await createCheckpoint(selectedProject, checkpointTag.trim());
+      setApprovalNotice(`Snapshot created: ${res.checkpoint_id} (${res.tag})`);
+      warRoom.reload();
+    } catch (e) {
+      setApprovalNotice(`Failed to create checkpoint: ${errMsg(e)}`);
+    } finally {
+      setCheckpointBusy(false);
+    }
+  };
+
+  const handleRestoreCheckpoint = async (checkpointId: string) => {
+    setCheckpointBusy(true);
+    try {
+      await restoreCheckpoint(selectedProject, checkpointId);
+      setApprovalNotice(`Restored workspace state from checkpoint: ${checkpointId}`);
+      warRoom.reload();
+    } catch (e) {
+      setApprovalNotice(`Failed to restore checkpoint: ${errMsg(e)}`);
+    } finally {
+      setCheckpointBusy(false);
+    }
+  };
+
+  const handleProbeCanary = async () => {
+    setCanaryBusy(true);
+    try {
+      const res = await probeCanary(selectedProject, 3000, true);
+      setApprovalNotice(`Canary probe completed: ${res.status.toUpperCase()} (Latency: ${res.latency_ms}ms)`);
+      warRoom.reload();
+    } catch (e) {
+      setApprovalNotice(`Failed to run canary probe: ${errMsg(e)}`);
+    } finally {
+      setCanaryBusy(false);
+    }
+  };
+
   const pendingApprovals = warRoom.data?.pending_approvals || [];
   const contracts = warRoom.data?.contracts || [];
   const costSummary = warRoom.data?.cost_summary;
   const livingSpec = warRoom.data?.living_spec;
   const standup = warRoom.data?.standup;
+  const checkpoints = warRoom.data?.checkpoints || [];
+  const leaderboard = warRoom.data?.leaderboard || [];
+  const canaryHistory = warRoom.data?.canary_history || [];
+  const visualQa = warRoom.data?.visual_qa || [];
 
   return (
     <div className="space-y-3">
@@ -846,7 +895,128 @@ function WarRoomTab() {
             </Panel>
           </div>
 
-          {/* 7. Flight Recorder Stream */}
+          {/* 7. Canary Staging Watchdog & Automated Smoke Gate */}
+          <Panel
+            title="Canary Staging Watchdog & Automated Gate"
+            hint="Synthetic health probing before promotion to production branch"
+            actions={
+              <Btn variant="ghost" disabled={canaryBusy} onClick={handleProbeCanary}>
+                <Activity className="size-3 mr-1" /> Probe Ephemeral Canary
+              </Btn>
+            }
+          >
+            {canaryHistory.length === 0 ? (
+              <p className="text-xs text-muted-foreground py-1">No canary probes executed yet. Ephemeral staging runs on pre-merge.</p>
+            ) : (
+              <div className="space-y-1.5 text-xs">
+                {canaryHistory.map((c) => (
+                  <div key={c.probe_id} className="flex items-center justify-between p-2 rounded-lg bg-muted/40 font-mono">
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold text-foreground">{c.probe_id}</span>
+                      <span className="text-[10px] text-muted-foreground">{c.target_url}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] text-muted-foreground">{c.latency_ms}ms</span>
+                      <Badge tone={c.status === "healthy" ? "green" : "amber"}>{c.status}</Badge>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </Panel>
+
+          {/* 8. Workspace Checkpoint & Warm Resume */}
+          <Panel
+            title={`Workspace Checkpoints & Warm Resume (${checkpoints.length})`}
+            hint="Durable full-state snapshots allowing instant recovery across machine restarts"
+            actions={
+              <div className="flex items-center gap-1.5">
+                <input
+                  value={checkpointTag}
+                  onChange={(e) => setCheckpointTag(e.target.value)}
+                  placeholder="tag (e.g. v1.0.0)"
+                  className="text-xs bg-muted/60 border border-border/60 rounded-lg px-2 py-1 font-mono w-32"
+                />
+                <Btn variant="primary" disabled={checkpointBusy || !checkpointTag.trim()} onClick={handleCreateCheckpoint}>
+                  <Save className="size-3 mr-1" /> Snapshot
+                </Btn>
+              </div>
+            }
+          >
+            {checkpoints.length === 0 ? (
+              <p className="text-xs text-muted-foreground py-1">No durable checkpoints saved yet. Click Snapshot to persist state.</p>
+            ) : (
+              <div className="space-y-1.5 text-xs">
+                {checkpoints.map((ck) => (
+                  <div key={ck.checkpoint_id} className="flex items-center justify-between p-2 rounded-lg bg-muted/40 font-mono">
+                    <div>
+                      <span className="font-semibold text-foreground">{ck.checkpoint_id}</span>
+                      <span className="text-[10px] text-muted-foreground ml-2">[{ck.tag}]</span>
+                      <span className="text-[10px] text-muted-foreground ml-2">({ck.timestamp_iso || "recent"})</span>
+                    </div>
+                    <Btn variant="ghost" disabled={checkpointBusy} onClick={() => handleRestoreCheckpoint(ck.checkpoint_id)}>
+                      <RotateCcw className="size-3 mr-1" /> Restore
+                    </Btn>
+                  </div>
+                ))}
+              </div>
+            )}
+          </Panel>
+
+          {/* 9. SWE-Bench Bot Arena Leaderboard */}
+          {leaderboard.length > 0 && (
+            <Panel
+              title="SWE-Bench Evaluation Arena & Fleet Leaderboard"
+              hint="Empirical performance benchmarks calibrating task auction reputation scores"
+            >
+              <div className="space-y-1 text-xs font-mono">
+                <div className="grid grid-cols-5 p-1.5 text-muted-foreground font-semibold border-b border-border/50 text-[10px] uppercase">
+                  <span>Rank</span>
+                  <span>Bot Persona</span>
+                  <span>Pass Rate</span>
+                  <span>Avg Latency</span>
+                  <span>Reputation</span>
+                </div>
+                {leaderboard.map((lb) => (
+                  <div key={lb.bot_name} className="grid grid-cols-5 p-1.5 rounded hover:bg-muted/30 items-center">
+                    <span className="flex items-center gap-1 font-bold text-foreground">
+                      {lb.rank === 1 ? <Trophy className="size-3 text-amber-500" /> : `#${lb.rank}`}
+                    </span>
+                    <span className="font-semibold text-primary">@{lb.bot_name}</span>
+                    <span>{lb.pass_rate}%</span>
+                    <span>{lb.avg_duration_seconds}s</span>
+                    <span className="font-bold text-emerald-500">{lb.reputation_score} pts</span>
+                  </div>
+                ))}
+              </div>
+            </Panel>
+          )}
+
+          {/* 10. Visual QA Evidence Receipts */}
+          {visualQa.length > 0 && (
+            <Panel
+              title="Visual QA & Headless Browser Evidence"
+              hint="Automated DOM verification and layout stability receipts"
+            >
+              <div className="space-y-1.5 text-xs font-mono">
+                {visualQa.map((v) => (
+                  <div key={v.receipt_id} className="flex items-center justify-between p-2 rounded-lg bg-muted/40">
+                    <div className="flex items-center gap-2">
+                      <Eye className="size-3.5 text-primary" />
+                      <span className="font-semibold text-foreground">{v.receipt_id}</span>
+                      <span className="text-[10px] text-muted-foreground truncate max-w-xs">{v.url}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] text-muted-foreground">Stability: {Math.round(v.visual_stability_score * 100)}%</span>
+                      <Badge tone={v.passed ? "green" : "amber"}>{v.passed ? "PASSED" : "FAILED"}</Badge>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </Panel>
+          )}
+
+          {/* 11. Flight Recorder Stream */}
           <Panel title="Flight Recorder (Event Stream)" hint="Audit timeline of autonomous decisions and tool operations">
             {warRoom.data.events.length === 0 ? (
               <p className="text-xs text-muted-foreground">No recent events recorded for this project.</p>

@@ -278,6 +278,10 @@ export interface WarRoomSnapshot {
   living_spec?: WarRoomLivingSpec;
   cost_summary?: WarRoomCostSummary;
   standup?: WarRoomStandup;
+  checkpoints?: WarRoomCheckpoint[];
+  leaderboard?: WarRoomLeaderboardEntry[];
+  canary_history?: WarRoomCanaryResult[];
+  visual_qa?: Array<{ receipt_id: string; url: string; passed: boolean; visual_stability_score: number; verified_by: string; verified_at: string }>;
   handoffs: Array<{
     handoff_id: string;
     task_id: string;
@@ -385,4 +389,46 @@ export async function resolveApprovalRequest(
     comment,
     resolved_by: resolvedBy,
   });
+}
+
+export interface WarRoomCheckpoint {
+  checkpoint_id: string;
+  project_id: string;
+  tag: string;
+  timestamp_iso: string;
+  active_locks: Array<Record<string, unknown>>;
+  contracts: Array<Record<string, unknown>>;
+}
+
+export interface WarRoomLeaderboardEntry {
+  bot_name: string;
+  challenges_attempted: number;
+  challenges_passed: number;
+  pass_rate: number;
+  avg_duration_seconds: number;
+  reputation_score: number;
+  rank: number;
+}
+
+export interface WarRoomCanaryResult {
+  probe_id: string;
+  target_port: number;
+  target_url: string;
+  status: "healthy" | "degraded" | "failed";
+  http_status: number | null;
+  latency_ms: number;
+  recommendation: string;
+  tested_at: string;
+}
+
+export async function createCheckpoint(projectId: string, tag = "manual"): Promise<WarRoomCheckpoint> {
+  return send(`/projects/${enc(projectId)}/checkpoints`, "POST", { tag });
+}
+
+export async function restoreCheckpoint(projectId: string, checkpointId: string): Promise<Record<string, unknown>> {
+  return send(`/projects/${enc(projectId)}/checkpoints/${enc(checkpointId)}/restore`, "POST", {});
+}
+
+export async function probeCanary(projectId: string, port = 3000, mockSuccess = true): Promise<WarRoomCanaryResult> {
+  return send(`/projects/${enc(projectId)}/canary/probe`, "POST", { port, mock_success: mockSuccess });
 }

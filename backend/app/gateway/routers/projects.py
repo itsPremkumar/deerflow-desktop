@@ -827,6 +827,22 @@ async def get_war_room(project_id: str, request: Request) -> dict:
         from deerflow.projects.standup_engine import get_standup_engine
         standup_data = get_standup_engine(project_id).generate_standup().to_dict()
 
+        # 13. Workspace Checkpoints
+        from deerflow.projects.checkpoint_engine import get_checkpoint_engine
+        checkpoints = [c.to_dict() for c in get_checkpoint_engine(project_id).list_checkpoints()[:5]]
+
+        # 14. Arena Bot Leaderboard
+        from deerflow.benchmarks.arena import get_benchmark_arena
+        leaderboard = [l.to_dict() for l in get_benchmark_arena(project_id).get_leaderboard()[:5]]
+
+        # 15. Canary Watchdog Status
+        from deerflow.projects.canary_watchdog import get_canary_watchdog
+        canary_history = [c.to_dict() for c in get_canary_watchdog(project_id).get_history()[-3:]]
+
+        # 16. Visual QA Receipts
+        from deerflow.projects.visual_verifier import get_visual_qa_engine
+        visual_qa = [v.to_dict() for v in get_visual_qa_engine(project_id).get_history()[-3:]]
+
         return {
             "project_id": project_id,
             "status": "active",
@@ -839,6 +855,10 @@ async def get_war_room(project_id: str, request: Request) -> dict:
             "living_spec": living_spec,
             "cost_summary": cost_summary,
             "standup": standup_data,
+            "checkpoints": checkpoints,
+            "leaderboard": leaderboard,
+            "canary_history": canary_history,
+            "visual_qa": visual_qa,
             "handoffs": handoffs,
             "decisions": decisions,
             "events": event_records,
@@ -886,4 +906,89 @@ async def resolve_project_approval(project_id: str, request_id: str, body: Resol
         raise HTTPException(status_code=404, detail=str(e))
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+class CreateCheckpointBody(BaseModel):
+    tag: str = Field(default="manual", max_length=128)
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+@router.post("/{project_id}/checkpoints")
+@require_permission("projects", "write")
+async def create_project_checkpoint(project_id: str, body: CreateCheckpointBody, request: Request) -> dict:
+    await _require_project(project_id, request)
+
+    def _do():
+        from deerflow.projects.checkpoint_engine import get_checkpoint_engine
+
+        return get_checkpoint_engine(project_id).create_checkpoint(tag=body.tag, metadata=body.metadata).to_dict()
+
+    return await asyncio.to_thread(_do)
+
+
+@router.get("/{project_id}/checkpoints")
+@require_permission("projects", "read")
+async def list_project_checkpoints(project_id: str, request: Request) -> dict:
+    await _require_project(project_id, request)
+
+    def _do():
+        from deerflow.projects.checkpoint_engine import get_checkpoint_engine
+
+        return {
+            "project_id": project_id,
+            "checkpoints": [c.to_dict() for c in get_checkpoint_engine(project_id).list_checkpoints()],
+        }
+
+    return await asyncio.to_thread(_do)
+
+
+@router.post("/{project_id}/checkpoints/{checkpoint_id}/restore")
+@require_permission("projects", "write")
+async def restore_project_checkpoint(project_id: str, checkpoint_id: str, request: Request) -> dict:
+    await _require_project(project_id, request)
+
+    def _do():
+        from deerflow.projects.checkpoint_engine import get_checkpoint_engine
+
+        return get_checkpoint_engine(project_id).restore_checkpoint(checkpoint_id)
+
+    try:
+        return await asyncio.to_thread(_do)
+    except KeyError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+class CanaryProbeBody(BaseModel):
+    port: int = Field(default=3000, ge=1024, le=65535)
+    mock_success: bool = Field(default=False)
+
+
+@router.post("/{project_id}/canary/probe")
+@require_permission("projects", "write")
+async def probe_project_canary(project_id: str, body: CanaryProbeBody, request: Request) -> dict:
+    await _require_project(project_id, request)
+
+    def _do():
+        from deerflow.projects.canary_watchdog import get_canary_watchdog
+
+        return get_canary_watchdog(project_id).probe_staging(port=body.port, mock_success=body.mock_success).to_dict()
+
+    return await asyncio.to_thread(_do)
+
+
+@router.get("/{project_id}/benchmarks/leaderboard")
+@require_permission("projects", "read")
+async def get_project_bot_leaderboard(project_id: str, request: Request) -> dict:
+    await _require_project(project_id, request)
+
+    def _do():
+        from deerflow.benchmarks.arena import get_benchmark_arena
+
+        return {
+            "project_id": project_id,
+            "leaderboard": [e.to_dict() for e in get_benchmark_arena(project_id).get_leaderboard()],
+        }
+
+    return await asyncio.to_thread(_do)
+
 
