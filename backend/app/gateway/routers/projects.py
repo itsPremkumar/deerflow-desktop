@@ -766,3 +766,59 @@ async def completion_check(project_id: str, body: CompletionCheckRequest, reques
         return check_completion(body.evidence, task_kind=body.task_kind).to_dict()
 
     return await asyncio.to_thread(_do)
+
+
+@router.get("/{project_id}/war-room")
+@require_permission("projects", "read")
+async def get_war_room(project_id: str, request: Request) -> dict:
+    """Aggregated War Room dashboard state for autonomous multi-agent workforce."""
+    await _require_project(project_id, request)
+
+    def _do():
+        from deerflow.bots.kill_switch import get_kill_switch_status
+        from deerflow.projects import decisions as dec_mod
+        from deerflow.projects import events as events_mod
+        from deerflow.projects import handoffs as handoff_mod
+        from deerflow.projects import locks as locks_mod
+        from deerflow.projects import membership as mem_mod
+        from deerflow.projects import state as state_mod
+
+        # 1. Members Presence
+        mem_store = mem_mod.get_membership_store()
+        presence_list = [m.to_dict() for m in mem_store.presence(project_id)]
+
+        # 2. Project State
+        st = state_mod.get_state(project_id)
+
+        # 3. Active Locks & Pending Requests
+        lock_mgr = locks_mod.get_lock_manager()
+        active_locks = [l.to_dict() for l in lock_mgr.list_locks(project_id)]
+        pending_requests = [r.to_dict() for r in lock_mgr.list_requests(project_id, pending_only=True)]
+
+        # 4. Handoffs
+        handoffs = [h.to_dict() for h in handoff_mod.get_handoff_store(project_id).list()[-10:]]
+
+        # 5. Decisions
+        decisions = [d.to_dict() for d in dec_mod.get_decision_log(project_id).list()[-10:]]
+
+        # 6. Events Stream
+        event_records = [e.to_dict() for e in events_mod.get_event_bus(project_id).read(limit=30)]
+
+        # 7. Kill switch status
+        ks = get_kill_switch_status()
+
+        return {
+            "project_id": project_id,
+            "status": "active",
+            "state": st.to_dict(),
+            "members": presence_list,
+            "active_locks": active_locks,
+            "pending_lock_requests": pending_requests,
+            "handoffs": handoffs,
+            "decisions": decisions,
+            "events": event_records,
+            "kill_switch": ks,
+        }
+
+    return await asyncio.to_thread(_do)
+

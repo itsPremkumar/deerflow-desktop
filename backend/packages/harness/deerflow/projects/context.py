@@ -90,3 +90,22 @@ def build_context(
         take("constitution", const.markdown[:2000])
         ctx.sections["constitution"] = sections.get("constitution")
     return ctx
+
+
+def get_three_level_context(
+    project_id: str,
+    bot_name: str,
+    task_id: str | None = None,
+    task_scratchpad: dict[str, Any] | None = None,
+):
+    """Retrieve the consolidated 3-tier isolated context envelope."""
+    from deerflow.projects.context_router import get_three_level_router
+
+    router = get_three_level_router()
+    return router.build_isolated_context(
+        project_id=project_id,
+        bot_name=bot_name,
+        task_id=task_id,
+        task_scratchpad=task_scratchpad,
+    )
+

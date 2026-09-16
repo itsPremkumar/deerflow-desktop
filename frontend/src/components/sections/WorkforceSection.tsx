@@ -8,18 +8,20 @@ import {
   fetchInbox, sendDM, ackDM, fetchPresence, fetchProjectState, fetchSkillUsage,
   fetchCuratorReport, runCurator, fetchBlueprints, launchBlueprint, fetchBenchmarkSuites,
   runBenchmarkSuite, fetchConsoleInsights, fetchOpsAdvice, listCouncilCases, fetchPendingApprovals,
-  decideApproval, localEndpointHealth, type PresenceMember, type ProjectStateSnapshot,
+  decideApproval, localEndpointHealth, fetchWarRoomData, type PresenceMember, type ProjectStateSnapshot,
+  type WarRoomSnapshot,
 } from "@/lib/workforce";
-import { RefreshCw, Send, Inbox, Users, Wrench, CalendarClock, Scale, Activity } from "lucide-react";
+import { RefreshCw, Send, Inbox, Users, Wrench, CalendarClock, Scale, Activity, Radio, ShieldAlert } from "lucide-react";
 
 export interface WorkforceBot {
   name: string;
   display_name: string;
 }
 
-type TabId = "inbox" | "presence" | "curator" | "automation" | "oversight" | "insights";
+type TabId = "warroom" | "inbox" | "presence" | "curator" | "automation" | "oversight" | "insights";
 
 const TABS: Array<{ id: TabId; label: string; icon: React.ReactNode }> = [
+  { id: "warroom", label: "War Room", icon: <Radio className="size-3.5 text-rose-500" /> },
   { id: "inbox", label: "Bot Inbox", icon: <Inbox className="size-3.5" /> },
   { id: "presence", label: "Presence", icon: <Users className="size-3.5" /> },
   { id: "curator", label: "Curator", icon: <Wrench className="size-3.5" /> },
@@ -436,8 +438,140 @@ function InsightsTab() {
   );
 }
 
+function WarRoomTab() {
+  const [projects, setProjects] = useState<Array<{ id: string; name: string }>>([]);
+  const [selectedProject, setSelectedProject] = useState<string>("default");
+
+  useEffect(() => {
+    listProjects().then((p) => {
+      if (p && p.length > 0) {
+        setProjects(p.map((x) => ({ id: x.id, name: x.name })));
+        setSelectedProject(p[0].id);
+      }
+    }).catch(() => {});
+  }, []);
+
+  const warRoom = useAsync(() => fetchWarRoomData(selectedProject), [selectedProject]);
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        <div className="flex items-center gap-2">
+          <label className="text-xs font-semibold text-muted-foreground">Project Workspace:</label>
+          <select
+            value={selectedProject}
+            onChange={(e) => setSelectedProject(e.target.value)}
+            className="text-xs bg-muted/50 border border-border/60 rounded-lg px-2.5 py-1"
+          >
+            {projects.length === 0 && <option value="default">default</option>}
+            {projects.map((p) => (
+              <option key={p.id} value={p.id}>{p.name} ({p.id})</option>
+            ))}
+          </select>
+        </div>
+        <Btn variant="ghost" onClick={() => warRoom.reload()}>
+          <RefreshCw className="size-3 mr-1" /> Refresh Telemetry
+        </Btn>
+      </div>
+
+      {warRoom.loading ? (
+        <p className="text-xs text-muted-foreground">Connecting to War Room telemetry...</p>
+      ) : warRoom.error ? (
+        <ErrorBox message={warRoom.error} />
+      ) : warRoom.data ? (
+        <div className="space-y-3">
+          {/* Top: Emergency Status Bar */}
+          <div className="flex items-center justify-between p-3 rounded-xl border border-border/60 bg-muted/20">
+            <div className="flex items-center gap-2">
+              <span className={`size-2.5 rounded-full ${warRoom.data.kill_switch?.active ? "bg-rose-500 animate-ping" : "bg-emerald-500"}`} />
+              <span className="text-xs font-bold">
+                {warRoom.data.kill_switch?.active ? "EMERGENCY STOP ENGAGED" : "Autonomous Operations Active"}
+              </span>
+              {warRoom.data.kill_switch?.reason && (
+                <span className="text-[11px] text-muted-foreground">({warRoom.data.kill_switch.reason})</span>
+              )}
+            </div>
+            <Badge tone={warRoom.data.kill_switch?.active ? "amber" : "green"}>
+              {warRoom.data.members.length} Active Bot(s)
+            </Badge>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {/* Active Members & Presence */}
+            <Panel title="Active Workforce Presence" hint="Registered bots & real-time assignments">
+              {warRoom.data.members.length === 0 ? (
+                <EmptyState title="No bots currently joined" />
+              ) : (
+                <div className="space-y-1.5">
+                  {warRoom.data.members.map((m) => (
+                    <div key={m.bot_name} className="flex items-center justify-between p-2 rounded-lg bg-muted/40 text-xs">
+                      <div>
+                        <span className="font-semibold">{m.bot_name}</span>
+                        <span className="text-[10px] text-muted-foreground ml-1.5">({m.role_in_project})</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        {m.current_task_id && (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400 font-mono">
+                            {m.current_task_id}
+                          </span>
+                        )}
+                        <Badge tone={m.status === "active" ? "green" : m.status === "blocked" ? "amber" : "gray"}>
+                          {m.status}
+                        </Badge>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </Panel>
+
+            {/* Resource Concurrency & Locks */}
+            <Panel title="Resource Locks (Concurrency Control)" hint="File, dir, and task ownership locks">
+              {warRoom.data.active_locks.length === 0 ? (
+                <p className="text-xs text-muted-foreground">No active locks. Workspace is clear for concurrent execution.</p>
+              ) : (
+                <div className="space-y-1.5">
+                  {warRoom.data.active_locks.map((lk) => (
+                    <div key={lk.lock_id} className="flex items-center justify-between p-2 rounded-lg bg-muted/40 text-xs font-mono">
+                      <div>
+                        <span className="font-semibold text-foreground">{lk.scope}:{lk.path}</span>
+                        <span className="text-[10px] text-muted-foreground ml-1.5">by @{lk.owner_bot}</span>
+                      </div>
+                      <Badge tone="amber">LOCKED</Badge>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </Panel>
+          </div>
+
+          {/* Flight Recorder Stream */}
+          <Panel title="Flight Recorder (Event Stream)" hint="Audit timeline of autonomous decisions and tool operations">
+            {warRoom.data.events.length === 0 ? (
+              <p className="text-xs text-muted-foreground">No recent events recorded for this project.</p>
+            ) : (
+              <div className="max-h-60 overflow-y-auto space-y-1 font-mono text-[11px]">
+                {warRoom.data.events.slice(-15).reverse().map((ev) => (
+                  <div key={ev.event_id || ev.seq} className="p-1.5 rounded bg-muted/30 flex items-start gap-2">
+                    <span className="text-muted-foreground">#{ev.seq}</span>
+                    <span className="font-semibold text-primary">{ev.type}</span>
+                    <span className="text-muted-foreground">by @{ev.actor}</span>
+                    <span className="text-[10px] text-muted-foreground/80 ml-auto truncate max-w-xs">
+                      {JSON.stringify(ev.payload || {})}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </Panel>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 export function WorkforceSection(props: { bots: WorkforceBot[] }) {
-  const [tab, setTab] = useState<TabId>("inbox");
+  const [tab, setTab] = useState<TabId>("warroom");
   return (
     <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-5 w-full">
       <div className="max-w-6xl mx-auto space-y-3">
@@ -453,6 +587,7 @@ export function WorkforceSection(props: { bots: WorkforceBot[] }) {
             </button>
           ))}
         </div>
+        {tab === "warroom" && <WarRoomTab />}
         {tab === "inbox" && <InboxTab bots={props.bots} />}
         {tab === "presence" && <PresenceTab />}
         {tab === "curator" && <CuratorTab />}
@@ -463,3 +598,4 @@ export function WorkforceSection(props: { bots: WorkforceBot[] }) {
     </div>
   );
 }
+

@@ -86,3 +86,23 @@ def release_worktree(repo_path: str | Path, project_id: str, branch: str, *, for
     except Exception:
         logger.warning("Worktree release failed for %s", branch, exc_info=True)
         return False
+
+
+def with_task_worktree(
+    repo_path: str | Path,
+    agent: str,
+    project_id: str,
+    task_id: str,
+    base_ref: str = "HEAD",
+):
+    """Context manager for automatic worktree task execution."""
+    from deerflow.projects.worktree_hook import WorktreeTaskContext
+
+    return WorktreeTaskContext(
+        repo_path=repo_path,
+        agent=agent,
+        project_id=project_id,
+        task_id=task_id,
+        base_ref=base_ref,
+    )
+

@@ -245,3 +245,58 @@ export async function decideApproval(requestId: string, approved: boolean): Prom
 export async function localEndpointHealth(baseUrl: string): Promise<{ reachable: boolean; models: string[]; reason: string }> {
   return get(`/models/local/health?base_url=${enc(baseUrl)}`);
 }
+
+export interface WarRoomSnapshot {
+  project_id: string;
+  status: string;
+  state: Record<string, unknown>;
+  members: Array<{
+    bot_name: string;
+    role_in_project: string;
+    status: string;
+    current_task_id: string | null;
+    joined_at: string;
+    last_activity: string;
+  }>;
+  active_locks: Array<{
+    lock_id: string;
+    scope: string;
+    path: string;
+    owner_bot: string;
+    reason: string;
+    expires_at: number;
+  }>;
+  pending_lock_requests: Array<Record<string, unknown>>;
+  handoffs: Array<{
+    handoff_id: string;
+    task_id: string;
+    from_bot: string;
+    to_bot: string;
+    objective: string;
+    status: string;
+  }>;
+  decisions: Array<{
+    decision_id: string;
+    title: string;
+    status: string;
+    decided_by: string;
+  }>;
+  events: Array<{
+    seq: number;
+    event_id: string;
+    type: string;
+    actor: string;
+    payload: Record<string, unknown>;
+    created_at: number;
+  }>;
+  kill_switch: {
+    active: boolean;
+    reason: string;
+    paused_bots: Record<string, unknown>;
+  };
+}
+
+export async function fetchWarRoomData(projectId: string): Promise<WarRoomSnapshot> {
+  return get(`/projects/${enc(projectId)}/war-room`);
+}
+
