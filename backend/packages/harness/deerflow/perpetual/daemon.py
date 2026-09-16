@@ -117,6 +117,14 @@ class PerpetualDaemon:
         completed_goal_tasks = sum(1 for tid in self.active_goal.subtasks if tid in self._tasks and self._tasks[tid].status == "completed")
         self.active_goal.progress_percent = round((completed_goal_tasks / max(1, total_goal_tasks)) * 100.0, 1)
 
+        # 6. Integrated Enterprise Software Heartbeat Cycle
+        enterprise_heartbeat = None
+        try:
+            from deerflow.enterprise.heartbeat import get_enterprise_heartbeat_coordinator
+            enterprise_heartbeat = get_enterprise_heartbeat_coordinator().step_heartbeat_cycle()
+        except Exception as e:
+            logger.debug("Enterprise heartbeat cycle step omitted: %s", e)
+
         return {
             "heartbeat": self._heartbeat_count,
             "state": self.state.value,
@@ -124,6 +132,7 @@ class PerpetualDaemon:
             "stagnation_incident": incident.to_dict() if incident else None,
             "consolidation_report": consolidation_report,
             "goal_progress_percent": self.active_goal.progress_percent,
+            "enterprise_heartbeat": enterprise_heartbeat,
             "timestamp": now_str,
         }
 

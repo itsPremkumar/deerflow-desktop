@@ -19,10 +19,12 @@ import {
   MessagesSquare,
   SquareKanban,
   Factory,
+  Building2,
 } from "lucide-react";
 
 export type WorkspaceView =
   | "chat"
+  | "warroom"
   | "bots"
   | "messages"
   | "kanban"
@@ -42,6 +44,7 @@ export type WorkspaceView =
 
 export const WORKSPACE_TABS: Array<{ id: WorkspaceView; label: string; icon: React.ReactNode; blurb: string }> = [
   { id: "chat", label: "Chat", icon: <MessageSquare className="size-3.5" />, blurb: "Talk to the agent" },
+  { id: "warroom", label: "War Room", icon: <Building2 className="size-3.5" />, blurb: "Autonomous AI Software Enterprise War Room" },
   { id: "bots", label: "Bots", icon: <Bot className="size-3.5" />, blurb: "Specialist profiles & team ops" },
   { id: "messages", label: "Messages", icon: <MessagesSquare className="size-3.5" />, blurb: "Agent chats & group rooms, WhatsApp-style" },
   { id: "kanban", label: "Board", icon: <SquareKanban className="size-3.5" />, blurb: "Full project kanban board" },

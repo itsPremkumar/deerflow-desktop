@@ -179,3 +179,24 @@ apply) and negative values are rejected loudly. Both `_budget_content` and the
 so the fast path never false-negatives; tiers ride `release_policy_parameters`
 into the assembly identity automatically. Tests:
 `tests/test_tool_output_prune_tiers.py`.
+
+### Autonomous AI Software Enterprise (`packages/harness/deerflow/enterprise/`)
+
+Enterprise-level autonomous operations platform:
+1. **Dynamic Enterprise Hierarchy & C-Suite Swarm**:
+   - 4 leadership roles: Executive Director (CEO), Lead Architect (CTO), Product & Market Strategist (CPO), and Quality & Security Director (CISO).
+   - 5 core departments: Engineering, Architecture, Security, Performance, and Documentation with leader-worker reporting trees and capability contracts (`CapabilityContract`).
+2. **Mission-to-Sprint Pipeline & Dynamic DAG Execution**:
+   - Strategic missions decompose into Epics, Technical Specs with Definition of Done (DoD), and dynamic DAG sprints with topological dependency layers.
+3. **Cross-Department Blackboard & RFC Protocol**:
+   - Formal RFC proposals, multi-agent reviews, and epistemic debate threads with epistemic confidence weighting. Consensus gating enforces quorum and a >= 0.75 score before dynamic execution.
+4. **Department Token Treasury & Fiscal Governance**:
+   - Allocations, rolling burn rate monitoring (TPM), ROI velocity tracking, and automated circuit breakers that throttle rogue or exhausted departments.
+5. **Quality Council Quorum & Cryptographic Multi-Sig Releases**:
+   - 3 required cryptographic attestations (`CTO_ARCH`, `SWE_BENCHMARK`, `CISO_ASTRA`) verifying holdout benchmark pass rate >= 90% and AST boundary isolation before zero-downtime hot-swap promotion.
+6. **Continuous Discovery, Latency Profiling & AST Boundary Scans**:
+   - Integrated into cyclic heartbeats with Keel-style auto-recovery from stagnation.
+7. **Gateway REST API & Next.js War Room UI**:
+   - Mounted at `/api/enterprise/*` and `/api/gateway/enterprise/*`. Visualized in War Room tab.
+Tests: `tests/test_enterprise_autonomous_software_company.py`.
+

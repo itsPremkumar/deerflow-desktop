@@ -55,6 +55,7 @@ const TeamOpsSection = lazy(() => import("@/components/sections/TeamOpsSection")
 const ChannelsSection = lazy(() => import("@/components/sections/ChannelsSection").then((m) => ({ default: m.ChannelsSection })));
 const SystemSection = lazy(() => import("@/components/sections/SystemSection").then((m) => ({ default: m.SystemSection })));
 const WorkforceSection = lazy(() => import("@/components/sections/WorkforceSection").then((m) => ({ default: m.WorkforceSection })));
+const WarRoomSection = lazy(() => import("@/components/sections/WarRoomSection").then((m) => ({ default: m.WarRoomSection })));
 
 function SectionFallback() {
   return (
@@ -849,7 +850,11 @@ export default function ChatView() {
         )}
 
         <ErrorBoundary resetKey={view} label={view}>
-        {view === "bots" ? (
+        {view === "warroom" ? (
+          <Suspense fallback={<SectionFallback />}>
+            <WarRoomSection />
+          </Suspense>
+        ) : view === "bots" ? (
           <div className="shrink-0 px-4 sm:px-6 pt-3">
             <div className="max-w-6xl mx-auto flex gap-1 rounded-xl bg-muted/60 p-1 w-fit">
               {(["profiles", "ops"] as const).map((t) => (

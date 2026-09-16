@@ -91,6 +91,7 @@ export function Btn(props: {
   variant?: "primary" | "ghost" | "danger";
   disabled?: boolean;
   title?: string;
+  className?: string;
 }) {
   const base =
     "inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold transition-opacity disabled:opacity-40";
@@ -106,7 +107,7 @@ export function Btn(props: {
       disabled={props.disabled}
       onClick={props.onClick}
       title={props.title}
-      className={`${base} ${style}`}
+      className={`${base} ${style} ${props.className || ""}`}
     >
       {props.children}
     </button>
@@ -115,7 +116,7 @@ export function Btn(props: {
 
 export function Badge(props: {
   children: React.ReactNode;
-  tone?: "green" | "amber" | "gray" | "blue" | "purple" | "cyan" | "red";
+  tone?: "green" | "amber" | "gray" | "blue" | "purple" | "cyan" | "red" | "indigo";
 }) {
   const tone =
     props.tone === "green"
@@ -124,8 +125,10 @@ export function Badge(props: {
         ? "bg-amber-500/10 text-amber-600 dark:text-amber-400"
         : props.tone === "blue"
           ? "bg-primary/10 text-primary"
-          : props.tone === "purple"
-            ? "bg-purple-500/10 text-purple-600 dark:text-purple-400"
+          : props.tone === "indigo"
+            ? "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400"
+            : props.tone === "purple"
+              ? "bg-purple-500/10 text-purple-600 dark:text-purple-400"
             : props.tone === "cyan"
               ? "bg-cyan-500/10 text-cyan-600 dark:text-cyan-400"
               : props.tone === "red"
