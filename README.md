@@ -12,7 +12,6 @@ capabilities, and production-grade operations, maintained by
 [![Python](https://img.shields.io/badge/Python-3.12%2B-3776AB?logo=python&logoColor=white)](./backend/pyproject.toml)
 [![Node.js](https://img.shields.io/badge/Node.js-22%2B-339933?logo=node.js&logoColor=white)](./Makefile)
 [![Electron](https://img.shields.io/badge/Electron-Desktop-47848F?logo=electron&logoColor=white)](./electron/README.md)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
 
 Version: **2.1.0** — backend, frontend, Helm chart, and desktop installer share
 one version (verified by `scripts/verify_versions.sh`).
@@ -203,10 +202,6 @@ Useful commands: `make help`, `make doctor`, `make prod-check`,
 Issues and pull requests are welcome. Please run `make prod-check`, backend
 `make test` + `make lint`, and frontend `pnpm check` before submitting, and
 keep `README.md`/`AGENTS.md` in sync with behavior changes.
-
-## License
-
-MIT — see [LICENSE](./LICENSE).
 
 ## References & Credits
 
