@@ -807,6 +807,10 @@ async def get_war_room(project_id: str, request: Request) -> dict:
         # 7. Kill switch status
         ks = get_kill_switch_status()
 
+        # 8. Pending Approvals
+        from deerflow.projects.approval_queue import get_approval_queue
+        pending_approvals = [a.to_dict() for a in get_approval_queue(project_id).list_pending()]
+
         return {
             "project_id": project_id,
             "status": "active",
@@ -814,6 +818,7 @@ async def get_war_room(project_id: str, request: Request) -> dict:
             "members": presence_list,
             "active_locks": active_locks,
             "pending_lock_requests": pending_requests,
+            "pending_approvals": pending_approvals,
             "handoffs": handoffs,
             "decisions": decisions,
             "events": event_records,
@@ -821,4 +826,44 @@ async def get_war_room(project_id: str, request: Request) -> dict:
         }
 
     return await asyncio.to_thread(_do)
+
+
+class ResolveApprovalBody(BaseModel):
+    approved: bool
+    resolved_by: str = Field(default="human_operator", max_length=64)
+    comment: str = Field(default="", max_length=1000)
+
+
+@router.get("/{project_id}/approvals")
+@require_permission("projects", "read")
+async def list_project_approvals(project_id: str, request: Request, status: str | None = None) -> dict:
+    await _require_project(project_id, request)
+
+    def _do():
+        from deerflow.projects.approval_queue import get_approval_queue
+
+        q = get_approval_queue(project_id)
+        return {"project_id": project_id, "approvals": [r.to_dict() for r in q.list_requests(status=status)]}
+
+    return await asyncio.to_thread(_do)
+
+
+@router.post("/{project_id}/approvals/{request_id}/resolve")
+@require_permission("projects", "write")
+async def resolve_project_approval(project_id: str, request_id: str, body: ResolveApprovalBody, request: Request) -> dict:
+    await _require_project(project_id, request)
+
+    def _do():
+        from deerflow.projects.approval_queue import get_approval_queue
+
+        q = get_approval_queue(project_id)
+        req = q.resolve_request(request_id, approved=body.approved, resolved_by=body.resolved_by, comment=body.comment)
+        return req.to_dict()
+
+    try:
+        return await asyncio.to_thread(_do)
+    except KeyError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
