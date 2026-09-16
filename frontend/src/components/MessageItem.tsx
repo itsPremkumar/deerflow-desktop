@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { Bot, User, Brain, Copy, Check, ThumbsUp, ThumbsDown, RotateCcw, Pencil } from "lucide-react";
+import { Bot, User, Brain, Copy, Check, ThumbsUp, ThumbsDown, RotateCcw, Pencil, Users, ShieldCheck } from "lucide-react";
 import { ChatMessage } from "@/types/chat";
 import { ToolPill } from "./ToolPill";
 import { TodoBlock } from "./TodoBlock";
@@ -29,23 +29,80 @@ export function MessageItem({ message, onApprovalDecision, onRate, onRegenerate,
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(message.content);
 
+  const dmMatch = message.content ? message.content.match(/^\[DM from ([^\]]+)\]\s*([\s\S]*)$/) : null;
+  const groupMatch = !dmMatch && message.content ? message.content.match(/^\[(Group(?:\s+Chat)?(?::\s*([^\]]+))?)\](?:\s*@?([a-zA-Z0-9_-]+):)?\s*([\s\S]*)$/i) : null;
+
+  const isA2A = Boolean(dmMatch);
+  const a2aSender = dmMatch ? dmMatch[1] : null;
+  const isGroupChat = Boolean(groupMatch);
+  const groupName = groupMatch ? (groupMatch[2] || "Team Channel") : null;
+  const groupSender = groupMatch ? groupMatch[3] : null;
+
+  const displayContent = dmMatch ? dmMatch[2] : groupMatch ? groupMatch[4] : message.content;
+
   const copyToClipboard = () => {
-    navigator.clipboard.writeText(message.content);
+    navigator.clipboard.writeText(displayContent);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
 
   return (
-    <div className={`flex w-full gap-3 py-4 px-4 rounded-xl transition-all ${isUser ? "bg-muted/30 ml-auto max-w-3xl" : "bg-card border border-border/50 max-w-4xl"}`}>
-      <div className={`size-8 rounded-lg flex items-center justify-center shrink-0 ${isUser ? "bg-primary text-primary-foreground" : "bg-muted text-foreground border border-border"}`}>
-        {isUser ? <User className="size-4" /> : <Bot className="size-4 text-primary" />}
+    <div
+      className={`flex w-full gap-3 py-4 px-4 rounded-xl transition-all ${
+        isUser
+          ? "bg-muted/30 ml-auto max-w-3xl"
+          : isA2A
+            ? "bg-card border border-blue-500/40 shadow-sm shadow-blue-500/5 max-w-4xl"
+            : isGroupChat
+              ? "bg-card border border-purple-500/40 shadow-sm shadow-purple-500/5 max-w-4xl"
+              : "bg-card border border-border/50 max-w-4xl"
+      }`}
+    >
+      <div
+        className={`size-8 rounded-lg flex items-center justify-center shrink-0 ${
+          isUser
+            ? "bg-primary text-primary-foreground"
+            : isA2A
+              ? "bg-blue-500/20 text-blue-400 border border-blue-500/30"
+              : isGroupChat
+                ? "bg-purple-500/20 text-purple-400 border border-purple-500/30"
+                : "bg-muted text-foreground border border-border"
+        }`}
+      >
+        {isUser ? (
+          <User className="size-4" />
+        ) : isGroupChat ? (
+          <Users className="size-4 text-purple-400" />
+        ) : (
+          <Bot className={`size-4 ${isA2A ? "text-blue-400" : "text-primary"}`} />
+        )}
       </div>
 
       <div className="flex-1 overflow-hidden space-y-2 min-w-0">
         <div className="flex items-center justify-between gap-2">
-          <span className="text-xs font-medium text-muted-foreground">
-            {isUser ? "You" : "DeerFlow Assistant"}
-          </span>
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className="text-xs font-semibold text-foreground">
+              {isUser
+                ? "You"
+                : isA2A
+                  ? `@${a2aSender}`
+                  : isGroupChat
+                    ? groupSender
+                      ? `@${groupSender}`
+                      : "Team Channel"
+                    : "DeerFlow Assistant"}
+            </span>
+            {isA2A && (
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/15 text-blue-400 font-medium">
+                Agent-to-Agent DM
+              </span>
+            )}
+            {isGroupChat && (
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-500/15 text-purple-400 font-medium">
+                #{groupName}
+              </span>
+            )}
+          </div>
           <div className="flex items-center gap-0.5">
             {/* Your rating teaches the system what good looks like */}
             {!isUser && onRate && message.runId && (
@@ -127,6 +184,32 @@ export function MessageItem({ message, onApprovalDecision, onRate, onRegenerate,
           </div>
         )}
 
+        {/* Agent-to-Agent Verified Attribution Banner */}
+        {isA2A && (
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-blue-500/30 bg-blue-500/10 text-xs my-1">
+            <Bot className="size-3.5 text-blue-400 shrink-0" />
+            <span className="font-semibold text-blue-400">@{a2aSender}</span>
+            <span className="text-muted-foreground text-[11px]">➔ autonomous dispatch to team</span>
+            <span className="ml-auto text-[10px] px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 font-mono font-medium flex items-center gap-1">
+              <ShieldCheck className="size-3" /> Server-Verified A2A Attribution
+            </span>
+          </div>
+        )}
+
+        {/* Group Chat Channel Banner */}
+        {isGroupChat && (
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-purple-500/30 bg-purple-500/10 text-xs my-1">
+            <Users className="size-3.5 text-purple-400 shrink-0" />
+            <span className="font-semibold text-purple-400">#{groupName}</span>
+            <span className="text-muted-foreground text-[11px]">
+              Multi-Agent Room Broadcast {groupSender ? `from @${groupSender}` : ""}
+            </span>
+            <span className="ml-auto text-[10px] px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 font-mono font-medium">
+              Group Channel
+            </span>
+          </div>
+        )}
+
         {editing && isUser && onEdit ? (
           <div className="space-y-2">
             <textarea
@@ -194,10 +277,10 @@ export function MessageItem({ message, onApprovalDecision, onRate, onRegenerate,
               </div>
             )}
 
-            {message.content && (
+            {displayContent && (
               <div className="prose prose-sm dark:prose-invert max-w-none text-sm leading-relaxed break-words">
                 <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                  {message.content}
+                  {displayContent}
                 </ReactMarkdown>
               </div>
             )}

@@ -409,25 +409,47 @@ export function MessagesSection(props: { threadId: string | null; botNames: stri
                             <span className="text-[10px] font-semibold px-2.5 py-1 rounded-lg bg-muted text-muted-foreground">{day}</span>
                           </div>
                         )}
-                        <div className={`flex ${mine ? "justify-end" : "justify-start"}`}>
-                          <div className={`max-w-[80%] sm:max-w-[70%] rounded-2xl px-3 py-2 shadow-sm ${mine ? "bg-emerald-600/90 text-white rounded-br-md" : "bg-card border border-border/60 rounded-bl-md"}`}>
-                            {!mine && (
-                              <p className="text-[11px] font-bold" style={{ color: senderColor(m.sender) }}>
-                                {m.sender}
-                              </p>
-                            )}
-                            {m.kind !== "discussion" && (
-                              <span className={`inline-block text-[10px] font-bold px-1.5 py-0.5 rounded-md mt-0.5 mb-1 ${kindTone(m.kind) === "green" ? "bg-emerald-500/15 text-emerald-600" : kindTone(m.kind) === "amber" ? "bg-amber-500/15 text-amber-600" : kindTone(m.kind) === "blue" ? "bg-primary/15 text-primary" : "bg-muted text-muted-foreground"}`}>
-                                {m.kind.replace(/_/g, " ").toUpperCase()}
-                              </span>
-                            )}
-                            <p className="text-[13px] leading-relaxed whitespace-pre-wrap break-words">{m.content}</p>
-                            <p className={`text-[10px] mt-1 flex items-center gap-1 justify-end ${mine ? "text-white/70" : "text-muted-foreground"}`}>
-                              {fmtTime(m.at)}
-                              {mine && (m.read ? <CheckCheck className="size-3" /> : <Check className="size-3" />)}
-                            </p>
-                          </div>
-                        </div>
+                        {(() => {
+                          const dmMatch = m.content?.match(/^\[DM from ([^\]]+)\]\s*([\s\S]*)$/);
+                          const isA2A = Boolean(dmMatch);
+                          const a2aSender = dmMatch ? dmMatch[1] : null;
+                          const cleanContent = dmMatch ? dmMatch[2] : m.content;
+
+                          return (
+                            <div className={`flex ${mine ? "justify-end" : "justify-start"}`}>
+                              <div className={`max-w-[80%] sm:max-w-[70%] rounded-2xl px-3 py-2 shadow-sm ${
+                                mine
+                                  ? "bg-emerald-600/90 text-white rounded-br-md"
+                                  : isA2A
+                                    ? "bg-card border border-blue-500/40 rounded-bl-md shadow-blue-500/5"
+                                    : "bg-card border border-border/60 rounded-bl-md"
+                              }`}>
+                                {!mine && (
+                                  <div className="flex items-center gap-1.5 flex-wrap">
+                                    <p className="text-[11px] font-bold" style={{ color: senderColor(m.sender) }}>
+                                      {m.sender}
+                                    </p>
+                                    {isA2A && (
+                                      <span className="text-[9px] font-mono px-1 py-0.2 rounded bg-blue-500/15 text-blue-400">
+                                        ⚡ from @{a2aSender}
+                                      </span>
+                                    )}
+                                  </div>
+                                )}
+                                {m.kind !== "discussion" && (
+                                  <span className={`inline-block text-[10px] font-bold px-1.5 py-0.5 rounded-md mt-0.5 mb-1 ${kindTone(m.kind) === "green" ? "bg-emerald-500/15 text-emerald-600" : kindTone(m.kind) === "amber" ? "bg-amber-500/15 text-amber-600" : kindTone(m.kind) === "blue" ? "bg-primary/15 text-primary" : "bg-muted text-muted-foreground"}`}>
+                                    {m.kind.replace(/_/g, " ").toUpperCase()}
+                                  </span>
+                                )}
+                                <p className="text-[13px] leading-relaxed whitespace-pre-wrap break-words">{cleanContent}</p>
+                                <p className={`text-[10px] mt-1 flex items-center gap-1 justify-end ${mine ? "text-white/70" : "text-muted-foreground"}`}>
+                                  {fmtTime(m.at)}
+                                  {mine && (m.read ? <CheckCheck className="size-3" /> : <Check className="size-3" />)}
+                                </p>
+                              </div>
+                            </div>
+                          );
+                        })()}
                       </React.Fragment>
                     );
                   })

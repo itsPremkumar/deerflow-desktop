@@ -811,6 +811,22 @@ async def get_war_room(project_id: str, request: Request) -> dict:
         from deerflow.projects.approval_queue import get_approval_queue
         pending_approvals = [a.to_dict() for a in get_approval_queue(project_id).list_pending()]
 
+        # 9. Task Contracts
+        from deerflow.projects.contracts import get_contract_gatekeeper
+        contracts = [c.to_dict() for c in get_contract_gatekeeper(project_id).list_contracts()]
+
+        # 10. Living Specification
+        from deerflow.projects.living_spec import get_living_spec_engine
+        living_spec = get_living_spec_engine(project_id).get_spec().to_dict()
+
+        # 11. Cost & Token Governance
+        from deerflow.models.cost_governor import get_cost_governor
+        cost_summary = get_cost_governor().get_project_summary(project_id)
+
+        # 12. Async Standup Briefing
+        from deerflow.projects.standup_engine import get_standup_engine
+        standup_data = get_standup_engine(project_id).generate_standup().to_dict()
+
         return {
             "project_id": project_id,
             "status": "active",
@@ -819,6 +835,10 @@ async def get_war_room(project_id: str, request: Request) -> dict:
             "active_locks": active_locks,
             "pending_lock_requests": pending_requests,
             "pending_approvals": pending_approvals,
+            "contracts": contracts,
+            "living_spec": living_spec,
+            "cost_summary": cost_summary,
+            "standup": standup_data,
             "handoffs": handoffs,
             "decisions": decisions,
             "events": event_records,

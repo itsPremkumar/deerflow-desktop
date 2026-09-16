@@ -266,7 +266,18 @@ export interface WarRoomSnapshot {
     reason: string;
     expires_at: number;
   }>;
-  pending_lock_requests: Array<Record<string, unknown>>;
+  pending_lock_requests: Array<{
+    request_id: string;
+    requester_bot: string;
+    scope: string;
+    path: string;
+    reason: string;
+  }>;
+  pending_approvals?: WarRoomApprovalItem[];
+  contracts?: WarRoomContractItem[];
+  living_spec?: WarRoomLivingSpec;
+  cost_summary?: WarRoomCostSummary;
+  standup?: WarRoomStandup;
   handoffs: Array<{
     handoff_id: string;
     task_id: string;
@@ -296,7 +307,82 @@ export interface WarRoomSnapshot {
   };
 }
 
+export interface WarRoomApprovalItem {
+  request_id: string;
+  project_id: string;
+  bot_name: string;
+  action_type: string;
+  risk_level: "low" | "medium" | "high" | "critical";
+  details: Record<string, unknown>;
+  diff_preview?: string;
+  status: "pending" | "approved" | "rejected" | "timed_out";
+  created_at: string;
+}
+
+export interface WarRoomContractItem {
+  task_id: string;
+  project_id: string;
+  title: string;
+  assignee_bot: string;
+  verifier_bot?: string;
+  status: string;
+  evidence_receipts: Array<{ kind: string; reference: string; verified_by: string; detail?: string }>;
+  created_at: string;
+}
+
+export interface WarRoomLivingSpec {
+  project_id: string;
+  title: string;
+  updated_at: string;
+  sections: Record<string, {
+    section_key: string;
+    title: string;
+    content: string;
+    last_author_bot: string;
+    version: number;
+    updated_at: string;
+  }>;
+}
+
+export interface WarRoomCostSummary {
+  project_id: string;
+  daily_budget_usd: number;
+  current_spend_24h: number;
+  budget_utilized_ratio: number;
+  bot_breakdown: Record<string, {
+    input_tokens: number;
+    output_tokens: number;
+    cost_usd: number;
+  }>;
+}
+
+export interface WarRoomStandup {
+  project_id: string;
+  timestamp: string;
+  executive_summary: string;
+  blockers: string[];
+  stagnant_alerts: Array<{
+    task_id: string;
+    assignee_bot: string;
+    minutes_inactive: number;
+    recommendation: string;
+  }>;
+}
+
 export async function fetchWarRoomData(projectId: string): Promise<WarRoomSnapshot> {
   return get(`/projects/${enc(projectId)}/war-room`);
 }
 
+export async function resolveApprovalRequest(
+  projectId: string,
+  requestId: string,
+  approved: boolean,
+  comment = "",
+  resolvedBy = "human_operator"
+): Promise<WarRoomApprovalItem> {
+  return send(`/projects/${enc(projectId)}/approvals/${enc(requestId)}/resolve`, "POST", {
+    approved,
+    comment,
+    resolved_by: resolvedBy,
+  });
+}

@@ -8,10 +8,14 @@ import {
   fetchInbox, sendDM, ackDM, fetchPresence, fetchProjectState, fetchSkillUsage,
   fetchCuratorReport, runCurator, fetchBlueprints, launchBlueprint, fetchBenchmarkSuites,
   runBenchmarkSuite, fetchConsoleInsights, fetchOpsAdvice, listCouncilCases, fetchPendingApprovals,
-  decideApproval, localEndpointHealth, fetchWarRoomData, type PresenceMember, type ProjectStateSnapshot,
+  decideApproval, localEndpointHealth, fetchWarRoomData, resolveApprovalRequest, type PresenceMember, type ProjectStateSnapshot,
   type WarRoomSnapshot,
 } from "@/lib/workforce";
-import { RefreshCw, Send, Inbox, Users, Wrench, CalendarClock, Scale, Activity, Radio, ShieldAlert } from "lucide-react";
+import {
+  RefreshCw, Send, Inbox, Users, Wrench, CalendarClock, Scale, Activity, Radio, ShieldAlert,
+  Check, Ban, CheckCircle2, AlertTriangle, FileText, DollarSign, Layers, ChevronDown, ChevronRight,
+  ShieldCheck, CheckSquare,
+} from "lucide-react";
 
 export interface WorkforceBot {
   name: string;
@@ -441,6 +445,10 @@ function InsightsTab() {
 function WarRoomTab() {
   const [projects, setProjects] = useState<Array<{ id: string; name: string }>>([]);
   const [selectedProject, setSelectedProject] = useState<string>("default");
+  const [approvalBusy, setApprovalBusy] = useState<Record<string, boolean>>({});
+  const [approvalNotice, setApprovalNotice] = useState<string | null>(null);
+  const [expandedSpecKey, setExpandedSpecKey] = useState<string | null>(null);
+  const [expandedContractId, setExpandedContractId] = useState<string | null>(null);
 
   useEffect(() => {
     listProjects().then((p) => {
@@ -452,6 +460,26 @@ function WarRoomTab() {
   }, []);
 
   const warRoom = useAsync(() => fetchWarRoomData(selectedProject), [selectedProject]);
+
+  const handleApproval = async (requestId: string, approved: boolean) => {
+    setApprovalBusy((prev) => ({ ...prev, [requestId]: true }));
+    setApprovalNotice(null);
+    try {
+      await resolveApprovalRequest(selectedProject, requestId, approved);
+      setApprovalNotice(approved ? `Approved request ${requestId}` : `Rejected request ${requestId}`);
+      warRoom.reload();
+    } catch (e) {
+      setApprovalNotice(`Failed to resolve request: ${errMsg(e)}`);
+    } finally {
+      setApprovalBusy((prev) => ({ ...prev, [requestId]: false }));
+    }
+  };
+
+  const pendingApprovals = warRoom.data?.pending_approvals || [];
+  const contracts = warRoom.data?.contracts || [];
+  const costSummary = warRoom.data?.cost_summary;
+  const livingSpec = warRoom.data?.living_spec;
+  const standup = warRoom.data?.standup;
 
   return (
     <div className="space-y-3">
@@ -474,6 +502,13 @@ function WarRoomTab() {
         </Btn>
       </div>
 
+      {approvalNotice && (
+        <div className="text-xs p-2.5 rounded-xl border border-primary/30 bg-primary/10 text-primary flex items-center justify-between">
+          <span>{approvalNotice}</span>
+          <button type="button" onClick={() => setApprovalNotice(null)} className="text-[11px] underline ml-2">Dismiss</button>
+        </div>
+      )}
+
       {warRoom.loading ? (
         <p className="text-xs text-muted-foreground">Connecting to War Room telemetry...</p>
       ) : warRoom.error ? (
@@ -485,17 +520,283 @@ function WarRoomTab() {
             <div className="flex items-center gap-2">
               <span className={`size-2.5 rounded-full ${warRoom.data.kill_switch?.active ? "bg-rose-500 animate-ping" : "bg-emerald-500"}`} />
               <span className="text-xs font-bold">
-                {warRoom.data.kill_switch?.active ? "EMERGENCY STOP ENGAGED" : "Autonomous Operations Active"}
+                {warRoom.data.kill_switch?.active ? "EMERGENCY STOP ENGAGED" : "Autonomous Workforce Active"}
               </span>
               {warRoom.data.kill_switch?.reason && (
                 <span className="text-[11px] text-muted-foreground">({warRoom.data.kill_switch.reason})</span>
               )}
             </div>
-            <Badge tone={warRoom.data.kill_switch?.active ? "amber" : "green"}>
-              {warRoom.data.members.length} Active Bot(s)
-            </Badge>
+            <div className="flex items-center gap-2">
+              {pendingApprovals.length > 0 && (
+                <Badge tone="amber">
+                  {pendingApprovals.length} Approval Pending
+                </Badge>
+              )}
+              <Badge tone={warRoom.data.kill_switch?.active ? "amber" : "green"}>
+                {warRoom.data.members.length} Active Bot(s)
+              </Badge>
+            </div>
           </div>
 
+          {/* 1. Human-in-the-Loop Approval Queue */}
+          <Panel
+            title={`Human Approval Queue (${pendingApprovals.length})`}
+            hint="Review and authorize high-risk actions (code merge, production push, schema migration)"
+            actions={<Badge tone={pendingApprovals.length > 0 ? "amber" : "green"}>{pendingApprovals.length > 0 ? "Action Required" : "All Clear"}</Badge>}
+          >
+            {pendingApprovals.length === 0 ? (
+              <p className="text-xs text-muted-foreground py-2">No pending approval requests. Operations are proceeding within autonomous boundaries.</p>
+            ) : (
+              <div className="space-y-2.5">
+                {pendingApprovals.map((req) => (
+                  <div key={req.request_id} className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-3 space-y-2 text-xs">
+                    <div className="flex items-center justify-between flex-wrap gap-2">
+                      <div className="flex items-center gap-2">
+                        <ShieldAlert className="size-4 text-amber-500 shrink-0" />
+                        <span className="font-semibold text-foreground">@{req.bot_name}</span>
+                        <span className="text-muted-foreground font-mono">[{req.action_type}]</span>
+                        <span className={`text-[10px] uppercase font-bold px-1.5 py-0.5 rounded ${
+                          req.risk_level === "critical"
+                            ? "bg-rose-500/20 text-rose-500"
+                            : req.risk_level === "high"
+                              ? "bg-amber-500/20 text-amber-500"
+                              : "bg-blue-500/20 text-blue-400"
+                        }`}>
+                          {req.risk_level} risk
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <Btn
+                          variant="primary"
+                          disabled={approvalBusy[req.request_id]}
+                          onClick={() => handleApproval(req.request_id, true)}
+                        >
+                          <Check className="size-3" /> Approve
+                        </Btn>
+                        <Btn
+                          variant="danger"
+                          disabled={approvalBusy[req.request_id]}
+                          onClick={() => handleApproval(req.request_id, false)}
+                        >
+                          <Ban className="size-3" /> Reject
+                        </Btn>
+                      </div>
+                    </div>
+
+                    {req.diff_preview && (
+                      <div className="rounded-lg border border-border/60 bg-muted/30 p-2 font-mono text-[11px] overflow-x-auto whitespace-pre">
+                        {req.diff_preview}
+                      </div>
+                    )}
+
+                    {req.details && Object.keys(req.details).length > 0 && (
+                      <div className="text-[11px] text-muted-foreground font-mono bg-background/50 p-2 rounded border border-border/40">
+                        {JSON.stringify(req.details, null, 2)}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </Panel>
+
+          {/* 2. Standup & Blocker Alerts */}
+          {standup && (
+            <Panel
+              title="Autonomous Standup Briefing"
+              hint={`Executive sync across active agents • ${standup.timestamp ? new Date(standup.timestamp).toLocaleTimeString() : "Live"}`}
+            >
+              <div className="space-y-2 text-xs">
+                <p className="text-foreground leading-relaxed bg-muted/30 p-2.5 rounded-xl border border-border/60">
+                  {standup.executive_summary || "Workforce is progressing according to schedule."}
+                </p>
+
+                {standup.blockers && standup.blockers.length > 0 && (
+                  <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-2.5 space-y-1">
+                    <div className="flex items-center gap-1.5 font-semibold text-amber-500 text-xs">
+                      <AlertTriangle className="size-3.5" />
+                      <span>Critical Path Blockers ({standup.blockers.length})</span>
+                    </div>
+                    <ul className="list-disc list-inside space-y-0.5 text-muted-foreground text-[11px]">
+                      {standup.blockers.map((b, idx) => (
+                        <li key={idx}>{b}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {standup.stagnant_alerts && standup.stagnant_alerts.length > 0 && (
+                  <div className="space-y-1.5">
+                    <span className="text-[11px] font-semibold text-muted-foreground">Stagnation & Bottleneck Alerts:</span>
+                    {standup.stagnant_alerts.map((stg) => (
+                      <div key={stg.task_id} className="flex items-center justify-between p-2 rounded-lg bg-muted/40 text-xs border border-border/50">
+                        <div>
+                          <span className="font-mono font-semibold text-primary">{stg.task_id}</span>
+                          <span className="text-muted-foreground ml-1.5">by @{stg.assignee_bot} ({stg.minutes_inactive}m inactive)</span>
+                          <p className="text-[10px] text-muted-foreground mt-0.5">{stg.recommendation}</p>
+                        </div>
+                        <Badge tone="amber">Stalled</Badge>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </Panel>
+          )}
+
+          {/* 3. Cost Governor & Token Burn-Rate */}
+          {costSummary && (
+            <Panel
+              title="Token Burn-Rate & Financial Governance"
+              hint="Real-time spend tracking and model tier throttling against daily budget"
+            >
+              <div className="space-y-3 text-xs">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <DollarSign className="size-4 text-emerald-500" />
+                    <span className="font-bold text-foreground">
+                      ${costSummary.current_spend_24h.toFixed(2)} / ${costSummary.daily_budget_usd.toFixed(2)} USD (24h)
+                    </span>
+                  </div>
+                  <Badge tone={costSummary.budget_utilized_ratio > 0.9 ? "amber" : "green"}>
+                    {(costSummary.budget_utilized_ratio * 100).toFixed(1)}% consumed
+                  </Badge>
+                </div>
+
+                <div className="w-full bg-muted rounded-full h-2 overflow-hidden border border-border/60">
+                  <div
+                    className={`h-full transition-all rounded-full ${
+                      costSummary.budget_utilized_ratio > 0.9
+                        ? "bg-rose-500"
+                        : costSummary.budget_utilized_ratio > 0.7
+                          ? "bg-amber-500"
+                          : "bg-emerald-500"
+                    }`}
+                    style={{ width: `${Math.min(100, Math.max(0, costSummary.budget_utilized_ratio * 100))}%` }}
+                  />
+                </div>
+
+                {costSummary.bot_breakdown && Object.keys(costSummary.bot_breakdown).length > 0 && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 pt-1">
+                    {Object.entries(costSummary.bot_breakdown).map(([bname, bdata]) => (
+                      <div key={bname} className="p-2 rounded-lg bg-muted/30 border border-border/50 text-[11px] font-mono">
+                        <div className="flex items-center justify-between font-semibold text-foreground mb-0.5">
+                          <span>@{bname}</span>
+                          <span className="text-emerald-500 font-sans">${bdata.cost_usd.toFixed(3)}</span>
+                        </div>
+                        <div className="text-[10px] text-muted-foreground">
+                          {bdata.input_tokens.toLocaleString()} in / {bdata.output_tokens.toLocaleString()} out
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </Panel>
+          )}
+
+          {/* 4. Definition of Done & Task Contracts */}
+          <Panel
+            title={`Task Contracts & Definition of Done (${contracts.length})`}
+            hint="Enforced quality gates with verifiable evidence receipts (test suites, diff hashes)"
+          >
+            {contracts.length === 0 ? (
+              <p className="text-xs text-muted-foreground py-1">No formal task contracts established yet for this workspace.</p>
+            ) : (
+              <div className="space-y-2">
+                {contracts.map((c) => {
+                  const isExpanded = expandedContractId === c.task_id;
+                  return (
+                    <div key={c.task_id} className="rounded-xl border border-border/60 bg-muted/20 p-2.5 text-xs space-y-1.5">
+                      <div className="flex items-center justify-between flex-wrap gap-2">
+                        <div className="flex items-center gap-2">
+                          <CheckSquare className="size-3.5 text-primary shrink-0" />
+                          <span className="font-mono font-bold text-foreground">{c.task_id}</span>
+                          <span className="font-medium text-foreground">{c.title}</span>
+                          <span className="text-[10px] text-muted-foreground">assignee: @{c.assignee_bot}</span>
+                          {c.verifier_bot && (
+                            <span className="text-[10px] text-muted-foreground">• verifier: @{c.verifier_bot}</span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Badge tone={
+                            c.status === "verified_complete" ? "green" :
+                            c.status === "ready_for_review" ? "blue" :
+                            c.status === "rejected" ? "amber" : "gray"
+                          }>
+                            {c.status}
+                          </Badge>
+                          {c.evidence_receipts && c.evidence_receipts.length > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => setExpandedContractId(isExpanded ? null : c.task_id)}
+                              className="text-[11px] text-muted-foreground hover:text-foreground flex items-center gap-0.5"
+                            >
+                              {c.evidence_receipts.length} Receipt(s)
+                              {isExpanded ? <ChevronDown className="size-3" /> : <ChevronRight className="size-3" />}
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
+                      {isExpanded && c.evidence_receipts && (
+                        <div className="pt-1.5 border-t border-border/50 space-y-1 font-mono text-[10px]">
+                          {c.evidence_receipts.map((rec, rIdx) => (
+                            <div key={rIdx} className="p-1.5 rounded bg-muted/50 flex items-center justify-between text-muted-foreground">
+                              <span><strong>[{rec.kind}]</strong> {rec.reference}</span>
+                              <span className="text-emerald-500 flex items-center gap-1">
+                                <ShieldCheck className="size-3" /> verified by @{rec.verified_by}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </Panel>
+
+          {/* 5. Living Specification & ADR Viewer */}
+          {livingSpec && livingSpec.sections && Object.keys(livingSpec.sections).length > 0 && (
+            <Panel
+              title={`Living Specification: ${livingSpec.title || "Architecture & System Spec"}`}
+              hint="Continually updated project architecture document maintained autonomously by specialist bots"
+            >
+              <div className="space-y-1.5 text-xs">
+                {Object.entries(livingSpec.sections).map(([sKey, section]) => {
+                  const isExpanded = expandedSpecKey === sKey;
+                  return (
+                    <div key={sKey} className="rounded-xl border border-border/60 bg-muted/20 overflow-hidden">
+                      <button
+                        type="button"
+                        onClick={() => setExpandedSpecKey(isExpanded ? null : sKey)}
+                        className="w-full flex items-center justify-between p-2.5 hover:bg-muted/40 transition-colors text-left"
+                      >
+                        <div className="flex items-center gap-2">
+                          <Layers className="size-3.5 text-primary shrink-0" />
+                          <span className="font-semibold text-foreground">{section.title || sKey}</span>
+                          <span className="text-[10px] text-muted-foreground">
+                            v{section.version} by @{section.last_author_bot}
+                          </span>
+                        </div>
+                        {isExpanded ? <ChevronDown className="size-3.5 text-muted-foreground" /> : <ChevronRight className="size-3.5 text-muted-foreground" />}
+                      </button>
+
+                      {isExpanded && (
+                        <div className="p-3 border-t border-border/50 bg-background/50 text-[11px] leading-relaxed whitespace-pre-wrap font-mono text-muted-foreground max-h-60 overflow-y-auto">
+                          {section.content}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </Panel>
+          )}
+
+          {/* 6. Presence & Concurrency Locks */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {/* Active Members & Presence */}
             <Panel title="Active Workforce Presence" hint="Registered bots & real-time assignments">
@@ -545,7 +846,7 @@ function WarRoomTab() {
             </Panel>
           </div>
 
-          {/* Flight Recorder Stream */}
+          {/* 7. Flight Recorder Stream */}
           <Panel title="Flight Recorder (Event Stream)" hint="Audit timeline of autonomous decisions and tool operations">
             {warRoom.data.events.length === 0 ? (
               <p className="text-xs text-muted-foreground">No recent events recorded for this project.</p>
