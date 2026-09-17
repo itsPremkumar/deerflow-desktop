@@ -7,6 +7,7 @@ import { searchThreads, renameThread, deleteThread, branchThread, moveThread } f
 import { searchLocalMessages, removeLocalThread, upsertLocalThread, storageInfo, clearLocalStore, SearchHit } from "@/lib/history-store";
 import { listProjects, Project } from "@/lib/projects";
 import { errMsg } from "@/lib/http";
+import { branding } from "@/lib/branding";
 
 interface ThreadSidebarProps {
   threads: Thread[];
@@ -22,6 +23,8 @@ interface ThreadSidebarProps {
   onBranchOpened?: (newThreadId: string) => void;
   onExportHistory: () => void;
   onImportHistory: (f: File) => Promise<string>;
+  /** True when the Gateway is reachable — controls honest sync copy. Defaults to true. */
+  serverOnline?: boolean;
 }
 
 export function ThreadSidebar({
@@ -36,6 +39,7 @@ export function ThreadSidebar({
   scopeLabel,
   scopeAvatar,
   ownerLabel,
+  serverOnline = true,
 }: ThreadSidebarProps) {
   const [isOpen, setIsOpen] = useState(true);
   const [search, setSearch] = useState("");
@@ -179,7 +183,7 @@ export function ThreadSidebar({
           <div className="size-7 rounded-lg bg-primary/10 text-primary flex items-center justify-center font-bold">
             <Bot className="size-4" />
           </div>
-          <span className="font-semibold text-sm tracking-tight">DeerFlow</span>
+          <span className="font-semibold text-sm tracking-tight">{branding.name}</span>
         </div>
         <button
           type="button"
@@ -243,7 +247,7 @@ export function ThreadSidebar({
         )}
         {(serverHits !== null ? [] : local).length === 0 && serverHits === null ? (
           <div className="text-center py-8 text-xs text-muted-foreground">
-            No conversations found
+            {search.trim() ? "No conversations found" : "No conversations yet — start one with New Chat."}
           </div>
         ) : (
           <>
@@ -373,8 +377,8 @@ export function ThreadSidebar({
 
       {/* History storage footer */}
       <div className="p-3 border-t border-border/60 space-y-2">
-        <p className="text-[10px] text-muted-foreground" title="Every chat is stored on the server; this browser keeps a copy for offline use">
-          💾 {storage.threads} chats • {storage.messages} msgs • auto-saved to server
+        <p className="text-[10px] text-muted-foreground" title={serverOnline ? "Every chat is stored on the server; this browser keeps a copy for offline use" : "No server connection — chats live only in this browser until the Gateway is reachable"}>
+          💾 {storage.threads} chats • {storage.messages} msgs • {serverOnline ? "auto-saved to server" : "saved in this browser only"}
         </p>
         {importMsg && <p className="text-[11px] text-emerald-600">{importMsg}</p>}
         <div className="flex items-center gap-1.5">
@@ -413,12 +417,12 @@ export function ThreadSidebar({
           />
         </div>
         <div className="flex items-center justify-between text-[11px] text-muted-foreground">
-          <span>DeerFlow Studio</span>
+          <span>{branding.name}</span>
           <span className="flex items-center gap-1.5">
             <button
               type="button"
               onClick={() => {
-                if (!window.confirm("Erase ALL chats saved in this browser? (Server copies are kept.)")) return;
+                if (!window.confirm(serverOnline ? "Erase ALL chats saved in this browser? (Server copies are kept.)" : "Erase ALL chats saved in this browser? (No server connection — this cannot be undone.)")) return;
                 try {
                   clearLocalStore();
                 } catch {

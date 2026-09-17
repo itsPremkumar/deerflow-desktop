@@ -4,9 +4,12 @@ from __future__ import annotations
 
 import logging
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 
+from app.gateway.auth_disabled import AUTH_SOURCE_PAT, AUTH_SOURCE_SESSION
+from app.gateway.authz import require_permission
+from app.gateway.deps import get_current_user_from_request, require_admin_user
 from deerflow.jobs import (
     JobPriority,
     JobSpec,
@@ -22,6 +25,16 @@ _GLOBAL_QUEUE = PersistentJobQueue(max_concurrency=4)
 _GLOBAL_RUNNER = ExternalJobRunner(queue=_GLOBAL_QUEUE)
 
 
+async def _job_owner(request: Request) -> str:
+    user = await get_current_user_from_request(request)
+    if getattr(request.state, "auth_source", None) == AUTH_SOURCE_PAT:
+        raise HTTPException(status_code=403, detail="PAT credentials are not permitted on this route")
+    owner_id = getattr(user, "id", None)
+    if owner_id is None or not str(owner_id).strip():
+        raise HTTPException(status_code=401, detail="Authentication required")
+    return str(owner_id)
+
+
 class JobSubmitRequest(BaseModel):
     command: list[str] | str = Field(..., description="Executable command or shell string")
     title: str = Field(default="Background Task", description="Human-readable job label")
@@ -33,8 +46,12 @@ class JobSubmitRequest(BaseModel):
 
 
 @router.post("")
-async def submit_job(payload: JobSubmitRequest):
+@require_permission("runs", "create")
+async def submit_job(payload: JobSubmitRequest, request: Request, owner_id: str = Depends(_job_owner)):
     """Submits a decoupled background job for execution."""
+    await require_admin_user(request, detail="Authenticated operator permission is required for host jobs")
+    if getattr(request.state, "auth_source", None) != AUTH_SOURCE_SESSION:
+        raise HTTPException(status_code=403, detail="Host jobs require an authenticated operator session")
     p_enum = JobPriority.NORMAL
     try:
         p_enum = JobPriority(payload.priority.lower().strip())
@@ -42,6 +59,7 @@ async def submit_job(payload: JobSubmitRequest):
         pass
 
     spec = JobSpec(
+        owner_id=owner_id,
         title=payload.title,
         command=payload.command,
         working_dir=payload.working_dir,
@@ -51,7 +69,10 @@ async def submit_job(payload: JobSubmitRequest):
     )
     spec.resources.timeout_seconds = payload.timeout_seconds
 
-    job_id = await _GLOBAL_RUNNER.submit_async(spec)
+    try:
+        job_id = await _GLOBAL_RUNNER.submit_async(spec, authorized_operator=True)
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from None
     return {
         "status": "queued",
         "job_id": job_id,
@@ -62,7 +83,8 @@ async def submit_job(payload: JobSubmitRequest):
 
 
 @router.get("")
-async def list_jobs(status: str | None = None, tag: str | None = None, limit: int = 50):
+@require_permission("runs", "read")
+async def list_jobs(request: Request, status: str | None = None, tag: str | None = None, limit: int = Query(default=50, ge=1, le=100), owner_id: str = Depends(_job_owner)):
     """Lists registered background jobs with optional status/tag filtering."""
     s_enum = None
     if status:
@@ -70,23 +92,25 @@ async def list_jobs(status: str | None = None, tag: str | None = None, limit: in
             s_enum = JobStatus(status.lower().strip())
         except ValueError:
             pass
-    jobs = _GLOBAL_QUEUE.list_jobs(status=s_enum, tag=tag, limit=limit)
+    jobs = _GLOBAL_QUEUE.list_jobs(status=s_enum, tag=tag, limit=limit, owner_id=owner_id)
     return [j.model_dump() for j in jobs]
 
 
 @router.get("/{job_id}")
-async def get_job_status(job_id: str):
+@require_permission("runs", "read")
+async def get_job_status(job_id: str, request: Request, owner_id: str = Depends(_job_owner)):
     """Retrieves status and metadata of a specific job."""
-    res = _GLOBAL_QUEUE.get_status(job_id)
+    res = _GLOBAL_QUEUE.get_status(job_id, owner_id=owner_id)
     if not res:
         raise HTTPException(status_code=404, detail=f"Job '{job_id}' not found.")
     return res.model_dump()
 
 
 @router.get("/{job_id}/logs")
-async def get_job_logs(job_id: str):
+@require_permission("runs", "read")
+async def get_job_logs(job_id: str, request: Request, owner_id: str = Depends(_job_owner)):
     """Retrieves stdout/stderr outputs for a specific job."""
-    res = _GLOBAL_QUEUE.get_status(job_id)
+    res = _GLOBAL_QUEUE.get_status(job_id, owner_id=owner_id)
     if not res:
         raise HTTPException(status_code=404, detail=f"Job '{job_id}' not found.")
     return {
@@ -100,8 +124,11 @@ async def get_job_logs(job_id: str):
 
 
 @router.post("/{job_id}/cancel")
-async def cancel_job(job_id: str):
+@require_permission("runs", "cancel")
+async def cancel_job(job_id: str, request: Request, owner_id: str = Depends(_job_owner)):
     """Cancels a queued or currently executing background job."""
+    if _GLOBAL_QUEUE.get_status(job_id, owner_id=owner_id) is None:
+        raise HTTPException(status_code=404, detail=f"Job '{job_id}' not found or already finished.")
     cancelled = _GLOBAL_RUNNER.cancel(job_id)
     if not cancelled:
         raise HTTPException(status_code=404, detail=f"Job '{job_id}' not found or already finished.")

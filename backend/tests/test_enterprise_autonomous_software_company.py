@@ -2,35 +2,31 @@
 
 from __future__ import annotations
 
+import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from app.gateway.routers.enterprise import (
     gateway_router as enterprise_gateway_router,
+)
+from app.gateway.routers.enterprise import (
     router as enterprise_router,
 )
 from deerflow.enterprise import (
-    CSuiteRole,
     EnterpriseDepartment,
     EnterpriseHeartbeatCoordinator,
     EnterpriseHierarchyEngine,
     EnterpriseRFCProtocol,
     MissionToSprintPipeline,
     QualityCouncilQuorumEngine,
-    get_council_quorum_engine,
-    get_department_treasury,
     get_discovery_and_optimization_engine,
-    get_enterprise_heartbeat_coordinator,
-    get_enterprise_hierarchy,
-    get_mission_pipeline,
-    get_rfc_protocol,
 )
 from deerflow.enterprise.governance import DepartmentTokenTreasury
-
 
 # ============================================================================
 # 1. Dynamic Enterprise Hierarchy & C-Suite Swarm Tests
 # ============================================================================
+
 
 def test_enterprise_csuite_and_departments():
     hierarchy = EnterpriseHierarchyEngine()
@@ -76,6 +72,7 @@ def test_enterprise_csuite_and_departments():
 # 2. Mission-to-Sprint Pipeline & Dynamic DAG Sprint Tests
 # ============================================================================
 
+
 def test_mission_to_sprint_pipeline_and_dag_execution():
     pipeline = MissionToSprintPipeline()
     mission_id = "msn-ai-enterprise-test"
@@ -118,6 +115,7 @@ def test_mission_to_sprint_pipeline_and_dag_execution():
 # ============================================================================
 # 3. Blackboard & Cross-Department RFC Protocol with Epistemic Debate Tests
 # ============================================================================
+
 
 def test_rfc_consensus_gating_and_epistemic_debate():
     rfc_engine = EnterpriseRFCProtocol()
@@ -202,6 +200,7 @@ def test_rfc_leadership_veto_blocks_gating():
 # 4. Department Token Treasury & Fiscal Governance Tests
 # ============================================================================
 
+
 def test_department_treasury_burn_and_circuit_breaker():
     treasury = DepartmentTokenTreasury()
 
@@ -232,6 +231,19 @@ def test_department_treasury_burn_and_circuit_breaker():
 # 5. Quality Council Quorum & Multi-Sig Promotion Tests
 # ============================================================================
 
+
+def test_council_starts_without_invented_active_release():
+    council = QualityCouncilQuorumEngine()
+    assert council.list_releases() == []
+    assert council.get_active_release() is None
+    with pytest.raises(KeyError):
+        council.run_holdout_benchmark("missing")
+    with pytest.raises(KeyError):
+        council.sign_release("missing", "CTO_ARCH", "bot-cto")
+    with pytest.raises(KeyError):
+        council.promote_release_zero_downtime("missing")
+
+
 def test_council_holdout_benchmark_and_3_signature_release():
     council = QualityCouncilQuorumEngine()
 
@@ -243,42 +255,43 @@ def test_council_holdout_benchmark_and_3_signature_release():
         diff_content="git diff unified content for v2.2.0 release candidate",
     )
     assert candidate.status == "staged"
+    assert candidate.evidence_kind == "unknown"
+    with pytest.raises(ValueError, match="Invalid signatory role"):
+        council.sign_release(candidate.release_id, "INVALID", "untrusted")
 
-    # Cannot promote without signatures
-    try:
+    with pytest.raises(PermissionError, match="deployment adapter"):
         council.promote_release_zero_downtime(candidate.release_id)
-        assert False, "Should have raised PermissionError due to incomplete quorum"
-    except PermissionError as e:
-        assert "Quorum incomplete" in str(e)
 
-    # 2. Run Holdout Benchmark
     score = council.run_holdout_benchmark(candidate.release_id)
+    assert isinstance(score, float)
     assert score >= 90.0
-    assert candidate.holdout_passed is True
-    # Verify SWE_BENCHMARK signature was attached
-    sig_roles = {s.signatory_role for s in candidate.signatures}
-    assert "SWE_BENCHMARK" in sig_roles
+    assert candidate.holdout_passed is False
+    assert candidate.preview_holdout_passed is True
+    assert candidate.signatures == []
+    assert candidate.evidence_kind == "simulated"
 
-    # 3. Lead Architect CTO Signs
-    council.sign_release(candidate.release_id, "CTO_ARCH", "bot-cto")
-    # 4. Security Director CISO Signs
-    council.sign_release(candidate.release_id, "CISO_ASTRA", "bot-ciso")
+    for role, bot in [("CTO_ARCH", "bot-cto"), ("CISO_ASTRA", "bot-ciso"), ("SWE_BENCHMARK", "bot-perf-lead")]:
+        before = candidate.model_dump()
+        with pytest.raises(PermissionError, match="trusted signing authority"):
+            council.sign_release(candidate.release_id, role, bot)
+        assert candidate.model_dump() == before
 
-    # Verify All 3 Signatures Present
-    assert candidate.status == "multi_sig_verified"
+    assert candidate.status == "preview"
+    with pytest.raises(PermissionError):
+        council.promote_release_zero_downtime(candidate.release_id)
+    assert candidate.promoted_at is None
+    assert candidate.deployed is False
+    assert council.get_active_release("enterprise-core") is None
+    payload = candidate.model_dump(mode="json")
+    from deerflow.enterprise.council import PreviewReleaseCandidate
 
-    # 5. Zero-Downtime Hot-Swap Promotion
-    promoted = council.promote_release_zero_downtime(candidate.release_id)
-    assert promoted.status == "promoted_active"
-    assert promoted.promoted_at is not None
-
-    active_release = council.get_active_release("enterprise-core")
-    assert active_release.version == "v2.2.0"
+    assert PreviewReleaseCandidate.model_validate(payload).model_dump(mode="json") == payload
 
 
 # ============================================================================
 # 6. Cyclic Heartbeat & Continuous Telemetry Tests
 # ============================================================================
+
 
 def test_enterprise_heartbeat_coordinator_and_telemetry():
     coordinator = EnterpriseHeartbeatCoordinator()
@@ -301,6 +314,7 @@ def test_enterprise_heartbeat_coordinator_and_telemetry():
 # ============================================================================
 # 7. Gateway REST API Integration Tests
 # ============================================================================
+
 
 def test_enterprise_gateway_api():
     app = FastAPI()
@@ -369,7 +383,8 @@ def test_enterprise_gateway_api():
     # 5. Council releases
     res_rels = client.get("/api/enterprise/council/releases")
     assert res_rels.status_code == 200
-    assert len(res_rels.json()) >= 1
+    assert isinstance(res_rels.json(), list)
+    assert all(release["status"] != "promoted_active" for release in res_rels.json())
 
     # 6. Heartbeat and telemetry
     res_hb = client.post("/api/enterprise/heartbeat")
@@ -385,8 +400,8 @@ def test_enterprise_gateway_api():
 # 8. Advanced Edge Case Tests
 # ============================================================================
 
-def test_holdout_benchmark_updates_quorum_when_run_last():
-    """Verify that if CTO and CISO sign first, running holdout benchmark last triggers quorum."""
+
+def test_holdout_preview_clears_stale_quorum():
     council = QualityCouncilQuorumEngine()
     candidate = council.stage_candidate_release(
         version="v2.3.0",
@@ -394,20 +409,25 @@ def test_holdout_benchmark_updates_quorum_when_run_last():
         description="Candidate where benchmark runs last",
         diff_content="sample diff content for v2.3.0",
     )
-    # CTO signs
-    council.sign_release(candidate.release_id, "CTO_ARCH", "bot-cto")
+    from deerflow.enterprise.models import CryptographicSignature
+
+    candidate.signatures = [CryptographicSignature(signatory_role=role, signatory_bot="untrusted", signature_hash="invalid", payload_digest=candidate.diff_hash, verified=True) for role in ("CTO_ARCH", "CISO_ASTRA", "SWE_BENCHMARK")]
+    candidate.status = "multi_sig_verified"
+    candidate.holdout_passed = True
+    candidate.architecture_approved = True
+    candidate.security_scan_passed = True
+    with pytest.raises(PermissionError):
+        council.promote_release_zero_downtime(candidate.release_id)
     assert candidate.status == "staged"
-    # CISO signs
-    council.sign_release(candidate.release_id, "CISO_ASTRA", "bot-ciso")
-    assert candidate.status == "staged"
-    # SWE benchmark runs last
     score = council.run_holdout_benchmark(candidate.release_id)
     assert score >= 90.0
-    # Quorum MUST now be updated to multi_sig_verified
-    assert candidate.status == "multi_sig_verified"
-    # Can promote
-    promoted = council.promote_release_zero_downtime(candidate.release_id)
-    assert promoted.status == "promoted_active"
+    assert candidate.status == "preview"
+    assert candidate.signatures == []
+    assert not candidate.holdout_passed
+    assert not candidate.architecture_approved
+    assert not candidate.security_scan_passed
+    assert candidate.promoted_at is None
+    assert council.get_active_release() is None
 
 
 def test_dag_sprint_dependency_isolation_between_layers():

@@ -264,3 +264,22 @@ never merge repos, never import `src/**` across boundaries.
 | `adk-python-ref` | Orchestration alt | Graph workflows + eval/deployment patterns |
 | Operator's `hermes-asi-master` | Skills, GEPA, verification | `skills/07-search-optimized`, `09-github-advanced` → `skills/public/`; GEPA loop → Phase F2; 5-gate pipeline → Phase D |
 | Operator's `hermes-harness-repo` / `hermes-agi-asi-harness` | Registry, benchmarks, control plane | `capability_registry.py` → console; `benchmarks/` → Phase F1; `continuous_dev.py` → nightly CI job, not runtime |
+
+## 2026-09-17 — Docs re-apply merge entry (ULT + REBRAND into main, docs only)
+
+Docs-only re-application after prior docs edits were wiped (LICENSE restoration
+verified intact via `git hash-object LICENSE` = `git rev-parse 52229a6c^:LICENSE`;
+no code, frontend, config, skills, or env changes in this pass; no test runs; no commits).
+
+Ported scopes (docs only, incl. recovery): Union Alpha configuration baseline +
+cognitive-memory owner contract (`AGENTS.md` before Cross-Cutting Conventions),
+Union Alpha model configuration (`README.md`), Display-Identity contract
+(`backend/AGENTS.md`), owner-scoped goals contract
+(`backend/packages/harness/deerflow/goals/AGENTS.md`, verified identical to ULT
+source so no copy was needed), root `verify` script (`package.json`), and
+recovery-policy scope notes. Sources: `deer-flow-ultimate-harness` (ULT) and
+`rebrand-wt` (REBRAND Display-Identity hunk).
+
+Deferred (not ported in this docs pass): profile.py / templates.py /
+full-skills-pack, durable queue, sandbox-backed jobs, multi-process coherence,
+live inference, browser E2E.

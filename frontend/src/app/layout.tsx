@@ -1,9 +1,10 @@
 ﻿import type { Metadata } from "next";
+import { branding } from "@/lib/branding";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "DeerFlow AI - Lightweight Workspace",
-  description: "High-performance, clean AI chat studio",
+  title: branding.name,
+  description: branding.description,
 };
 
 export default function RootLayout({

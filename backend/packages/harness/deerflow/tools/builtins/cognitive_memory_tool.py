@@ -11,23 +11,36 @@ Enables agents to:
 from __future__ import annotations
 
 import json
-import logging
-from typing import Any
+from collections.abc import Mapping
 
 from langchain.tools import tool
 
 from deerflow.memory.cognitive import (
     HybridRecallQuery,
-    TraceOutcome,
     get_cognitive_memory_system,
 )
+from deerflow.runtime.user_context import (
+    _user_id_from_auth_user,
+    _user_id_from_langgraph_auth,
+    get_current_user,
+    resolve_runtime_user_id,
+)
+from deerflow.tools.types import Runtime
 
-logger = logging.getLogger(__name__)
+
+def _cognitive_runtime_owner(runtime: Runtime | None) -> str:
+    context = getattr(runtime, "context", None)
+    context_owner = context.get("user_id") if isinstance(context, Mapping) else None
+    server_owner = _user_id_from_auth_user(getattr(getattr(runtime, "server_info", None), "user", None))
+    if not server_owner and not _user_id_from_langgraph_auth() and not context_owner and get_current_user() is None:
+        raise RuntimeError("Cognitive memory requires an owner")
+    return resolve_runtime_user_id(runtime)
 
 
 @tool("cognitive_memory_tool", parse_docstring=True)
 def cognitive_memory_tool(
     action: str,
+    runtime: Runtime,
     query: str = "",
     subject: str = "",
     predicate: str = "",
@@ -59,7 +72,12 @@ def cognitive_memory_tool(
         error_context: Optional error message or traceback for 'record_step' on failure.
         limit: Maximum results to return for 'recall' or 'lookup_skill' (default: 5).
     """
-    system = get_cognitive_memory_system()
+    system = get_cognitive_memory_system(user_id=_cognitive_runtime_owner(runtime))
+    with system.operation():
+        return _execute_cognitive_action(system, action, query, subject, predicate, object_val, confidence, observation, outcome, error_context, limit)
+
+
+def _execute_cognitive_action(system, action, query, subject, predicate, object_val, confidence, observation, outcome, error_context, limit):
     act = action.strip().lower()
 
     if act == "recall":
@@ -67,11 +85,14 @@ def cognitive_memory_tool(
             return json.dumps({"error": "Query string is required for recall action."})
         recall_query = HybridRecallQuery(query=query.strip(), limit=min(limit, 20))
         results = system.recall(recall_query)
-        return json.dumps({
-            "query": query.strip(),
-            "count": len(results),
-            "results": [r.to_dict() for r in results],
-        }, indent=2)
+        return json.dumps(
+            {
+                "query": query.strip(),
+                "count": len(results),
+                "results": [r.to_dict() for r in results],
+            },
+            indent=2,
+        )
 
     elif act == "store_belief":
         if not subject.strip() or not predicate.strip() or not object_val.strip():
@@ -84,34 +105,40 @@ def cognitive_memory_tool(
             tags=["agent_inferred"],
         )
         system.save_to_disk()
-        return json.dumps({
-            "status": "stored",
-            "node_id": node.node_id,
-            "statement": node.statement,
-            "status_code": node.status.value,
-            "confidence": node.confidence,
-        }, indent=2)
+        return json.dumps(
+            {
+                "status": "stored",
+                "node_id": node.node_id,
+                "statement": node.statement,
+                "status_code": node.status.value,
+                "confidence": node.confidence,
+            },
+            indent=2,
+        )
 
     elif act == "lookup_skill":
         context = query.strip() or f"{subject} {predicate} {object_val}".strip()
         if not context:
             return json.dumps({"error": "Query or context is required for lookup_skill."})
         matches = system.procedural_mem.find_matching_skills(context, limit=min(limit, 10))
-        return json.dumps({
-            "context": context,
-            "count": len(matches),
-            "skills": [
-                {
-                    "name": s[0].name,
-                    "description": s[0].description,
-                    "match_score": round(s[1], 3),
-                    "steps": s[0].steps,
-                    "code_snippet": s[0].code_snippet,
-                    "success_rate": round(s[0].success_rate, 3),
-                }
-                for s in matches
-            ],
-        }, indent=2)
+        return json.dumps(
+            {
+                "context": context,
+                "count": len(matches),
+                "skills": [
+                    {
+                        "name": s[0].name,
+                        "description": s[0].description,
+                        "match_score": round(s[1], 3),
+                        "steps": s[0].steps,
+                        "code_snippet": s[0].code_snippet,
+                        "success_rate": round(s[0].success_rate, 3),
+                    }
+                    for s in matches
+                ],
+            },
+            indent=2,
+        )
 
     elif act == "record_step":
         action_text = query.strip()
@@ -125,12 +152,15 @@ def cognitive_memory_tool(
             tags=["runtime_turn"],
         )
         system.save_to_disk()
-        return json.dumps({
-            "status": "recorded",
-            "trace_id": trace.trace_id,
-            "outcome": trace.outcome.value,
-            "salience": trace.salience,
-        }, indent=2)
+        return json.dumps(
+            {
+                "status": "recorded",
+                "trace_id": trace.trace_id,
+                "outcome": trace.outcome.value,
+                "salience": trace.salience,
+            },
+            indent=2,
+        )
 
     elif act == "overview":
         return json.dumps(system.overview(), indent=2)

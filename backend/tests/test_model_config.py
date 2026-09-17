@@ -1,4 +1,7 @@
+from pathlib import Path
+
 import pytest
+import yaml
 from pydantic import ValidationError
 
 from deerflow.config.model_config import ModelConfig
@@ -41,3 +44,23 @@ def test_context_window_round_trips_when_positive():
 def test_context_window_rejects_non_positive_capacity(context_window):
     with pytest.raises(ValidationError, match="context_window"):
         _make_model(context_window=context_window)
+
+
+def test_union_alpha_example_uses_verified_openrouter_contract():
+    example_path = Path(__file__).resolve().parents[2] / "config.example.yaml"
+    data = yaml.safe_load(example_path.read_text(encoding="utf-8"))
+    assert data["models"], "The example must provide the Union Alpha model configuration"
+    model = ModelConfig.model_validate(data["models"][0])
+    assert model.name == "union-alpha"
+    assert model.model == "stealth/union-alpha"
+    assert model.use == "langchain_openai:ChatOpenAI"
+    assert model.context_window == 262144
+    assert model.supports_vision is True
+    assert model.supports_thinking is False
+    assert model.supports_reasoning_effort is False
+    assert model.use_responses_api is False
+    assert model.fallbacks == []
+    settings = model.model_dump()
+    assert settings["base_url"] == "https://openrouter.ai/api/v1"
+    assert settings["api_key"] == "$OPENROUTER_API_KEY"
+    assert settings["max_tokens"] == 16384

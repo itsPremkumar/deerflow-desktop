@@ -42,6 +42,7 @@ from app.gateway.csrf_middleware import CSRF_COOKIE_NAME, CSRF_HEADER_NAME, gene
 from app.gateway.github import run_policy as _github_run_policy  # noqa: F401
 from app.gateway.internal_auth import create_internal_auth_headers
 from app.gateway.path_utils import resolve_outputs_confined_path
+from deerflow.branding import DISPLAY_NAME
 from deerflow.config.agents_config import list_custom_agents, load_agent_config
 from deerflow.config.paths import make_safe_user_id
 from deerflow.runtime import END_SENTINEL, StreamBridge
@@ -85,8 +86,8 @@ STREAM_UPDATE_MIN_CHARS = 60  # flush immediately when this many chars accumulat
 STREAM_MODES = ["messages-tuple", "values"]
 MESSAGE_STREAM_EVENTS = ("messages-tuple", "messages")
 THREAD_BUSY_MESSAGE = "This conversation is already processing another request. Please wait for it to finish and try again."
-BOUND_IDENTITY_REQUIRED_MESSAGE = "Connect this channel from DeerFlow Settings, complete the in-channel connect step, then send your message again."
-BOUND_IDENTITY_UNAVAILABLE_MESSAGE = "Channel connection verification is temporarily unavailable. Please try again later or contact the DeerFlow operator."
+BOUND_IDENTITY_REQUIRED_MESSAGE = f"Connect this channel from {DISPLAY_NAME} Settings, complete the in-channel connect step, then send your message again."
+BOUND_IDENTITY_UNAVAILABLE_MESSAGE = f"Channel connection verification is temporarily unavailable. Please try again later or contact the {DISPLAY_NAME} operator."
 # Inbound-redelivery dedup window. The dedupe state lives in
 # ``self._inbound_dedupe_store``: the default in-process Memory store is
 # local to this Gateway process (a recorded key survives only for the store's

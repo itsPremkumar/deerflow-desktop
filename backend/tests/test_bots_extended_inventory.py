@@ -222,7 +222,9 @@ def test_work_discovery_capability_matching():
     )
     assert len(matches) > 0
     top_bot = matches[0]
-    assert top_bot["bot_name"] in ("coder", "architect")
+    # SQL-optimization tasks rank the SQL specialist (data-analyst) first,
+    # ahead of the generalist coders — the expanded default roster at work.
+    assert top_bot["bot_name"] in ("coder", "architect", "data-analyst")
     assert top_bot["match_score"] > 0.3
 
 

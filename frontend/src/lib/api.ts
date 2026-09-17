@@ -1,12 +1,12 @@
 import { ChatMessage, Thread, AIModel, SlashCommandInfo, SlashCommandResult, AutonomousDetection } from "@/types/chat";
 
-const BASE_URL = process.env.NEXT_PUBLIC_GATEWAY_URL || "/api/gateway";
+import { apiFetch } from "./api-client";
 
 export async function fetchThreads(limit = 100): Promise<Thread[]> {
   try {
     // Backend has no GET /threads — listing lives at POST /threads/search,
     // which returns a bare array of ThreadResponse records.
-    const res = await fetch(`${BASE_URL}/threads/search`, {
+    const res = await apiFetch(`/threads/search`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ limit }),
@@ -46,7 +46,7 @@ export async function createThread(title?: string, opts?: CreateThreadOptions): 
     ...(opts?.botName ? { assistant_id: opts.botName } : {}),
     ...(opts?.projectId ? { project_id: opts.projectId } : {}),
   };
-  const res = await fetch(`${BASE_URL}/threads`, {
+  const res = await apiFetch(`/threads`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
@@ -83,7 +83,7 @@ export async function fetchThreadHistory(threadId: string): Promise<ChatMessage[
   try {
     // GET /threads/{id}/messages returns a bare array of run-event rows:
     // {seq, run_id, event_type, category, content: {type, content, ...}, created_at, feedback?}
-    const res = await fetch(`${BASE_URL}/threads/${threadId}/messages?limit=100`);
+    const res = await apiFetch(`/threads/${encodeURIComponent(threadId)}/messages?limit=100`);
     if (!res.ok) return [];
     const data = await res.json();
     const messages = Array.isArray(data) ? data : data.messages || [];
@@ -150,7 +150,7 @@ export async function fetchThreadHistory(threadId: string): Promise<ChatMessage[
 
 export async function fetchAvailableModels(): Promise<AIModel[]> {
   try {
-    const res = await fetch(`${BASE_URL}/models`);
+    const res = await apiFetch(`/models`);
     if (!res.ok) throw new Error("Models endpoint error");
     const data = await res.json();
     return (data.models || []).map((m: any) => ({
@@ -171,7 +171,7 @@ export async function fetchCommands(category?: string, coreOnly?: boolean): Prom
     const params = new URLSearchParams();
     if (category) params.append("category", category);
     if (coreOnly) params.append("core_only", "true");
-    const res = await fetch(`/api/commands?${params.toString()}`);
+    const res = await apiFetch(`/api/commands?${params.toString()}`);
     if (!res.ok) return [];
     const data = await res.json();
     return data.commands || [];
@@ -182,7 +182,7 @@ export async function fetchCommands(category?: string, coreOnly?: boolean): Prom
 
 export async function searchCommands(q: string): Promise<SlashCommandInfo[]> {
   try {
-    const res = await fetch(`/api/commands/search?q=${encodeURIComponent(q)}`);
+    const res = await apiFetch(`/api/commands/search?q=${encodeURIComponent(q)}`);
     if (!res.ok) return [];
     const data = await res.json();
     return data.commands || [];
@@ -195,7 +195,7 @@ export async function executeSlashCommand(
   command: string,
   context?: Record<string, unknown>
 ): Promise<SlashCommandResult> {
-  const res = await fetch(`/api/commands/execute`, {
+  const res = await apiFetch(`/api/commands/execute`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ command, context }),
@@ -212,7 +212,7 @@ export async function autoTriggerCommand(
   autoExecute: boolean = true,
   context?: Record<string, unknown>
 ): Promise<AutonomousDetection> {
-  const res = await fetch(`/api/commands/auto-trigger`, {
+  const res = await apiFetch(`/api/commands/auto-trigger`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ prompt, phase, auto_execute: autoExecute, context }),

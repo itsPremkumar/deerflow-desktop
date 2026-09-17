@@ -54,6 +54,7 @@ from app.channels.buzz_seen_events import BuzzSeenEventStore
 from app.channels.commands import is_known_channel_command
 from app.channels.connection_identity import attach_connection_identity
 from app.channels.message_bus import InboundMessage, InboundMessageType, InboundQueueFullError, MessageBus, OutboundMessage
+from deerflow.branding import DISPLAY_NAME
 
 logger = logging.getLogger(__name__)
 
@@ -174,7 +175,7 @@ _PERMANENT_CLOSE_MARKERS = ("revoke", "not a member", "not a channel member", "n
 # templates in wecom.py / feishu.py / dingtalk.py / wechat.py), substituting
 # "Buzz" for the platform name.
 _CONNECT_REPLY_TEXT = {
-    "success": "Buzz connected to DeerFlow.",
+    "success": f"Buzz connected to {DISPLAY_NAME}.",
     "invalid": "Buzz connection code is invalid or expired.",
     "error": "Buzz connection could not be completed from this message.",
 }

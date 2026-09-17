@@ -7,17 +7,22 @@ Sleep/Dream Consolidation, and Hybrid Retrieval into a unified, durable engine.
 
 from __future__ import annotations
 
+import copy
 import json
 import logging
+import os
+import tempfile
+from contextlib import contextmanager
 from pathlib import Path
+from threading import RLock
 from typing import Any
 
+from deerflow.config.paths import get_paths
 from deerflow.memory.cognitive.associative_memory import AssociativeNetwork
 from deerflow.memory.cognitive.consolidation import CognitiveConsolidationEngine
 from deerflow.memory.cognitive.episodic_memory import EpisodicMemoryEngine
 from deerflow.memory.cognitive.models import (
     BeliefStatus,
-    CognitiveTier,
     ConsolidationReport,
     HybridRecallQuery,
     ScoredMemoryItem,
@@ -28,6 +33,7 @@ from deerflow.memory.cognitive.retrieval import HybridCognitiveRetriever
 from deerflow.memory.cognitive.semantic_graph import SemanticBeliefGraph
 from deerflow.memory.cognitive.spatio_temporal import SpatioTemporalMemory
 from deerflow.memory.cognitive.working_memory import WorkingMemoryEngine
+from deerflow.runtime.user_context import require_current_user
 
 logger = logging.getLogger(__name__)
 
@@ -35,8 +41,11 @@ logger = logging.getLogger(__name__)
 class CognitiveMemorySystem:
     """Master production-grade cognitive memory system for frontier autonomous agents."""
 
-    def __init__(self, storage_dir: Path | None = None) -> None:
-        self.storage_dir = storage_dir or Path(".deer-flow/cognitive_memory")
+    def __init__(self, storage_dir: Path | None = None, *, user_id: str | None = None) -> None:
+        if storage_dir is not None and user_id is not None:
+            raise ValueError("Pass storage_dir or user_id, not both")
+        self.storage_dir = Path(storage_dir).resolve() if storage_dir is not None else _owner_storage_dir(user_id)
+        self.lock = RLock()
         self.working_mem = WorkingMemoryEngine()
         self.episodic_mem = EpisodicMemoryEngine()
         self.semantic_graph = SemanticBeliefGraph()
@@ -107,22 +116,42 @@ class CognitiveMemorySystem:
 
     def save_to_disk(self) -> None:
         """Persist state cleanly to storage directory."""
-        try:
+        with self.lock:
             self.storage_dir.mkdir(parents=True, exist_ok=True)
             snapshot = {
                 "version": "2.1",
                 "semantic_nodes": [n.to_dict() for n in self.semantic_graph.list_nodes(limit=2000)],
                 "semantic_edges": [e.to_dict() for e in self.semantic_graph._edges.values()],
-                "procedural_skills": [s.to_dict() for s in self.procedural_mem.list_skills(limit=500)],
-                "spatio_temporal_events": [e.to_dict() for e in self.spatio_temporal.list_events(limit=500)],
-                "episodic_traces": [t.to_dict() for t in self.episodic_mem.list_traces(limit=1000)],
-                "hierarchical_episodes": [ep.to_dict() for ep in self.episodic_mem.list_episodes(limit=200)],
-                "associative_links": [l.to_dict() for l in self.assoc_net._links.values()],
+                "procedural_skills": [s.to_dict() for s in self.procedural_mem._skills.values()],
+                "spatio_temporal_events": [e.to_dict() for e in self.spatio_temporal._events.values()],
+                "episodic_traces": [t.to_dict() for t in self.episodic_mem._traces.values()],
+                "hierarchical_episodes": [ep.to_dict() for ep in self.episodic_mem._episodes.values()],
+                "associative_links": [link.to_dict() for link in self.assoc_net._links.values()],
             }
+            payload = json.dumps(snapshot, indent=2, allow_nan=False)
             target_path = self.storage_dir / "cognitive_state.json"
-            target_path.write_text(json.dumps(snapshot, indent=2), encoding="utf-8")
-        except Exception as e:
-            logger.warning("Failed to persist cognitive memory: %s", e)
+            temporary_path = None
+            try:
+                with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", dir=self.storage_dir, prefix=".cognitive-", suffix=".tmp", delete=False) as temporary:
+                    temporary_path = Path(temporary.name)
+                    temporary.write(payload)
+                    temporary.flush()
+                    os.fsync(temporary.fileno())
+                os.replace(temporary_path, target_path)
+            finally:
+                if temporary_path is not None:
+                    temporary_path.unlink(missing_ok=True)
+
+    @contextmanager
+    def operation(self):
+        with self.lock:
+            state = copy.deepcopy({key: value for key, value in vars(self).items() if key not in {"lock", "storage_dir"}})
+            try:
+                yield self
+            except BaseException:
+                for key, value in state.items():
+                    setattr(self, key, value)
+                raise
 
     def _load_or_bootstrap(self) -> None:
         """Load persisted state or bootstrap with frontier defaults."""
@@ -227,8 +256,9 @@ class CognitiveMemorySystem:
                     )
                 logger.info("Loaded persisted cognitive memory from %s", target_path)
                 return
-            except Exception as e:
-                logger.warning("Failed to load cognitive state, bootstrapping defaults: %s", e)
+            except Exception:
+                logger.error("Failed to load cognitive state")
+                raise
 
         # Bootstrap Frontier Cognitive Knowledge
         self._bootstrap_defaults()
@@ -310,12 +340,43 @@ class CognitiveMemorySystem:
         )
 
 
-_global_cognitive_system: CognitiveMemorySystem | None = None
+_MAX_OWNER_SYSTEMS = 128
+_owner_systems: dict[tuple[str, Path], CognitiveMemorySystem] = {}
+_owner_systems_lock = RLock()
 
 
-def get_cognitive_memory_system(storage_dir: Path | None = None) -> CognitiveMemorySystem:
-    """Singleton provider for CognitiveMemorySystem."""
-    global _global_cognitive_system
-    if _global_cognitive_system is None:
-        _global_cognitive_system = CognitiveMemorySystem(storage_dir=storage_dir)
-    return _global_cognitive_system
+def _evict_lru_owner_system() -> None:
+    for key, system in _owner_systems.items():
+        if system.lock._is_owned() or not system.lock.acquire(blocking=False):
+            continue
+        try:
+            del _owner_systems[key]
+            return
+        finally:
+            system.lock.release()
+    raise RuntimeError("Cognitive memory owner cache is busy")
+
+
+def _owner_storage_dir(user_id: str | None) -> Path:
+    owner = str(require_current_user().id) if user_id is None else user_id
+    if not isinstance(owner, str) or not owner.strip():
+        raise ValueError("Cognitive memory requires an owner")
+    return (get_paths().user_dir(owner) / "cognitive_memory").absolute()
+
+
+def get_cognitive_memory_system(storage_dir: Path | None = None, *, user_id: str | None = None) -> CognitiveMemorySystem:
+    """Return an owner-scoped process cache or an independent explicit-path instance."""
+    if storage_dir is not None:
+        return CognitiveMemorySystem(storage_dir=storage_dir, user_id=user_id)
+    owner = str(require_current_user().id) if user_id is None else user_id
+    directory = _owner_storage_dir(owner)
+    key = (owner, directory)
+    with _owner_systems_lock:
+        if key in _owner_systems:
+            system = _owner_systems.pop(key)
+        else:
+            while len(_owner_systems) >= _MAX_OWNER_SYSTEMS:
+                _evict_lru_owner_system()
+            system = CognitiveMemorySystem(storage_dir=directory)
+        _owner_systems[key] = system
+        return system

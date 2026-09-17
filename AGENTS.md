@@ -235,6 +235,33 @@ cd frontend && pnpm rstest run <pattern>     # e.g. pnpm rstest run my-component
 - Changes → **[CHANGELOG.md](CHANGELOG.md)**
 - Cutting a release → **[RELEASING.md](RELEASING.md)**
 
+## Union Alpha configuration baseline
+
+The first model in `config.example.yaml` is `union-alpha`, using
+`langchain_openai:ChatOpenAI`, OpenRouter's `stealth/union-alpha` API slug, and
+`$OPENROUTER_API_KEY`. Do not use the CLI-qualified
+`openrouter/stealth/union-alpha` as the OpenRouter API slug. Catalog metadata
+was checked on 2026-09-17; live account access is not established. The offline
+contract is pinned by `backend/tests/test_model_config.py`.
+
+The current frontend package declares `pnpm typecheck`, but does not declare
+`pnpm check`, lint, or test scripts. Older command examples above describe the
+previous frontend and are not verified gates for this checkout. Restore those
+scripts and their tests before treating inherited CI workflows as working.
+
+## Cognitive-memory owner contract
+
+Production cognitive memory requires a server-resolved owner and stores state
+under `Paths.user_dir(owner) / "cognitive_memory"` (`users/{owner}/cognitive_memory`).
+`backend/packages/harness/deerflow/memory/cognitive/engine.py:41` owns the per-owner,
+per-directory process cache, locks and atomic fsync-backed snapshots; missing
+owners and corrupt-state load failures fail closed. Explicit `storage_dir`
+instances stay independent of the cache. Retained persistent records, not display
+pages, belong in snapshots; working memory stays ephemeral. These locks do not
+provide multi-process coherence. Keep HTTP/model-supplied owners and paths out of
+this boundary; see `backend/packages/harness/deerflow/memory/cognitive/AGENTS.md`
+for the detailed contract and current semantic-capacity caveat.
+
 ## Cross-Cutting Conventions
 
 These apply repo-wide; module guides own the module-specific detail.

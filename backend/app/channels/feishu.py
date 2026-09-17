@@ -24,6 +24,7 @@ from app.channels.message_bus import (
     ResolvedAttachment,
 )
 from app.channels.sandbox_files import sync_file_to_thread_sandbox
+from deerflow.branding import DISPLAY_NAME
 from deerflow.config.paths import VIRTUAL_PATH_PREFIX, get_paths
 from deerflow.runtime.user_context import get_effective_user_id
 from deerflow.sandbox.sandbox_provider import get_sandbox_provider
@@ -1050,7 +1051,7 @@ class FeishuChannel(Channel):
             },
             status="connected",
         )
-        await self._reply_card(message_id, "Feishu connected to DeerFlow.")
+        await self._reply_card(message_id, f"Feishu connected to {DISPLAY_NAME}.")
         return True
 
     def _on_message(self, event) -> None:

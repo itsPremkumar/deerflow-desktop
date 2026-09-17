@@ -17,6 +17,7 @@ from app.channels.runtime_config_store import (
     merge_runtime_channel_configs,
 )
 from app.gateway.deps import require_admin_user
+from deerflow.branding import DISPLAY_NAME
 from deerflow.config.channel_connections_config import ChannelConnectionsConfig
 from deerflow.persistence.channel_connections import ChannelConnectionRepository
 from deerflow.persistence.engine import get_session_factory
@@ -352,11 +353,11 @@ async def _create_state(
 
 def _connect_instruction(provider: str, code: str) -> str:
     if provider == "telegram":
-        return f"Send /start {code} to the DeerFlow Telegram bot."
+        return f"Send /start {code} to the {DISPLAY_NAME} Telegram bot."
     meta = _PROVIDER_META.get(provider)
     if meta is None:
         raise HTTPException(status_code=404, detail="Unknown channel provider")
-    return f"Send /connect {code} to the DeerFlow {meta['display_name']} bot."
+    return f"Send /connect {code} to the {DISPLAY_NAME} {meta['display_name']} bot."
 
 
 def _connect_url(config: ChannelConnectionsConfig, provider: str, code: str) -> str | None:

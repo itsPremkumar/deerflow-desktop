@@ -37,6 +37,7 @@ from app.gateway.routers import (
     features,
     feedback,
     github_webhooks,
+    goal_contracts,
     goal_integrity,
     groups,
     input_polish,
@@ -67,6 +68,7 @@ from app.gateway.routers import (
 )
 from app.gateway.security_headers_middleware import SecurityHeadersMiddleware
 from app.gateway.trace_middleware import TraceMiddleware
+from deerflow.branding import DISPLAY_NAME
 from deerflow.config import app_config as deerflow_app_config
 from deerflow.logging_config import DEFAULT_LOG_DATE_FORMAT, DEFAULT_LOG_FORMAT, configure_logging
 from deerflow.tracing.monocle import setup_monocle_tracing_if_enabled
@@ -617,11 +619,11 @@ def create_app() -> FastAPI:
     openapi_url = "/openapi.json" if config.enable_docs else None
 
     app = FastAPI(
-        title="DeerFlow API Gateway",
-        description="""
-## DeerFlow API Gateway
+        title=f"{DISPLAY_NAME} API Gateway",
+        description=f"""
+## {DISPLAY_NAME} API Gateway
 
-API Gateway for DeerFlow - A LangGraph-based AI agent backend with sandbox execution capabilities.
+API Gateway for {DISPLAY_NAME} - A LangGraph-based AI agent backend with sandbox execution capabilities.
 
 ### Features
 
@@ -669,7 +671,7 @@ This gateway provides runtime endpoints for agent runs plus custom endpoints for
             },
             {
                 "name": "threads",
-                "description": "Manage DeerFlow thread-local filesystem data",
+                "description": "Manage thread-local filesystem data",
             },
             {
                 "name": "agents",
@@ -886,6 +888,7 @@ This gateway provides runtime endpoints for agent runs plus custom endpoints for
     app.include_router(deliberation.router)
     app.include_router(jobs.router)
     app.include_router(supervision.router)
+    app.include_router(goal_contracts.router)
     app.include_router(goal_integrity.router)
     app.include_router(a2a.router)
     app.include_router(company.router)

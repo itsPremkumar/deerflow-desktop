@@ -3,11 +3,17 @@
 from __future__ import annotations
 
 import logging
-from typing import Any
+from dataclasses import dataclass
 
 from deerflow.metacompiler.models import AgentBlueprint, BenchmarkScorecard
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class SimulatedBenchmarkScorecard(BenchmarkScorecard):
+    evidence_kind: str = "simulated"
+    preview_passed: bool = False
 
 
 class MetaBenchmarkHarness:
@@ -17,7 +23,7 @@ class MetaBenchmarkHarness:
     def evaluate_blueprint(
         candidate: AgentBlueprint,
         baseline_score: float = 0.80,
-    ) -> BenchmarkScorecard:
+    ) -> SimulatedBenchmarkScorecard:
         """Run synthetic evaluation suite against candidate architecture and compute Pareto metrics."""
         # Multi-dimensional benchmark scoring based on candidate configuration
         gen_boost = min(0.12, candidate.generation * 0.03)
@@ -58,27 +64,21 @@ class MetaBenchmarkHarness:
         robustness_score = min(0.99, robustness)
 
         # Weighted composite score
-        composite = (
-            (coding_score * 0.35)
-            + (reasoning_score * 0.25)
-            + (tool_accuracy * 0.20)
-            + (token_efficiency_score * 0.10)
-            + (robustness_score * 0.10)
-        )
+        composite = (coding_score * 0.35) + (reasoning_score * 0.25) + (tool_accuracy * 0.20) + (token_efficiency_score * 0.10) + (robustness_score * 0.10)
         composite_score = round(composite, 4)
 
         # Check regression gate against baseline
         passed = composite_score >= baseline_score and robustness_score >= 0.80
 
         details = [
-            {"suite": "SWE-Arena-Synthetic", "score": round(coding_score, 3), "status": "passed"},
-            {"suite": "Epistemic-Reasoning-Eval", "score": round(reasoning_score, 3), "status": "passed"},
-            {"suite": "Tool-Routing-Precision", "score": round(tool_accuracy, 3), "status": "passed"},
-            {"suite": "Token-Compaction-Efficiency", "score": round(token_efficiency_score, 3), "status": "passed"},
-            {"suite": "Loop-Robustness-Stress", "score": round(robustness_score, 3), "status": "passed"},
+            {"suite": "SWE-Arena-Synthetic", "score": round(coding_score, 3), "status": "simulated", "evidence_kind": "simulated"},
+            {"suite": "Epistemic-Reasoning-Eval", "score": round(reasoning_score, 3), "status": "simulated", "evidence_kind": "simulated"},
+            {"suite": "Tool-Routing-Precision", "score": round(tool_accuracy, 3), "status": "simulated", "evidence_kind": "simulated"},
+            {"suite": "Token-Compaction-Efficiency", "score": round(token_efficiency_score, 3), "status": "simulated", "evidence_kind": "simulated"},
+            {"suite": "Loop-Robustness-Stress", "score": round(robustness_score, 3), "status": "simulated", "evidence_kind": "simulated"},
         ]
 
-        return BenchmarkScorecard(
+        return SimulatedBenchmarkScorecard(
             blueprint_id=candidate.blueprint_id,
             generation=candidate.generation,
             coding_score=round(coding_score, 3),
@@ -87,6 +87,7 @@ class MetaBenchmarkHarness:
             token_efficiency_score=round(token_efficiency_score, 3),
             robustness_score=round(robustness_score, 3),
             composite_score=composite_score,
-            passed_regression_suite=passed,
+            passed_regression_suite=False,
             details=details,
+            preview_passed=passed,
         )

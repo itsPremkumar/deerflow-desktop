@@ -18,7 +18,6 @@ import {
   stepSprintDAG,
   runHoldoutBenchmark,
   signCouncilRelease,
-  promoteCouncilRelease,
   resetTreasuryCircuitBreaker,
   createEnterpriseRFC,
   submitRFCReview,
@@ -73,12 +72,12 @@ export function WarRoomSection() {
     setError(null);
     try {
       const [tel, hier, rfcList, treas, pipeline, rels] = await Promise.all([
-        fetchEnterpriseTelemetry().catch(() => null),
-        fetchEnterpriseHierarchy().catch(() => null),
-        fetchEnterpriseRFCs().catch(() => []),
-        fetchEnterpriseTreasury().catch(() => null),
-        fetchMissionPipeline().catch(() => ({ epics: [], sprints: [] })),
-        fetchCouncilReleases().catch(() => []),
+        fetchEnterpriseTelemetry(),
+        fetchEnterpriseHierarchy(),
+        fetchEnterpriseRFCs(),
+        fetchEnterpriseTreasury(),
+        fetchMissionPipeline(),
+        fetchCouncilReleases(),
       ]);
 
       if (tel) setTelemetry(tel);
@@ -151,19 +150,6 @@ export function WarRoomSection() {
     }
   };
 
-  const handlePromote = async (releaseId: string) => {
-    setActionLoading(true);
-    try {
-      await promoteCouncilRelease(releaseId);
-      const rels = await fetchCouncilReleases();
-      setReleases(rels);
-    } catch (e) {
-      setError(errMsg(e));
-    } finally {
-      setActionLoading(false);
-    }
-  };
-
   const handleResetCircuitBreaker = async (deptId: string) => {
     setActionLoading(true);
     try {
@@ -206,8 +192,8 @@ export function WarRoomSection() {
 
   return (
     <Section
-      title="Autonomous AI Software Enterprise War Room"
-      hint="Continuously discover feature gaps, optimize system latency, harden security boundaries, and execute continuous memory consolidation without stopping."
+      title="Enterprise War Room Preview"
+      hint="Synthetic enterprise telemetry, task progress, scores, and signatures are preview evidence only, not measured execution, security verification, or release authorization. Production promotion is unavailable."
       actions={
         <div className="flex items-center gap-2">
           <Btn variant="primary" onClick={handleHeartbeat} disabled={actionLoading}>
@@ -233,17 +219,17 @@ export function WarRoomSection() {
           <StatCard
             label="System Latency (p95)"
             value={`${telemetry.system_latency_p95_ms}ms`}
-            sub={telemetry.system_latency_p95_ms <= 60 ? "optimal" : "profiling"}
+            sub="Synthetic preview; not measured latency"
           />
           <StatCard
             label="Security Posture"
             value={`${telemetry.security_posture_score}%`}
-            sub="AST Sandbox Enforced"
+            sub="Synthetic preview; not a security audit"
           />
           <StatCard
             label="Holdout Benchmark"
             value={`${telemetry.holdout_pass_rate_percent}%`}
-            sub={telemetry.latest_release_version || "v2.1.0"}
+            sub="Synthetic preview; no release verified"
           />
           <StatCard
             label="Treasury Burn Rate"
@@ -728,7 +714,7 @@ export function WarRoomSection() {
           {subTab === "council" && (
             <div className="space-y-4">
               <p className="text-xs text-muted-foreground">
-                3-Signature Cryptographic Verification Protocol (Architecture + SWE Benchmark + Astra Security) before zero-downtime hot-swap promotion.
+                Preview signature records and synthetic benchmark scores do not verify a release. Measured evidence and a durable lifecycle API are required before promotion can be enabled.
               </p>
 
               <div className="grid grid-cols-1 gap-4">
@@ -745,15 +731,15 @@ export function WarRoomSection() {
                           <div className="flex items-center gap-2">
                             <h4 className="font-bold text-sm text-foreground">{rel.version}</h4>
                             <span className="text-xs text-muted-foreground">({rel.component})</span>
-                            <Badge tone={rel.status === "promoted_active" ? "green" : readyToPromote ? "indigo" : "amber"}>
-                              {rel.status.replace("_", " ").toUpperCase()}
+                            <Badge tone="gray">
+                              Preview: {rel.status.replaceAll("_", " ").toUpperCase()}
                             </Badge>
                           </div>
                           <p className="text-xs text-muted-foreground mt-0.5">{rel.description}</p>
                         </div>
                         {readyToPromote && (
-                          <Btn variant="primary" onClick={() => handlePromote(rel.release_id)} disabled={actionLoading}>
-                            <Sparkles className="size-3.5" /> Zero-Downtime Hot-Swap Promotion
+                          <Btn variant="primary" disabled title="Unavailable: measured backend evidence and a durable promotion API are required">
+                            <Sparkles className="size-3.5" /> Promotion unavailable
                           </Btn>
                         )}
                       </div>
@@ -761,7 +747,7 @@ export function WarRoomSection() {
                       {/* 3 Cryptographic Signatures Seals */}
                       <div>
                         <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground block mb-2">
-                          Multi-Signature Cryptographic Attestation
+                          Preview Signature Records (not cryptographic proof)
                         </span>
                         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                           {/* 1. Lead Architect CTO */}

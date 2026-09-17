@@ -1,8 +1,7 @@
-import pytest
-from deerflow.avo import AVOLineage, VersionRecord, EvaluationVector, get_avo_runner
-from deerflow.epistemics import EpistemicBeliefEngine, EpistemicStatus, get_epistemic_engine
-from deerflow.rsi import RSIEngine, RSIStage, get_rsi_engine
-from deerflow.trajectory.store import TrajectoryStore, get_trajectory_store
+from deerflow.avo import VersionRecord, get_avo_runner
+from deerflow.epistemics import EpistemicStatus, get_epistemic_engine
+from deerflow.rsi import RSIStage, get_rsi_engine
+from deerflow.trajectory.store import get_trajectory_store
 
 
 def test_avo_lineage_and_pareto():
@@ -74,7 +73,8 @@ def test_rsi_closed_loop_execution():
     engine = get_rsi_engine("test_proj_rsi")
     result = engine.run_rsi_cycle(bottleneck="High token consumption in prompt templates", target_component="compaction")
 
-    assert result.stage in {RSIStage.PROMOTED, RSIStage.ROLLED_BACK}
+    assert result.stage == RSIStage.PREVIEW
+    assert result.promoted is False
     assert result.hypothesis is not None
     assert result.candidate is not None
     assert result.ab_test is not None
@@ -87,6 +87,7 @@ def test_rsi_closed_loop_execution():
 
 def test_trajectory_time_travel_and_replay():
     import uuid
+
     store = get_trajectory_store("test_proj_traj")
     goal = f"test_deploy_{uuid.uuid4().hex[:6]}"
 

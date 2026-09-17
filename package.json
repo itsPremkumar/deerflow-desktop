@@ -9,6 +9,7 @@
     "stop": "powershell -ExecutionPolicy Bypass -File ./stop.ps1",
     "install:all": "powershell -ExecutionPolicy Bypass -File ./install.ps1",
     "doctor": "uv run --project backend python scripts/doctor.py",
-    "prod-check": "uv run --project backend python scripts/prod_check.py"
+    "prod-check": "uv run --project backend python scripts/prod_check.py",
+    "verify": "pnpm -C frontend verify"
   }
 }

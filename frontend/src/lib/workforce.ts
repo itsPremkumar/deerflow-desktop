@@ -526,9 +526,9 @@ export async function addEpistemicEvidence(
 
 export async function triggerRSICycle(
   projectId: string,
-  payload: { bottleneck: string; target_component?: string; force_promote?: boolean }
+  payload: { bottleneck: string; target_component?: string }
 ): Promise<Record<string, unknown>> {
-  return send(`/projects/${enc(projectId)}/rsi/cycle`, "POST", payload);
+  return send(`/projects/${enc(projectId)}/rsi/cycle`, "POST", { bottleneck: payload.bottleneck, target_component: payload.target_component, force_promote: false });
 }
 
 export async function replayTrajectory(
@@ -692,10 +692,9 @@ export async function benchmarkBlueprint(
 
 export async function hotswapBlueprint(
   projectId: string,
-  blueprintId: string,
-  force = false
+  blueprintId: string
 ): Promise<HotSwapOutcome> {
-  return send(`/projects/${enc(projectId)}/meta-compiler/hotswap`, "POST", { blueprint_id: blueprintId, force });
+  return send(`/projects/${enc(projectId)}/meta-compiler/hotswap`, "POST", { blueprint_id: blueprintId, force: false });
 }
 
 export async function rollbackBlueprint(

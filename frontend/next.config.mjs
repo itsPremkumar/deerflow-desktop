@@ -6,19 +6,26 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // The Gateway API runs on port 8001 by default (see start.ps1 -GatewayPort).
 // Override with DEER_FLOW_INTERNAL_GATEWAY_BASE_URL when the backend lives elsewhere.
-const gatewayBase = process.env.DEER_FLOW_INTERNAL_GATEWAY_BASE_URL || "http://127.0.0.1:8001";
+const gatewayBase = (process.env.DEER_FLOW_INTERNAL_GATEWAY_BASE_URL || "http://127.0.0.1:8001").replace(/\/+$/, "");
 
 const nextConfig = {
   reactStrictMode: true,
   // Pin the tracing root to this app: a stray package-lock.json in an ancestor
   // folder (e.g. the Windows home dir) otherwise hijacks workspace inference.
   outputFileTracingRoot: __dirname,
-  reactStrictMode: true,
   async rewrites() {
     return [
       {
+        source: "/api/gateway/enterprise/:path*",
+        destination: `${gatewayBase}/api/gateway/enterprise/:path*`,
+      },
+      {
+        source: "/api/gateway/api/commands/:path*",
+        destination: `${gatewayBase}/api/gateway/api/commands/:path*`,
+      },
+      {
         source: "/api/gateway/:path*",
-        destination: `${gatewayBase}/api/gateway/:path*`,
+        destination: `${gatewayBase}/api/:path*`,
       },
       {
         source: "/api/:path*",

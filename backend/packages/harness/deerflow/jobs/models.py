@@ -39,6 +39,7 @@ class ResourceLimits(BaseModel):
 
 class JobSpec(BaseModel):
     job_id: str = Field(default_factory=lambda: f"job-{uuid.uuid4().hex[:8]}")
+    owner_id: str | None = Field(default=None, description="Server-assigned authenticated owner")
     title: str = Field(default="Background Task", description="Human-readable job label")
     command: list[str] | str = Field(..., description="Executable command and args or shell string")
     working_dir: str | None = Field(default=None, description="Working directory path")

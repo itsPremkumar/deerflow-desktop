@@ -55,7 +55,8 @@ def test_full_hermes_agi_executive_lifecycle(tmp_path):
         bottleneck="Database index verification query latency high under burst",
         target_component="tool_router",
     )
-    assert rsi_result.stage in {RSIStage.PROMOTED, RSIStage.ROLLED_BACK}
+    assert rsi_result.stage == RSIStage.PREVIEW
+    assert rsi_result.promoted is False
 
     # 5. Step 5: Execute Self-Healing Watchdog sanity scan
     watchdog = SelfHealingWatchdog()

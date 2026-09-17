@@ -34,7 +34,7 @@ class RSIEngine:
         target_component: str = "compaction",
         force_promote: bool = False,
     ) -> RSIResult:
-        """Execute a complete closed-loop RSI cycle."""
+        """Generate a candidate and simulated evaluation preview without activation."""
         self.stage = RSIStage.BOTTLENECK_DETECTED
 
         # 1. Generate hypothesis
@@ -53,41 +53,27 @@ class RSIEngine:
         holdout = self._run_holdout_evaluation(candidate, ab_test)
         self.stage = RSIStage.HOLDOUT_EVALUATION
 
-        # 5. Decide promotion vs rollback
-        should_promote = force_promote or (ab_test.improved and not holdout.regressed and holdout.improved)
-
+        self.stage = RSIStage.PREVIEW
         evidence = [
-            f"Bottleneck analyzed: '{bottleneck}'",
-            f"Candidate score: {candidate.modified_config}",
-            f"A/B test delta: baseline={ab_test.baseline_score} -> candidate={ab_test.candidate_score} (improved={ab_test.improved})",
-            f"Holdout result: score={holdout.score} (regressed={holdout.regressed})",
+            f"Bottleneck supplied: '{bottleneck}'",
+            f"Proposed configuration: {candidate.modified_config}",
+            f"Simulated A/B scores: baseline={ab_test.baseline_score} -> candidate={ab_test.candidate_score}",
+            f"Simulated holdout score: {holdout.score}; no regression suite executed.",
+            "Promotion blocked: preview evidence is not release evidence; no runtime configuration was changed.",
         ]
-
-        if should_promote:
-            self.stage = RSIStage.PROMOTED
-            self.active_configurations[candidate.component] = dict(candidate.modified_config)
-            evidence.append(f"Promotion confirmed: Component '{candidate.component}' configuration updated.")
-            return RSIResult(
-                promoted=True,
-                stage=self.stage,
-                hypothesis=hypothesis,
-                candidate=candidate,
-                ab_test=ab_test,
-                holdout=holdout,
-                evidence=evidence,
-            )
-        else:
-            self.stage = RSIStage.ROLLED_BACK
-            evidence.append("Rollback executed: Candidate failed holdout evaluation or did not improve.")
-            return RSIResult(
-                promoted=False,
-                stage=self.stage,
-                hypothesis=hypothesis,
-                candidate=candidate,
-                ab_test=ab_test,
-                holdout=holdout,
-                evidence=evidence,
-            )
+        if force_promote:
+            evidence.append("force_promote cannot bypass evidence or deployment requirements.")
+        self._last_summary = evidence[-1]
+        return RSIResult(
+            promoted=False,
+            stage=self.stage,
+            hypothesis=hypothesis,
+            candidate=candidate,
+            ab_test=ab_test,
+            holdout=holdout,
+            evidence=evidence,
+            evidence_kind="simulated",
+        )
 
     def _generate_hypothesis(self, bottleneck: str, target_component: str) -> RSIHypothesis:
         return RSIHypothesis(
@@ -130,6 +116,7 @@ class RSIEngine:
             improved=improved,
             confidence=0.92,
             latency_delta_ms=-140.0,
+            evidence_kind="simulated",
         )
 
     def _run_holdout_evaluation(self, candidate: RSICandidate, ab_test: ABTestResult) -> HoldoutResult:
@@ -141,7 +128,8 @@ class RSIEngine:
             regressed=False,
             score=holdout_score,
             baseline_score=baseline_holdout,
-            evidence=["Holdout suite passed 45/45 regression benchmarks."],
+            evidence=["Simulated holdout preview; no regression benchmarks were executed."],
+            evidence_kind="simulated",
         )
 
     def get_status(self) -> dict[str, Any]:

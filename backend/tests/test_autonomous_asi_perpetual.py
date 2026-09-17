@@ -6,13 +6,12 @@
 """
 
 import pytest
+
 from deerflow.autoconfig import (
     ComplexityLevel,
-    GoalAnalysis,
     ModelTier,
     OperatingMode,
     RuntimeTuningUpdate,
-    SelfConfigurationEngine,
     TopologyType,
     get_self_config_engine,
 )
@@ -23,31 +22,24 @@ from deerflow.metacompiler import (
     BenchmarkScorecard,
     MemoryLayout,
     MetaBenchmarkHarness,
-    MetaLineageStore,
     ReasoningStrategy,
     get_meta_compiler_lineage,
 )
 from deerflow.perpetual import (
-    AutonomousTaskDiscoveryEngine,
     DaemonState,
-    PerpetualDaemon,
     PerpetualMemoryConsolidator,
     StagnationRecoveryWatchdog,
     get_perpetual_daemon,
 )
 
-
 # ==============================================================================
 # 1. Autonomous Self-Configuration Engine Tests
 # ==============================================================================
 
+
 def test_autoconfig_complex_frontier_goal():
     engine = get_self_config_engine("test_proj_autoconfig_1")
-    goal = (
-        "Build a world-class ASI agent harness with recursive self-improvement, "
-        "autonomous perpetual daemon that will never stop, and meta-compiler "
-        "capable of building its own next version with full verification."
-    )
+    goal = "Build a world-class ASI agent harness with recursive self-improvement, autonomous perpetual daemon that will never stop, and meta-compiler capable of building its own next version with full verification."
     analysis = engine.analyze_goal(goal)
 
     assert analysis.complexity == ComplexityLevel.RESEARCH_FRONTIER
@@ -106,6 +98,7 @@ def test_autoconfig_dynamic_tuning():
 # 2. Recursive Agent Meta-Compiler & Self-Replication Tests
 # ==============================================================================
 
+
 def test_metacompiler_compilation_and_specialization():
     store = get_meta_compiler_lineage("test_proj_meta_1")
     parent = store.active_head
@@ -143,16 +136,20 @@ def test_metacompiler_benchmarking_and_hotswap():
     # Benchmark candidate
     scorecard = MetaBenchmarkHarness.evaluate_blueprint(candidate, baseline_score=0.75)
     assert scorecard.composite_score >= 0.75
-    assert scorecard.passed_regression_suite is True
+    assert scorecard.passed_regression_suite is False
+    assert scorecard.evidence_kind == "simulated"
+    assert scorecard.preview_passed is True
     assert len(scorecard.details) == 5
     store.record_benchmark(scorecard)
 
-    # Execute verified zero-downtime hot-swap
     outcome = store.promote_blueprint(candidate.blueprint_id)
-    assert outcome.success is True
-    assert outcome.new_head_id == candidate.blueprint_id
-    assert outcome.generation == candidate.generation
-    assert store.active_head.blueprint_id == candidate.blueprint_id
+    assert outcome.success is False
+    assert outcome.new_head_id == parent.blueprint_id
+    assert outcome.generation == parent.generation
+    assert outcome.migrated_tasks == 0
+    assert outcome.promoted_at == ""
+    assert outcome.telemetry["deployed"] is False
+    assert store.active_head.blueprint_id == parent.blueprint_id
 
     # Test rollback
     rollback_ok = store.rollback(parent.blueprint_id)
@@ -167,6 +164,7 @@ def test_metacompiler_benchmarking_and_hotswap():
 # ==============================================================================
 # 3. Perpetual Never-Ending Daemon & Stagnation Watchdog Tests
 # ==============================================================================
+
 
 def test_stagnation_watchdog_loop_detection_and_intervention():
     watchdog = StagnationRecoveryWatchdog(loop_threshold=3)
@@ -254,6 +252,7 @@ def test_hotswap_prevents_regression():
     store.register_blueprint(candidate)
     low_scorecard = BenchmarkScorecard(
         blueprint_id=candidate.blueprint_id,
+        generation=candidate.generation,
         composite_score=0.82,
         robustness_score=0.85,
         passed_regression_suite=True,
@@ -263,13 +262,13 @@ def test_hotswap_prevents_regression():
     # Regular promotion MUST be rejected to prevent regression
     rejected_outcome = store.promote_blueprint(candidate.blueprint_id, force=False)
     assert rejected_outcome.success is False
-    assert "regressed" in rejected_outcome.telemetry["rejection_reason"].lower()
+    assert "unknown evidence" in rejected_outcome.telemetry["rejection_reason"].lower()
     assert store.active_head.blueprint_id == head.blueprint_id
 
-    # Forced promotion can override when explicitly authorized
     forced_outcome = store.promote_blueprint(candidate.blueprint_id, force=True)
-    assert forced_outcome.success is True
-    assert store.active_head.blueprint_id == candidate.blueprint_id
+    assert forced_outcome.success is False
+    assert forced_outcome.migrated_tasks == 0
+    assert store.active_head.blueprint_id == head.blueprint_id
 
 
 def test_never_ending_daemon_continuous_discovery():
@@ -292,6 +291,7 @@ def test_never_ending_daemon_continuous_discovery():
 def test_stagnation_intervention_auto_tunes_profile():
     daemon = get_perpetual_daemon("test_proj_stagnation_healing")
     from deerflow.autoconfig import get_self_config_engine
+
     cfg_engine = get_self_config_engine("test_proj_stagnation_healing")
 
     # Initial budget is standard
@@ -325,3 +325,71 @@ def test_metacompiler_hierarchical_decomposition_and_memory():
     sc = MetaBenchmarkHarness.evaluate_blueprint(candidate)
     assert sc.reasoning_score >= 0.88
     assert sc.composite_score >= 0.80
+
+
+@pytest.mark.parametrize("force", [False, True])
+@pytest.mark.parametrize("kind", ["simulated", "unknown", "measured"])
+def test_hotswap_never_claims_deployment_without_adapter(force, kind):
+    from deerflow.metacompiler.benchmark import SimulatedBenchmarkScorecard
+
+    parent = AgentBlueprint()
+    candidate = AgentMetaCompiler.compile_next_generation(parent)
+    scorecard = SimulatedBenchmarkScorecard(
+        blueprint_id=candidate.blueprint_id,
+        generation=candidate.generation,
+        evidence_kind=kind,
+        passed_regression_suite=True,
+        composite_score=0.99,
+    )
+    outcome = AgentHotSwapCoordinator.execute_hotswap(parent, candidate, scorecard, force=force)
+    assert not outcome.success
+    assert outcome.new_head_id == parent.blueprint_id
+    assert outcome.migrated_tasks == 0
+    assert outcome.promoted_at == ""
+    assert not outcome.telemetry["deployed"]
+    assert not outcome.telemetry["promotion_verified"]
+    if kind == "measured":
+        assert "No deployment adapter" in outcome.telemetry["rejection_reason"]
+
+
+def test_metacompiler_preview_serialization_and_legacy_scorecard():
+    import json
+    from dataclasses import fields
+
+    from deerflow.metacompiler.benchmark import SimulatedBenchmarkScorecard
+
+    candidate = AgentBlueprint()
+    scorecard = MetaBenchmarkHarness.evaluate_blueprint(candidate)
+    payload = json.loads(json.dumps(scorecard.to_dict()))
+    assert payload["evidence_kind"] == "simulated"
+    assert payload["passed_regression_suite"] is False
+    assert all(detail["status"] == "simulated" for detail in payload["details"])
+    assert SimulatedBenchmarkScorecard(**payload).to_dict() == payload
+    legacy = BenchmarkScorecard(**{field.name: payload[field.name] for field in fields(BenchmarkScorecard)})
+    outcome = AgentHotSwapCoordinator.execute_hotswap(candidate, candidate, legacy, force=True)
+    assert not outcome.success
+    assert outcome.telemetry["evidence_kind"] == "unknown"
+    assert not MetaBenchmarkHarness.evaluate_blueprint(candidate, baseline_score=1.0).preview_passed
+
+
+@pytest.mark.parametrize("mismatch", ["blueprint_id", "generation"])
+def test_hotswap_rejects_mismatched_scorecard(mismatch):
+    parent = AgentBlueprint()
+    candidate = AgentMetaCompiler.compile_next_generation(parent)
+    scorecard = MetaBenchmarkHarness.evaluate_blueprint(candidate)
+    setattr(scorecard, mismatch, "other" if mismatch == "blueprint_id" else 99)
+    outcome = AgentHotSwapCoordinator.execute_hotswap(parent, candidate, scorecard, force=True)
+    assert not outcome.success
+    assert not outcome.telemetry["preview_qualifies"]
+    assert "does not match" in outcome.telemetry["rejection_reason"]
+
+
+@pytest.mark.parametrize("score", [0.1, float("nan"), float("inf"), -1.0, 2.0])
+def test_hotswap_rejects_regressed_or_invalid_preview_even_with_force(score):
+    parent = AgentBlueprint()
+    candidate = AgentMetaCompiler.compile_next_generation(parent)
+    scorecard = MetaBenchmarkHarness.evaluate_blueprint(candidate)
+    scorecard.composite_score = score
+    outcome = AgentHotSwapCoordinator.execute_hotswap(parent, candidate, scorecard, force=True)
+    assert not outcome.success
+    assert not outcome.telemetry["preview_qualifies"]

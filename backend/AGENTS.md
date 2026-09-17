@@ -194,6 +194,10 @@ More specific `AGENTS.md` files in backend code directories contain the subsyste
 
 ## Architecture
 
+### Display Identity
+
+`packages/harness/deerflow/branding.py` owns the static `DISPLAY_NAME` (temporarily `AI Workspace`) for default prompt identity, channel display messages, Gateway documentation, and selected actionable errors. It has no configuration or environment dependencies. Do not use it for package/class names, runtime folders, API keys/routes, headers, or other protocol identifiers. Custom agent names and user-managed content remain untouched. Regression coverage: `tests/test_display_branding.py` and the channel connection suites.
+
 ### Harness / App Split
 
 The backend is split into two layers with a strict dependency direction:

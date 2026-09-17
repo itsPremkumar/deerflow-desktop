@@ -14,13 +14,14 @@ Verifies:
 
 import time
 from pathlib import Path
+from types import SimpleNamespace
 
+import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from app.gateway.routers import memory
 from deerflow.memory.cognitive.associative_memory import AssociativeNetwork
-from deerflow.memory.cognitive.consolidation import CognitiveConsolidationEngine
 from deerflow.memory.cognitive.engine import CognitiveMemorySystem
 from deerflow.memory.cognitive.episodic_memory import EpisodicMemoryEngine
 from deerflow.memory.cognitive.models import (
@@ -30,10 +31,18 @@ from deerflow.memory.cognitive.models import (
     TraceOutcome,
 )
 from deerflow.memory.cognitive.procedural_memory import ProceduralSkillMemory
-from deerflow.memory.cognitive.retrieval import HybridCognitiveRetriever
 from deerflow.memory.cognitive.semantic_graph import SemanticBeliefGraph
 from deerflow.memory.cognitive.spatio_temporal import SpatioTemporalMemory
 from deerflow.memory.cognitive.working_memory import WorkingMemoryEngine
+
+
+@pytest.fixture(autouse=True)
+def isolated_cognitive_storage(tmp_path, monkeypatch):
+    from deerflow.config.paths import Paths
+    from deerflow.memory.cognitive import engine
+
+    monkeypatch.setattr(engine, "get_paths", lambda: Paths(tmp_path))
+    monkeypatch.setattr(engine, "_owner_systems", {})
 
 
 def test_working_memory_lifecycle():
@@ -41,8 +50,8 @@ def test_working_memory_lifecycle():
 
     # 1. Add items
     it1 = wm.add("Implement OAuth2 flow", context_tag="goal", attention_score=1.0, salience=0.8)
-    it2 = wm.add("Token expiration might cause 401", context_tag="hypothesis", attention_score=0.9, salience=0.9)
-    it3 = wm.add("Temporary trace id abc", context_tag="scratch", attention_score=0.5, salience=0.2)
+    wm.add("Token expiration might cause 401", context_tag="hypothesis", attention_score=0.9, salience=0.9)
+    wm.add("Temporary trace id abc", context_tag="scratch", attention_score=0.5, salience=0.2)
 
     assert len(wm.list_active(min_attention=0.0)) == 3
     assert wm.get(it1.item_id) is not None
@@ -212,7 +221,7 @@ def test_associative_network_hebbian_and_spreading():
     net = AssociativeNetwork()
 
     # Link across tiers
-    l1 = net.link_memories(CognitiveTier.WORKING, "wm_1", CognitiveTier.EPISODIC_FLAT, "tr_1", initial_weight=0.5)
+    net.link_memories(CognitiveTier.WORKING, "wm_1", CognitiveTier.EPISODIC_FLAT, "tr_1", initial_weight=0.5)
     # Re-reinforce
     l1_re = net.link_memories(CognitiveTier.WORKING, "wm_1", CognitiveTier.EPISODIC_FLAT, "tr_1")
     assert l1_re.co_occurrences == 2
@@ -290,11 +299,6 @@ def test_context_aware_hybrid_retrieval(tmp_path: Path):
 
 
 def test_fastapi_cognitive_memory_gateway_routes(tmp_path: Path):
-    from deerflow.memory.cognitive import get_cognitive_memory_system
-
-    # Set storage dir to tmp_path for isolation
-    sys = get_cognitive_memory_system(storage_dir=tmp_path)
-
     app = FastAPI()
     app.include_router(memory.router)
 
@@ -459,7 +463,7 @@ def test_cognitive_memory_full_persistence_roundtrip(tmp_path: Path):
     )
 
     # 5. Add Associative Link
-    link = sys1.assoc_net.link_memories(
+    sys1.assoc_net.link_memories(
         source_tier=CognitiveTier.SEMANTIC_FACT,
         source_id=b1.node_id,
         target_tier=CognitiveTier.PROCEDURAL_SKILL,
@@ -517,11 +521,11 @@ def test_associative_network_capacity_leak_prevention():
     """Verify that when links are pruned on capacity limit, adjacency index is cleaned without leaks."""
     net = AssociativeNetwork(max_links=2)
     l1 = net.link_memories(CognitiveTier.WORKING, "wm1", CognitiveTier.EPISODIC_FLAT, "tr1", initial_weight=0.1)
-    l2 = net.link_memories(CognitiveTier.WORKING, "wm2", CognitiveTier.EPISODIC_FLAT, "tr2", initial_weight=0.2)
+    net.link_memories(CognitiveTier.WORKING, "wm2", CognitiveTier.EPISODIC_FLAT, "tr2", initial_weight=0.2)
     assert len(net._links) == 2
 
     # Adding third link triggers capacity enforcement
-    l3 = net.link_memories(CognitiveTier.WORKING, "wm3", CognitiveTier.EPISODIC_FLAT, "tr3", initial_weight=0.9)
+    net.link_memories(CognitiveTier.WORKING, "wm3", CognitiveTier.EPISODIC_FLAT, "tr3", initial_weight=0.9)
     assert len(net._links) == 2
     # Oldest/lowest weight link (l1) should have been pruned
     assert l1.link_id not in net._links
@@ -534,8 +538,8 @@ def test_three_way_belief_conflict_reconciliation():
     """Verify 3-way conflicting beliefs resolve cleanly without resurrecting superseded nodes."""
     graph = SemanticBeliefGraph()
     t = time.time()
-    b1 = graph.add_belief("DatabaseEngine", "flavor", "PostgreSQL_14", confidence=0.7, created_at=t)
-    b2 = graph.add_belief("DatabaseEngine", "flavor", "PostgreSQL_15", confidence=0.8, created_at=t + 10.0)
+    graph.add_belief("DatabaseEngine", "flavor", "PostgreSQL_14", confidence=0.7, created_at=t)
+    graph.add_belief("DatabaseEngine", "flavor", "PostgreSQL_15", confidence=0.8, created_at=t + 10.0)
     b3 = graph.add_belief("DatabaseEngine", "flavor", "PostgreSQL_16", confidence=0.95, created_at=t + 20.0)
 
     reconciled = graph.reconcile_conflicts()
@@ -566,44 +570,50 @@ def test_procedural_skill_deduplication_and_reinforcement():
 
 def test_cognitive_memory_builtin_tool(tmp_path: Path):
     """Verify built-in cognitive_memory_tool works across all supported actions."""
-    from deerflow.memory.cognitive import get_cognitive_memory_system
     from deerflow.tools.builtins.cognitive_memory_tool import cognitive_memory_tool
 
-    # Ensure system uses isolated tmp_path
-    get_cognitive_memory_system(storage_dir=tmp_path)
+    runtime = SimpleNamespace(context={"user_id": "tool-owner"})
+
+    def invoke(arguments):
+        return cognitive_memory_tool.func(runtime=runtime, **arguments)
 
     # 1. Overview
-    res_ov = cognitive_memory_tool.invoke({"action": "overview"})
+    res_ov = invoke({"action": "overview"})
     assert "tiers" in res_ov
 
     # 2. Store Belief
-    res_sb = cognitive_memory_tool.invoke({
-        "action": "store_belief",
-        "subject": "MicroserviceArchitecture",
-        "predicate": "uses_event_bus",
-        "object_val": "Kafka",
-        "confidence": 0.92,
-    })
+    res_sb = invoke(
+        {
+            "action": "store_belief",
+            "subject": "MicroserviceArchitecture",
+            "predicate": "uses_event_bus",
+            "object_val": "Kafka",
+            "confidence": 0.92,
+        }
+    )
     assert "stored" in res_sb
 
     # 3. Lookup Skill
-    res_ls = cognitive_memory_tool.invoke({"action": "lookup_skill", "query": "pytest verify"})
+    res_ls = invoke({"action": "lookup_skill", "query": "pytest verify"})
     assert "skills" in res_ls
 
     # 4. Record Step
-    res_rs = cognitive_memory_tool.invoke({
-        "action": "record_step",
-        "query": "deploy_agent",
-        "observation": "Container healthy on port 8000",
-        "outcome": "success",
-    })
+    res_rs = invoke(
+        {
+            "action": "record_step",
+            "query": "deploy_agent",
+            "observation": "Container healthy on port 8000",
+            "outcome": "success",
+        }
+    )
     assert "recorded" in res_rs
 
     # 5. Recall
-    res_rc = cognitive_memory_tool.invoke({
-        "action": "recall",
-        "query": "MicroserviceArchitecture Kafka event bus",
-        "limit": 3,
-    })
+    res_rc = invoke(
+        {
+            "action": "recall",
+            "query": "MicroserviceArchitecture Kafka event bus",
+            "limit": 3,
+        }
+    )
     assert "results" in res_rc
-

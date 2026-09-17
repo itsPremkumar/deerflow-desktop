@@ -109,12 +109,12 @@ def test_workspace_avo_runner_success_and_rollback(tmp_path: Path):
         hypothesis="Multiply by 2 for doubled throughput",
         modification="Change return x + 1 to x * 2",
         test_command=pass_test_cmd,
-        expected_metrics={"speed": 100.0},
     )
 
     assert res_good["success"] is True
     assert res_good["committed"] is True
     assert res_good["rolled_back"] is False
+    assert res_good["production_deployed"] is False
     assert test_file.read_text(encoding="utf-8") == good_code
 
     # 2. Failing candidate: syntax error or assertion failure in test
@@ -125,12 +125,12 @@ def test_workspace_avo_runner_success_and_rollback(tmp_path: Path):
         hypothesis="Subtract 999",
         modification="Corrupt compute function",
         test_command=pass_test_cmd,  # compute(5) == 10 will fail!
-        expected_metrics={"speed": 200.0},
     )
 
     assert res_bad["success"] is False
     assert res_bad["committed"] is False
     assert res_bad["rolled_back"] is True
+    assert res_bad["workspace_state"] == "baseline_restored"
     # Auto-rollback should have restored good_code!
     assert test_file.read_text(encoding="utf-8") == good_code
 
@@ -196,13 +196,15 @@ def test_nvidia_avo_tool_actions(tmp_path: Path):
     assert "head_id" in stats["lineage"]
 
     # 3. Vary (in-memory candidate)
-    vary_out = run_variation_operator_step.invoke({
-        "action": "vary",
-        "hypothesis": "SIMD register caching",
-        "modification": "AVX-512 register unroll",
-        "metrics_json": json.dumps({"throughput": 250.0}),
-        "correctness": True,
-    })
+    vary_out = run_variation_operator_step.invoke(
+        {
+            "action": "vary",
+            "hypothesis": "SIMD register caching",
+            "modification": "AVX-512 register unroll",
+            "metrics_json": json.dumps({"throughput": 250.0}),
+            "correctness": True,
+        }
+    )
     vary_res = json.loads(vary_out)
     assert vary_res["committed"] is True
     assert vary_res["correctness"] is True
@@ -213,26 +215,32 @@ def test_nvidia_avo_tool_actions(tmp_path: Path):
     assert frontier["frontier_size"] >= 1
 
     # 5. Knowledge Query
-    kq_out = run_variation_operator_step.invoke({
-        "action": "knowledge_query",
-        "query_text": "register",
-    })
+    kq_out = run_variation_operator_step.invoke(
+        {
+            "action": "knowledge_query",
+            "query_text": "register",
+        }
+    )
     kq = json.loads(kq_out)
     assert "results" in kq
 
     # 6. Persist & Restore
-    persist_out = run_variation_operator_step.invoke({
-        "action": "persist",
-        "root_path": str(tmp_path),
-    })
+    persist_out = run_variation_operator_step.invoke(
+        {
+            "action": "persist",
+            "root_path": str(tmp_path),
+        }
+    )
     p_data = json.loads(persist_out)
     assert p_data["status"] == "persisted"
     assert (tmp_path / ".avo" / "lineage.json").exists()
 
-    restore_out = run_variation_operator_step.invoke({
-        "action": "restore",
-        "root_path": str(tmp_path),
-    })
+    restore_out = run_variation_operator_step.invoke(
+        {
+            "action": "restore",
+            "root_path": str(tmp_path),
+        }
+    )
     r_data = json.loads(restore_out)
     assert r_data["status"] == "restored"
     assert r_data["lineage_restored"] is True

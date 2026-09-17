@@ -217,7 +217,7 @@ export function exportStoreJson(): string {
 /** Merge an exported file into the store. Returns counts for user feedback. */
 export function importStoreJson(text: string): { threads: number; messages: number } {
   const parsed = JSON.parse(text) as Partial<StoreShape>;
-  if (!parsed || !Array.isArray(parsed.threads)) throw new Error("That file is not a DeerFlow history export.");
+  if (!parsed || !Array.isArray(parsed.threads)) throw new Error("That file is not a valid chat history export.");
   let threads = 0;
   let messages = 0;
   mutate((s) => {

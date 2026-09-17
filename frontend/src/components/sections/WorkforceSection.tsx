@@ -12,7 +12,7 @@ import {
   createCheckpoint, restoreCheckpoint, probeCanary,
   triggerAVOIteration, registerEpistemicClaim, addEpistemicEvidence, triggerRSICycle, replayTrajectory,
   fetchSelfConfigStatus, inferSelfConfig, tuneSelfConfig,
-  fetchMetaLineage, compileNextGenBlueprint, benchmarkBlueprint, hotswapBlueprint, rollbackBlueprint,
+  fetchMetaLineage, compileNextGenBlueprint, benchmarkBlueprint,
   fetchPerpetualStatus, startPerpetualDaemon, stopPerpetualDaemon, triggerPerpetualHeartbeat,
   triggerPerpetualDiscovery, triggerPerpetualConsolidation, createPerpetualGoal,
   type PresenceMember, type ProjectStateSnapshot, type WarRoomSnapshot,
@@ -555,11 +555,8 @@ function WarRoomTab() {
       await triggerAVOIteration(selectedProject, {
         hypothesis: "Empirical optimization of active component execution path",
         modification: "adaptive_batch_compaction",
-        performance_score: 0.91,
-        quality_score: 0.94,
-        correctness: true,
       });
-      setApprovalNotice("AVO autonomous variation committed to Pareto frontier.");
+      setApprovalNotice("AVO preview response received; no measured improvement or deployment verified.");
       warRoom.reload();
     } catch (e) {
       setApprovalNotice(`AVO error: ${errMsg(e)}`);
@@ -575,8 +572,8 @@ function WarRoomTab() {
       const res = (await triggerRSICycle(selectedProject, {
         bottleneck: "Context window saturation during long-running tasks",
         target_component: "compaction",
-      })) as { promoted?: boolean; stage?: string };
-      setApprovalNotice(`RSI closed-loop cycle complete: ${res.promoted ? "PROMOTED to production" : "ROLLED BACK (zero regression)"}`);
+      })) as { stage?: string };
+      setApprovalNotice(`RSI preview response: ${res.stage || "received"}. Synthetic evidence does not establish promotion, rollback, or regression safety.`);
       warRoom.reload();
     } catch (e) {
       setApprovalNotice(`RSI error: ${errMsg(e)}`);
@@ -625,7 +622,6 @@ function WarRoomTab() {
   const [optimTarget, setOptimTarget] = useState("performance_and_reasoning");
   const [compilingGen, setCompilingGen] = useState(false);
   const [benchmarkingBp, setBenchmarkingBp] = useState<string | null>(null);
-  const [hotswappingBp, setHotswappingBp] = useState<string | null>(null);
 
   // Feature 3: Perpetual Never-Ending Daemon
   const perpetualStatus = useAsync(() => fetchPerpetualStatus(selectedProject), [selectedProject]);
@@ -697,7 +693,7 @@ function WarRoomTab() {
     setBenchmarkingBp(bpId);
     try {
       const res = await benchmarkBlueprint(selectedProject, bpId);
-      setApprovalNotice(`Benchmark completed: score=${res.composite_score} (Regression: ${res.passed_regression_suite ? "PASSED" : "FAILED"})`);
+      setApprovalNotice(`Synthetic benchmark preview: score=${res.composite_score}. Not measured regression evidence or release authorization.`);
       metaLineage.reload();
     } catch (e) {
       setApprovalNotice(`Benchmark error: ${errMsg(e)}`);
@@ -706,43 +702,11 @@ function WarRoomTab() {
     }
   };
 
-  const handleHotSwap = async (bpId: string, force = false) => {
-    setHotswappingBp(bpId);
-    try {
-      const res = await hotswapBlueprint(selectedProject, bpId, force);
-      if (res.success) {
-        setApprovalNotice(`Verified Hot-Swap SUCCESS! Promoted Gen ${res.generation} (${res.new_head_id}) with ${res.migrated_tasks} active tasks migrated.`);
-      } else {
-        setApprovalNotice(`Hot-Swap rejected by verification gate: ${JSON.stringify(res.telemetry)}`);
-      }
-      metaLineage.reload();
-    } catch (e) {
-      setApprovalNotice(`Hot-swap error: ${errMsg(e)}`);
-    } finally {
-      setHotswappingBp(null);
-    }
-  };
-
-  const handleRollback = async (bpId: string) => {
-    try {
-      const res = await rollbackBlueprint(selectedProject, bpId);
-      setApprovalNotice(`Rollback complete: Active head restored to ${res.active_head_id} (Gen ${res.generation})`);
-      metaLineage.reload();
-    } catch (e) {
-      setApprovalNotice(`Rollback error: ${errMsg(e)}`);
-    }
-  };
-
   const handleToggleDaemon = async (running: boolean) => {
     setPerpetualBusy(true);
     try {
-      if (running) {
-        await stopPerpetualDaemon(selectedProject);
-        setApprovalNotice("Perpetual Autonomous Daemon PAUSED.");
-      } else {
-        await startPerpetualDaemon(selectedProject);
-        setApprovalNotice("Perpetual Autonomous Daemon RUNNING.");
-      }
+      const res = running ? await stopPerpetualDaemon(selectedProject) : await startPerpetualDaemon(selectedProject);
+      setApprovalNotice(`Daemon preview response: ${res.state}. Durable background execution is not verified.`);
       perpetualStatus.reload();
     } catch (e) {
       setApprovalNotice(`Daemon control error: ${errMsg(e)}`);
@@ -768,7 +732,7 @@ function WarRoomTab() {
     setPerpetualBusy(true);
     try {
       const res = await triggerPerpetualDiscovery(selectedProject);
-      setApprovalNotice(`Autonomous Task Discovery completed: ${res.discovered_count} new tasks found.`);
+      setApprovalNotice(`Task discovery preview: ${res.discovered_count} candidate tasks returned; execution is not verified.`);
       perpetualStatus.reload();
     } catch (e) {
       setApprovalNotice(`Discovery error: ${errMsg(e)}`);
@@ -781,7 +745,7 @@ function WarRoomTab() {
     setPerpetualBusy(true);
     try {
       const res = (await triggerPerpetualConsolidation(selectedProject)) as { summary?: string };
-      setApprovalNotice(`Memory consolidation executed: ${res.summary || "Complete"}`);
+      setApprovalNotice(`Memory consolidation preview: ${res.summary || "No summary returned"}. Runtime changes are not verified.`);
       perpetualStatus.reload();
     } catch (e) {
       setApprovalNotice(`Consolidation error: ${errMsg(e)}`);
@@ -836,6 +800,9 @@ function WarRoomTab() {
         <ErrorBox message={warRoom.error} />
       ) : warRoom.data ? (
         <div className="space-y-3">
+          {selfConfig.error && <ErrorBox message={selfConfig.error} />}
+          {metaLineage.error && <ErrorBox message={metaLineage.error} />}
+          {perpetualStatus.error && <ErrorBox message={perpetualStatus.error} />}
           {/* Top: Emergency Status Bar */}
           <div className="flex items-center justify-between p-3 rounded-xl border border-border/60 bg-muted/20">
             <div className="flex items-center gap-2">
@@ -1290,8 +1257,8 @@ function WarRoomTab() {
 
           {/* 11. AVO Genetic Optimization Lineage & Pareto Frontier */}
           <Panel
-            title="AVO Genetic Variation Lineage & Pareto Frontier"
-            hint="NVIDIA AVO continuous evolutionary search operator: Vary(P_t) = Agent(P_t, K, f) with supervisory anti-stagnation"
+            title="AVO Lineage Preview"
+            hint="Candidate records and synthetic scores are not measured correctness or production evidence."
             actions={
               <div className="flex items-center gap-1.5">
                 <Badge tone="green">Frontier: {avoLineage?.pareto_frontier?.length || 0} versions</Badge>
@@ -1396,15 +1363,15 @@ function WarRoomTab() {
 
           {/* 13. Controlled RSI Closed-Loop Center */}
           <Panel
-            title="Controlled RSI Closed-Loop Center (The Keel Architecture)"
-            hint="Autonomous hypothesis synthesis, A/B simulation, and holdout regression gating"
+            title="RSI Preview"
+            hint="Synthetic cycle evidence only. No measured holdout, production promotion, or completed improvement loop is established."
             actions={
               <div className="flex items-center gap-1.5">
-                <Badge tone={rsiStatus?.stage === "promoted" ? "green" : "gray"}>
-                  Stage: {rsiStatus?.stage || "idle"}
+                <Badge tone="gray">
+                  Preview stage: {rsiStatus?.stage || "idle"}
                 </Badge>
                 <Btn variant="ghost" disabled={rsiBusy} onClick={handleTriggerRSI}>
-                  <Play className="size-3 mr-1" /> Run RSI Cycle
+                  <Play className="size-3 mr-1" /> Run RSI Preview
                 </Btn>
               </div>
             }
@@ -1417,11 +1384,11 @@ function WarRoomTab() {
                 </div>
                 <div className="p-2 rounded-lg bg-muted/40">
                   <span className="text-[10px] text-muted-foreground uppercase">Safety Kernel</span>
-                  <p className="font-bold text-emerald-500 mt-0.5">IMMUTABLE (Keel)</p>
+                  <p className="font-bold text-emerald-500 mt-0.5">Not verified</p>
                 </div>
                 <div className="p-2 rounded-lg bg-muted/40">
                   <span className="text-[10px] text-muted-foreground uppercase">Holdout Gate</span>
-                  <p className="font-bold text-primary mt-0.5">45 Benchmarks (0 Regress)</p>
+                  <p className="font-bold text-primary mt-0.5">No measured evidence</p>
                 </div>
                 <div className="p-2 rounded-lg bg-muted/40">
                   <span className="text-[10px] text-muted-foreground uppercase">Active Configs</span>
@@ -1432,7 +1399,7 @@ function WarRoomTab() {
               </div>
               {rsiStatus?.last_cycle_summary && (
                 <p className="text-[11px] text-muted-foreground font-sans p-2 rounded bg-muted/20 border border-border/40">
-                  ℹ️ {rsiStatus.last_cycle_summary}
+                   Preview summary: {rsiStatus.last_cycle_summary}
                 </p>
               )}
             </div>
@@ -1505,8 +1472,8 @@ function WarRoomTab() {
 
           {/* 15. Autonomous Perpetual Daemon & Self-Configuration Engine */}
           <Panel
-            title="Autonomous Perpetual Daemon & Self-Configuration Engine (Zero-Human Setup)"
-            hint="Agents dynamically analyze goals, classify domains, assess risk, and self-configure models, reasoning budgets, and tools"
+            title="Self-Configuration Preview"
+            hint="Goal analysis and profile suggestions do not verify changes to running agents."
             actions={
               <div className="flex items-center gap-1.5 flex-wrap">
                 {selfConfig.data?.active_profile && (
@@ -1613,13 +1580,13 @@ function WarRoomTab() {
 
           {/* 16. Recursive Agent Meta-Compiler & Self-Replication */}
           <Panel
-            title="Recursive Agent Meta-Compiler & Self-Replication ('Builds Its Own Next Version')"
-            hint="Synthesizes, benchmarks, verifies, and zero-downtime hot-swaps advanced next-generation agent architectures"
+            title="Agent Meta-Compiler Preview"
+            hint="Blueprint generation and synthetic scorecards only. Runtime promotion and rollback are unavailable without measured evidence and a durable lifecycle API."
             actions={
               <div className="flex items-center gap-1.5 flex-wrap">
-                {metaLineage.data && (
-                  <Badge tone="purple">
-                    Active: Gen {metaLineage.data.active_head.generation} ({metaLineage.data.active_head.architecture_tag})
+                {metaLineage.data?.active_head && (
+                  <Badge tone="gray">
+                    Preview: Gen {metaLineage.data.active_head.generation} ({metaLineage.data.active_head.architecture_tag})
                   </Badge>
                 )}
                 <Btn variant="primary" disabled={compilingGen} onClick={handleCompileNextGen}>
@@ -1634,14 +1601,14 @@ function WarRoomTab() {
                 <div className="p-3 rounded-xl border border-primary/30 bg-primary/5 space-y-1.5 font-mono text-[11px]">
                   <div className="flex items-center justify-between flex-wrap gap-1">
                     <div className="flex items-center gap-1.5">
-                      <Badge tone="green">PRODUCTION HEAD</Badge>
+                      <Badge tone="green">PREVIEW HEAD</Badge>
                       <span className="font-bold text-foreground text-xs">{metaLineage.data.active_head.name}</span>
                       <span className="text-muted-foreground">({metaLineage.data.active_head.blueprint_id})</span>
                     </div>
                     <div className="flex items-center gap-1.5">
                       <Badge tone="blue">Strategy: {metaLineage.data.active_head.reasoning_strategy}</Badge>
                       <Badge tone="purple">Memory: {metaLineage.data.active_head.memory_layout}</Badge>
-                      <Badge tone="cyan">Fitness: {metaLineage.data.active_scorecard.composite_score}</Badge>
+                      <Badge tone="gray">Synthetic score: {metaLineage.data.active_scorecard?.composite_score ?? "unavailable"}</Badge>
                     </div>
                   </div>
                   <p className="text-muted-foreground font-sans text-xs">
@@ -1666,9 +1633,8 @@ function WarRoomTab() {
                 <span className="font-semibold text-muted-foreground text-[11px]">Generational Lineage & Pareto Frontier:</span>
                 <div className="space-y-1.5 max-h-56 overflow-y-auto font-mono text-[11px]">
                   {metaLineage.data?.pareto_frontier.map((bp) => {
-                    const isHead = bp.blueprint_id === metaLineage.data?.active_head.blueprint_id;
+                    const isHead = bp.blueprint_id === metaLineage.data?.active_head?.blueprint_id;
                     const isBenchmarking = benchmarkingBp === bp.blueprint_id;
-                    const isHotSwapping = hotswappingBp === bp.blueprint_id;
 
                     return (
                       <div
@@ -1682,7 +1648,7 @@ function WarRoomTab() {
                             <span className="font-bold text-foreground">Gen {bp.generation}</span>
                             <span className="font-semibold text-primary">{bp.name}</span>
                             <Badge tone="gray">{bp.reasoning_strategy}</Badge>
-                            {isHead && <Badge tone="green">ACTIVE HEAD</Badge>}
+                            {isHead && <Badge tone="green">PREVIEW HEAD</Badge>}
                           </div>
                           <p className="text-[10px] text-muted-foreground truncate max-w-md font-sans">
                             {bp.mutation_notes}
@@ -1701,16 +1667,15 @@ function WarRoomTab() {
                             <>
                               <Btn
                                 variant="primary"
-                                disabled={isHotSwapping}
-                                onClick={() => handleHotSwap(bp.blueprint_id, true)}
-                                title="Promote to production with zero-downtime hot-swap"
+                                disabled
+                                title="Unavailable: measured backend evidence and a durable promotion API are required"
                               >
-                                <CheckCircle2 className="size-3 mr-1" /> {isHotSwapping ? "Promoting..." : "Hot-Swap"}
+                                <CheckCircle2 className="size-3 mr-1" /> Promotion unavailable
                               </Btn>
                               <Btn
                                 variant="ghost"
-                                onClick={() => handleRollback(bp.blueprint_id)}
-                                title="Roll back active head to this generation"
+                                disabled
+                                title="Unavailable: no verified runtime rollback contract"
                               >
                                 <RotateCcw className="size-3 mr-1" /> Rollback
                               </Btn>
@@ -1727,8 +1692,8 @@ function WarRoomTab() {
 
           {/* 17. Perpetual Never-Ending Autonomous Daemon ("Will Never Stop") */}
           <Panel
-            title="Perpetual Never-Ending Autonomous Daemon ('Will Never Stop')"
-            hint="Continuous goal pursuit, autonomous task discovery, stagnation & deadlock watchdog, and perpetual memory consolidation"
+            title="Perpetual Daemon Preview"
+            hint="Preview counters and simulated progress do not establish durable task execution, recovery, or a completed improvement loop."
             actions={
               <div className="flex items-center gap-1.5 flex-wrap">
                 {perpetualStatus.data?.telemetry && (

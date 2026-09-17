@@ -72,29 +72,40 @@ class BotRegistry:
         self._ensure_default_roster()
 
     def _ensure_default_roster(self) -> None:
-        defaults = [
-            ("architect", "Architect", "System Architect & Technical Lead", "engineering", "cto", ["System design", "Architecture review"], ["system_design", "refactoring"]),
-            ("coder", "Coder", "Software Engineer & Backend Developer", "engineering", "architect", ["Backend development", "Feature delivery"], ["python", "coding"]),
-            ("reviewer", "Reviewer", "Code & Quality Reviewer", "qa", "architect", ["Code review", "Standards enforcement"], ["code_audit", "style_enforcement"]),
-            ("tester", "Tester", "QA & Automated Verification Specialist", "qa", "reviewer", ["Automated testing", "Quality gates"], ["pytest", "test_automation"]),
-            ("researcher", "Researcher", "Deep Researcher & Synthesis Specialist", "product", "architect", ["Deep research", "Knowledge synthesis"], ["web_search", "fact_checking"]),
+        # Default seed roster: the highest-ROI starter team, built from the
+        # template catalog so display/role/skills stay in one place.
+        seeds = [
+            "architect",
+            "coder",
+            "reviewer",
+            "tester",
+            "researcher",
+            "support",
+            "data-analyst",
+            "technical-writer",
         ]
         with self._lock:
-            for name, display, role, dept, reports, resps, caps in defaults:
-                if name not in self._bots:
-                    soul = generate_default_soul(name, role)
-                    bot = BotProfile(
-                        name=name,
-                        display_name=display,
-                        role=role,
-                        soul=soul,
-                        toolsets=["all"],
-                        department=dept,
-                        reports_to=reports,
-                        responsibilities=resps,
-                        capabilities=caps,
-                    )
-                    self._bots[name] = bot
+            for slug in seeds:
+                if slug in self._bots:
+                    continue
+                spec = get_template(slug)
+                if spec is None:
+                    continue
+                soul = generate_default_soul(slug, spec["role"])
+                bot = BotProfile(
+                    name=slug,
+                    display_name=spec["display"],
+                    role=spec["role"],
+                    soul=soul,
+                    toolsets=list(spec.get("toolsets", [])) or ["all"],
+                    skills=list(spec.get("skills", [])),
+                    avatar=spec.get("avatar", ""),
+                    department=spec.get("department", "engineering"),
+                    reports_to=spec.get("reports_to"),
+                    responsibilities=list(spec.get("responsibilities", [])),
+                    capabilities=list(spec.get("capabilities", [])),
+                )
+                self._bots[slug] = bot
             self._save()
 
     def _load(self) -> None:
@@ -141,13 +152,16 @@ class BotRegistry:
         reports_to: str | None = None,
         responsibilities: list[str] | None = None,
         capabilities: list[str] | None = None,
+        skills: list[str] | None = None,
+        toolsets: list[str] | None = None,
         succession_fallback: str | None = None,
     ) -> BotProfile:
         """Fetch an existing bot or instantly auto-provision a new one.
 
         A ``template`` slug (see :mod:`deerflow.bots.templates`) supplies the
-        role/display/avatar/department/reports_to defaults for brand-new bots; explicit arguments
-        always win over the template. Existing bots are returned untouched.
+        role/display/avatar/department/reports_to/skills/toolsets defaults for
+        brand-new bots; explicit arguments always win over the template.
+        Existing bots are returned untouched.
         """
         key = name.lower().strip()
         spec = get_template(template) if template else None
@@ -166,13 +180,16 @@ class BotRegistry:
             assigned_reports = reports_to or (spec.get("reports_to") if spec else None)
             assigned_resps = responsibilities or (list(spec.get("responsibilities", [])) if spec else [])
             assigned_caps = capabilities or (list(spec.get("capabilities", [])) if spec else [])
+            assigned_skills = skills if skills is not None else (list(spec.get("skills", [])) if spec else [])
+            assigned_toolsets = toolsets if toolsets is not None else (list(spec.get("toolsets", [])) if spec else ["all"])
 
             bot = BotProfile(
                 name=key,
                 display_name=assigned_display,
                 role=assigned_role,
                 soul=assigned_soul,
-                toolsets=["all"],
+                toolsets=assigned_toolsets,
+                skills=assigned_skills,
                 avatar=assigned_avatar,
                 department=assigned_dept,
                 reports_to=assigned_reports,

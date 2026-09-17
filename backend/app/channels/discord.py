@@ -14,6 +14,7 @@ from app.channels.base import Channel
 from app.channels.commands import is_known_channel_command
 from app.channels.connection_identity import attach_connection_identity
 from app.channels.message_bus import InboundMessage, InboundMessageType, InboundReservation, MessageBus, OutboundMessage, ResolvedAttachment
+from deerflow.branding import DISPLAY_NAME
 
 logger = logging.getLogger(__name__)
 
@@ -723,7 +724,7 @@ class DiscordChannel(Channel):
             },
             status="connected",
         )
-        await self._send_connection_reply(message, "Discord connected to DeerFlow.")
+        await self._send_connection_reply(message, f"Discord connected to {DISPLAY_NAME}.")
         return True
 
     @staticmethod

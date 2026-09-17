@@ -18,11 +18,13 @@ class RSIStage(str, Enum):
     HOLDOUT_EVALUATION = "holdout_evaluation"
     PROMOTED = "promoted"
     ROLLED_BACK = "rolled_back"
+    PREVIEW = "preview"
 
 
 @dataclass
 class RSIHypothesis:
     """Hypothesis explaining an agent bottleneck and proposing an optimization."""
+
     id: str = field(default_factory=lambda: str(uuid.uuid4())[:8])
     bottleneck: str = ""
     description: str = ""
@@ -34,6 +36,7 @@ class RSIHypothesis:
 @dataclass
 class RSICandidate:
     """Candidate modification generated to resolve an identified bottleneck."""
+
     id: str = field(default_factory=lambda: str(uuid.uuid4())[:8])
     hypothesis_id: str = ""
     component: str = ""
@@ -50,6 +53,7 @@ class ABTestResult:
     improved: bool
     confidence: float
     latency_delta_ms: float = 0.0
+    evidence_kind: str = "unknown"
 
 
 @dataclass
@@ -60,11 +64,13 @@ class HoldoutResult:
     score: float
     baseline_score: float
     evidence: list[str] = field(default_factory=list)
+    evidence_kind: str = "unknown"
 
 
 @dataclass
 class RSIResult:
     """End-to-end outcome of an autonomous RSI cycle."""
+
     promoted: bool
     stage: RSIStage
     hypothesis: RSIHypothesis
@@ -72,6 +78,7 @@ class RSIResult:
     ab_test: ABTestResult | None = None
     holdout: HoldoutResult | None = None
     evidence: list[str] = field(default_factory=list)
+    evidence_kind: str = "unknown"
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -82,4 +89,5 @@ class RSIResult:
             "ab_test": asdict(self.ab_test) if self.ab_test else None,
             "holdout": asdict(self.holdout) if self.holdout else None,
             "evidence": self.evidence,
+            "evidence_kind": self.evidence_kind,
         }

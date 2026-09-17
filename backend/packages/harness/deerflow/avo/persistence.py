@@ -25,13 +25,26 @@ class AVOPersistenceManager:
     """Manages disk persistence for AVO Lineage and Domain Knowledge."""
 
     def __init__(self, base_dir: str | Path | None = None) -> None:
-        self.base_dir = Path(base_dir) if base_dir else Path.cwd()
+        self.base_dir = Path(base_dir).resolve() if base_dir else Path.cwd().resolve()
         self.avo_dir = self.base_dir / DEFAULT_AVO_DIR
+
+    def _target(self, filename: str) -> Path:
+        if not filename or Path(filename).name != filename or "/" in filename or "\\" in filename or ":" in filename or filename in (".", ".."):
+            raise ValueError("Invalid AVO persistence filename")
+        target = self.avo_dir / filename
+        if self.avo_dir.resolve() != self.avo_dir or target.resolve() != target:
+            raise ValueError("AVO persistence path escapes storage directory")
+        return target
+
+    @staticmethod
+    def _write(target: Path, payload: dict[str, Any]) -> None:
+        from deerflow.agents.memory.backends.deermem.deermem.core.storage import _atomic_write
+
+        _atomic_write(target, json.dumps(payload, indent=2, allow_nan=False).encode("utf-8"))
 
     def save_lineage(self, lineage: AVOLineage, filename: str = "lineage.json") -> Path:
         """Serialize complete AVOLineage tree and head state to disk."""
-        self.avo_dir.mkdir(parents=True, exist_ok=True)
-        target = self.avo_dir / filename
+        target = self._target(filename)
 
         versions_data: dict[str, Any] = {}
         for vid, v in lineage.versions.items():
@@ -48,15 +61,14 @@ class AVOPersistenceManager:
             "rejected_attempts": rejected_data,
         }
 
-        with open(target, "w", encoding="utf-8") as f:
-            json.dump(payload, f, indent=2)
+        self._write(target, payload)
 
         logger.info("Persisted AVO Lineage (%d versions) to %s", len(versions_data), target)
         return target
 
     def load_lineage(self, filename: str = "lineage.json") -> AVOLineage | None:
         """Load an AVOLineage from disk if present."""
-        target = self.avo_dir / filename
+        target = self._target(filename)
         if not target.exists():
             return None
 
@@ -127,21 +139,17 @@ class AVOPersistenceManager:
 
     def save_knowledge_base(self, kb: DomainKnowledgeBase, filename: str = "knowledge.json") -> Path:
         """Persist domain knowledge entries (patterns & anti-patterns) to disk."""
-        self.avo_dir.mkdir(parents=True, exist_ok=True)
-        target = self.avo_dir / filename
+        target = self._target(filename)
 
-        payload = {
-            "entries": [e.to_dict() for e in kb.entries]
-        }
-        with open(target, "w", encoding="utf-8") as f:
-            json.dump(payload, f, indent=2)
+        payload = {"entries": [e.to_dict() for e in kb.entries]}
+        self._write(target, payload)
 
         logger.info("Persisted Domain Knowledge (%d entries) to %s", len(kb.entries), target)
         return target
 
     def load_knowledge_base(self, filename: str = "knowledge.json") -> DomainKnowledgeBase | None:
         """Load domain knowledge entries from disk."""
-        target = self.avo_dir / filename
+        target = self._target(filename)
         if not target.exists():
             return None
 

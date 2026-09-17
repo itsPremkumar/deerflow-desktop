@@ -23,7 +23,7 @@ def test_bot_roster_tool_actions():
         "display_name": "Data Engineer",
         "soul": "Write high-throughput ETL pipelines.",
     })
-    assert f"Successfully provisioned bot @{bot_name}" in res_create
+    assert f"Successfully provisioned AI Agent: @{bot_name} (Data Engineer)" in res_create
     assert "Epoch:" in res_create
 
     # 3. Inspect bot

@@ -160,6 +160,23 @@ max_recursion_limit: 1000
 #     context_window: 262144
 
 models:
+  - name: union-alpha
+    display_name: Union Alpha (OpenRouter)
+    description: "Anonymous-provider preview; prompts and completions may be retained. Verify provider terms before sending sensitive data."
+    use: langchain_openai:ChatOpenAI
+    model: stealth/union-alpha
+    base_url: https://openrouter.ai/api/v1
+    api_key: $OPENROUTER_API_KEY
+    context_window: 262144
+    max_tokens: 16384
+    request_timeout: 600.0
+    max_retries: 2
+    use_responses_api: false
+    supports_vision: true
+    supports_thinking: false
+    supports_reasoning_effort: false
+    fallbacks: []
+
   # Example: Volcengine (Doubao) model
   # - name: doubao-seed-1.8
   #   display_name: Doubao-Seed-1.8

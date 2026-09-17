@@ -1,6 +1,5 @@
 import { BotProfile, BotTemplate, FleetHealth } from "@/types/bots";
-
-const BASE_URL = process.env.NEXT_PUBLIC_GATEWAY_URL || "/api/gateway";
+import { apiFetch } from "./api-client";
 
 function normalizeBot(raw: Record<string, unknown>): BotProfile {
   const taskStats = (raw.task_stats as BotProfile["task_stats"]) || {};
@@ -39,8 +38,7 @@ export async function fetchBots(params?: { status?: string; department?: string 
     if (params?.status) qs.set("status", params.status);
     if (params?.department) qs.set("department", params.department);
     const suffix = qs.toString() ? `?${qs.toString()}` : "";
-    const res = await fetch(`${BASE_URL}/bots${suffix}`);
-    if (!res.ok) return [];
+    const res = await apiFetch(`/bots${suffix}`);
     const data = await res.json();
     const list = Array.isArray(data.bots) ? data.bots : [];
     return list.map((b: Record<string, unknown>) => normalizeBot(b));
@@ -52,8 +50,7 @@ export async function fetchBots(params?: { status?: string; department?: string 
 
 export async function fetchBot(name: string): Promise<BotProfile | null> {
   try {
-    const res = await fetch(`${BASE_URL}/bots/${encodeURIComponent(name)}`);
-    if (!res.ok) return null;
+    const res = await apiFetch(`/bots/${encodeURIComponent(name)}`);
     return normalizeBot(await res.json());
   } catch (err) {
     console.error(`Failed to fetch bot ${name}:`, err);
@@ -63,8 +60,7 @@ export async function fetchBot(name: string): Promise<BotProfile | null> {
 
 export async function fetchBotTemplates(): Promise<BotTemplate[]> {
   try {
-    const res = await fetch(`${BASE_URL}/bots/templates`);
-    if (!res.ok) return [];
+    const res = await apiFetch(`/bots/templates`);
     const data = await res.json();
     const raw = data.templates;
     if (Array.isArray(raw)) return raw as BotTemplate[];
@@ -79,8 +75,7 @@ export async function fetchBotTemplates(): Promise<BotTemplate[]> {
 
 export async function fetchDepartments(): Promise<string[]> {
   try {
-    const res = await fetch(`${BASE_URL}/bots/departments`);
-    if (!res.ok) return [];
+    const res = await apiFetch(`/bots/departments`);
     const data = await res.json();
     return Array.isArray(data.departments) ? data.departments : [];
   } catch (err) {
@@ -107,7 +102,7 @@ export function uniqueDepartments(bots: BotProfile[]): string[] {
 /** Tell the server this bot was invoked in a run (updates last_active/version). Best-effort. */
 export async function touchBot(name: string): Promise<void> {
   try {
-    await fetch(`${BASE_URL}/bots/${encodeURIComponent(name)}/match`, { method: "POST" });
+    await apiFetch(`/bots/${encodeURIComponent(name)}/match`, { method: "POST" });
   } catch {
     /* offline or not permitted — never block chatting */
   }

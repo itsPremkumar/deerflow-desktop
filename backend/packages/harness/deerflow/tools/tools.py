@@ -38,6 +38,7 @@ from deerflow.tools.builtins import (
     check_metacognitive_health,
     check_or_set_autonomy_profile,
     code_mode_tool,
+    cognitive_memory_tool,
     cognitive_plan,
     company_tool,
     compile_cognitive_plan,
@@ -148,6 +149,7 @@ BUILTIN_TOOLS = [
     catalog_tool_search,
     catalog_tool_describe,
     catalog_tool_call,
+    cognitive_memory_tool,
     consolidate_memory_dream,
     update_progress_card,
     # Bounded Recursive Self-Improvement Loop:

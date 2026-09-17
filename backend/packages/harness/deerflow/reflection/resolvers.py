@@ -1,5 +1,7 @@
 from importlib import import_module
 
+from deerflow.branding import DISPLAY_NAME
+
 MODULE_TO_PACKAGE_HINTS = {
     "langchain_google_genai": "langchain-google-genai",
     "langchain_anthropic": "langchain-anthropic",
@@ -19,7 +21,7 @@ def _build_missing_dependency_hint(module_path: str, err: ImportError) -> str:
     if package_name is None:
         package_name = MODULE_TO_PACKAGE_HINTS.get(missing_module, missing_module.replace("_", "-"))
 
-    return f"Missing dependency '{missing_module}'. Install it with `uv add {package_name}` (or `pip install {package_name}`), then restart DeerFlow."
+    return f"Missing dependency '{missing_module}'. Install it with `uv add {package_name}` (or `pip install {package_name}`), then restart {DISPLAY_NAME}."
 
 
 def resolve_variable[T](

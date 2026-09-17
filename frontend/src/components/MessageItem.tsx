@@ -5,6 +5,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Bot, User, Brain, Copy, Check, ThumbsUp, ThumbsDown, RotateCcw, Pencil, Users, ShieldCheck } from "lucide-react";
 import { ChatMessage } from "@/types/chat";
+import { branding } from "@/lib/branding";
 import { ToolPill } from "./ToolPill";
 import { TodoBlock } from "./TodoBlock";
 import { HumanApprovalCard } from "./HumanApprovalCard";
@@ -90,7 +91,7 @@ export function MessageItem({ message, onApprovalDecision, onRate, onRegenerate,
                     ? groupSender
                       ? `@${groupSender}`
                       : "Team Channel"
-                    : "DeerFlow Assistant"}
+                    : branding.assistantLabel}
             </span>
             {isA2A && (
               <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/15 text-blue-400 font-medium">

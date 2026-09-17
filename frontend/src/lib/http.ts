@@ -1,6 +1,6 @@
-/** Shared HTTP helpers for all Gateway API clients. */
+import { apiFetch, ApiClientError } from "./api-client";
 
-export const GATEWAY_BASE = process.env.NEXT_PUBLIC_GATEWAY_URL || "/api/gateway";
+export { GATEWAY_BASE } from "./api-client";
 
 export class ApiError extends Error {
   status: number;
@@ -20,18 +20,6 @@ async function parseBody(res: Response): Promise<unknown> {
   }
 }
 
-function serverDetail(body: unknown, fallback: string): string {
-  if (body && typeof body === "object") {
-    const d = (body as Record<string, unknown>).detail;
-    if (typeof d === "string" && d) return d;
-    if (Array.isArray(d)) return d.map((e) => (typeof e === "string" ? e : JSON.stringify(e))).join("; ");
-    const msg = (body as Record<string, unknown>).message;
-    if (typeof msg === "string" && msg) return msg;
-  }
-  if (typeof body === "string" && body.length < 500) return body;
-  return fallback;
-}
-
 /** Default ceiling for API calls so a hung backend cannot freeze the UI forever. */
 export const DEFAULT_TIMEOUT_MS = 60000;
 
@@ -42,20 +30,20 @@ export async function req<T = unknown>(path: string, init?: RequestInit, timeout
   // Honor a caller-provided signal too: aborting either side aborts the request.
   const onCallerAbort = () => ctrl.abort();
   init?.signal?.addEventListener("abort", onCallerAbort);
+  if (init?.signal?.aborted) ctrl.abort();
   let res: Response;
   try {
-    res = await fetch(`${GATEWAY_BASE}${path}`, { ...init, signal: ctrl.signal });
+    res = await apiFetch(path, { ...init, signal: ctrl.signal });
   } catch (err) {
     if (ctrl.signal.aborted && !init?.signal?.aborted) {
       throw new ApiError(0, `Request timed out after ${Math.round(timeoutMs / 1000)}s — the server may be busy.`);
     }
-    throw new ApiError(0, err instanceof Error ? `Network error: ${err.message}` : "Network error");
+    throw new ApiError(err instanceof ApiClientError ? err.status : 0, err instanceof ApiClientError ? err.message : "Network error");
   } finally {
     clearTimeout(timer);
     init?.signal?.removeEventListener("abort", onCallerAbort);
   }
   const body = await parseBody(res);
-  if (!res.ok) throw new ApiError(res.status, serverDetail(body, `Request failed (${res.status})`));
   return body as T;
 }
 

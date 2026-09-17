@@ -1,4 +1,5 @@
 import { get, send, asList, pick, GATEWAY_BASE } from "./http";
+import { apiFetch, ApiClientError } from "./api-client";
 
 export interface UploadedFile {
   name: string;
@@ -22,21 +23,11 @@ export async function listUploads(threadId: string): Promise<UploadedFile[]> {
 export async function uploadFiles(threadId: string, files: FileList | File[]): Promise<UploadedFile[]> {
   const form = new FormData();
   Array.from(files).forEach((f) => form.append("files", f));
-  const res = await fetch(`${GATEWAY_BASE}/threads/${encodeURIComponent(threadId)}/uploads`, {
+  const res = await apiFetch(`/threads/${encodeURIComponent(threadId)}/uploads`, {
     method: "POST",
     body: form,
   });
-  if (!res.ok) {
-    let detail = `Upload failed (${res.status})`;
-    try {
-      const body = await res.json();
-      if (body && typeof body.detail === "string") detail = body.detail;
-    } catch {
-      /* keep default */
-    }
-    throw new Error(detail);
-  }
-  const data = await res.json();
+  const data = await res.json().catch(() => { throw new ApiClientError("response"); });
   return asList(data, ["files", "uploads", "data"]).map((f) => ({
     name: String(pick(f, ["filename", "name", "path"], "")),
     size: Number(pick(f, ["size", "size_bytes"], 0)),
@@ -57,20 +48,20 @@ export async function uploadLimits(threadId: string): Promise<Record<string, unk
   }
 }
 
+function artifactPath(threadId: string, path: string): string {
+  const clean = path.replace(/^\/+/, "");
+  return `/threads/${encodeURIComponent(threadId)}/artifacts/${clean.split("/").map(encodeURIComponent).join("/")}`;
+}
+
 /** Download URL for an artifact (opens in a new tab; active content forces download server-side). */
 export function artifactUrl(threadId: string, path: string, download = false): string {
-  const clean = path.replace(/^\/+/, "");
-  return `${GATEWAY_BASE}/threads/${encodeURIComponent(threadId)}/artifacts/${clean
-    .split("/")
-    .map(encodeURIComponent)
-    .join("/")}${download ? "?download=true" : ""}`;
+  return `${GATEWAY_BASE}${artifactPath(threadId, path)}${download ? "?download=true" : ""}`;
 }
 
 /** Fetch a text artifact for inline preview. Throws for binary/oversized content. */
 export async function previewArtifact(threadId: string, path: string): Promise<string> {
-  const res = await fetch(artifactUrl(threadId, path));
-  if (!res.ok) throw new Error(`Cannot preview (${res.status})`);
-  const blob = await res.blob();
+  const res = await apiFetch(artifactPath(threadId, path));
+  const blob = await res.blob().catch(() => { throw new ApiClientError("response"); });
   if (blob.size > 200_000) throw new Error("File is too large to preview — use download.");
   const type = blob.type || "";
   if (!type.startsWith("text/") && !type.includes("json") && !type.includes("markdown") && type !== "") {
@@ -79,7 +70,7 @@ export async function previewArtifact(threadId: string, path: string): Promise<s
       throw new Error("Binary file — use download instead of preview.");
     }
   }
-  return await blob.text();
+  return await blob.text().catch(() => { throw new ApiClientError("response"); });
 }
 
 export async function saveArtifact(threadId: string, path: string, content: string, sha256: string): Promise<void> {

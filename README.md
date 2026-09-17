@@ -97,6 +97,24 @@ working product:
   secrets) plus `make prod-check`.
 - Full runbook: [docs/PRODUCTION.md](./docs/PRODUCTION.md).
 
+## Union Alpha model configuration
+
+`config.example.yaml` now selects OpenRouter's `stealth/union-alpha` as its
+first/default model. Set `OPENROUTER_API_KEY` in the Gateway environment and
+copy the example to a new `config.yaml`, or merge its model entry into an
+existing configuration without overwriting other settings. No credentials are
+included and live inference has not been verified. Existing installations and
+custom-agent model overrides are unchanged.
+
+The public catalog checked on 2026-09-17 advertises a 262,144-token context,
+text/image input, and tool calling. This example caps output at 16,384 tokens
+and does not enable unsupported reasoning controls or cross-model fallbacks.
+The provider is anonymous and may retain prompts and completions; review its
+terms before sending sensitive data. Preview availability and pricing can change.
+
+The source-backed improvement roadmap is in
+[the implementation plan](refernace/ultimate-harness-implementation-plan.md).
+
 ## Quick start
 
 ### Option 1: Windows desktop app (end users)

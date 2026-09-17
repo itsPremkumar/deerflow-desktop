@@ -8,7 +8,11 @@ import { NavTabs, WorkspaceView } from "@/components/NavTabs";
 import { ChatMessage, Thread, AIModel } from "@/types/chat";
 import { BotProfile } from "@/types/bots";
 import { fetchThreads, createThread, fetchThreadHistory, fetchAvailableModels, autoTriggerCommand } from "@/lib/api";
-import { GATEWAY_BASE } from "@/lib/http";
+import { apiFetch, ApiClientError } from "@/lib/api-client";
+import { consumeChatStream } from "@/lib/chat-stream";
+import type { StreamMessage } from "@/lib/sse-reducer";
+import { chatRequestErrorMessage, ChatRequestFailure } from "@/lib/chat-request-error";
+import { branding } from "@/lib/branding";
 import { fetchBots, touchBot } from "@/lib/bots";
 import { fetchFeatures, fetchOpsStatus, FeatureFlags } from "@/lib/workspace";
 import { listThreadRuns, cancelRun } from "@/lib/runs";
@@ -35,7 +39,7 @@ import { BotGallery } from "@/components/bots/BotGallery";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { BotDetailPanel } from "@/components/bots/BotDetailPanel";
 import { ActiveBotPicker } from "@/components/bots/ActiveBotPicker";
-import { SkeletonList } from "@/components/ui";
+import { ErrorBox, SkeletonList } from "@/components/ui";
 import { Sparkles, Activity, Shrink, Target, ClipboardList } from "lucide-react";
 
 // Sections load on demand so the first paint stays light.
@@ -76,6 +80,8 @@ export default function ChatView() {
   const [input, setInput] = useState<string>("");
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [notice, setNotice] = useState<string | null>(null);
+  const [requestError, setRequestError] = useState<{ threadId: string; message: string; draft: string; partial: string } | null>(null);
+  const [offlineDismissed, setOfflineDismissed] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
 
@@ -383,6 +389,7 @@ export default function ChatView() {
 
     setInput("");
     setIsLoading(true);
+    setRequestError(null);
 
     // Automatically detect and trigger slash command lifecycle at the right time
     let detection = undefined;
@@ -413,14 +420,26 @@ export default function ChatView() {
     setSuggestions([]);
     const controller = new AbortController();
     abortRef.current = controller;
+    const assistantMsgId = `asst-${Date.now()}`;
+    const assistantCreatedAt = new Date().toISOString();
+    let assistantText = "";
+    let responseStarted = false;
+    let deliveredMessages: ChatMessage[] = [];
+    const streamedIds = new Set<string>();
+    const showRequestFailure = (failure: ChatRequestFailure) => {
+      setMessages((prev) => prev.filter((m) => !streamedIds.has(m.id)));
+      setRequestError({ threadId: tid, message: chatRequestErrorMessage(failure), draft: text, partial: assistantText });
+      setInput((current) => current || text);
+    };
 
     try {
-      const res = await fetch(`${GATEWAY_BASE}/threads/${threadId}/runs/stream`, {
+      const res = await apiFetch(`/threads/${encodeURIComponent(threadId)}/runs/stream`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         signal: controller.signal,
         body: JSON.stringify({
           assistant_id: activeBot?.name || "lead_agent",
+          stream_mode: ["messages-tuple", "values"],
           input: {
             messages: [{ role: "user", content }],
           },
@@ -433,64 +452,45 @@ export default function ChatView() {
         }),
       });
 
-      const assistantMsgId = `asst-${Date.now()}`;
-      const assistantCreatedAt = new Date().toISOString();
-      if (!res.ok) {
-        const assistantMsg: ChatMessage = {
-          id: assistantMsgId,
+      responseStarted = true;
+      const updateStream = (partial: StreamMessage[]) => {
+        deliveredMessages = partial.map((message) => ({
+          id: message.runId ? JSON.stringify([message.runId, message.id]) : assistantMsgId,
           role: "assistant",
-          content: `**${activeBot ? activeBot.display_name || activeBot.name : "DeerFlow"}** has received your request and evaluated the workflow. What next step would you like to execute?`,
+          content: message.content,
+          thinking: message.thinking,
+          toolCalls: message.toolCalls,
           createdAt: assistantCreatedAt,
-        };
-        setMessages((prev) => [...prev, assistantMsg]);
-        try {
-          appendLocalMessages(tid, [assistantMsg]);
-        } catch {
-          /* ignore */
-        }
+          runId: message.runId || undefined,
+        }));
+        assistantText = deliveredMessages.map((message) => message.content).join("\n\n");
+        for (const message of deliveredMessages) streamedIds.add(message.id);
+        setMessages((prev) => [...prev.filter((message) => !streamedIds.has(message.id)), ...deliveredMessages]);
+      };
+      const result = await consumeChatStream(res, {
+        threadId: tid,
+        signal: controller.signal,
+        onUpdate: updateStream,
+        onEvent: (event) => {
+          if (event.type === "replay-gap") flash("Some streamed events could not be replayed. This response is incomplete.");
+        },
+      });
+      updateStream(result.messages);
+      if (controller.signal.aborted) {
+        showRequestFailure({ kind: "stopped" });
         return;
       }
-
-      const reader = res.body?.getReader();
-      const decoder = new TextDecoder();
-      let assistantText = "";
-      setMessages((prev) => [
-        ...prev,
-        { id: assistantMsgId, role: "assistant", content: "", createdAt: assistantCreatedAt },
-      ]);
-
-      if (reader) {
-        for (;;) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          const chunk = decoder.decode(value, { stream: true });
-          assistantText += chunk;
-          setMessages((prev) =>
-            prev.map((m) => (m.id === assistantMsgId ? { ...m, content: assistantText } : m))
-          );
-        }
+      if (!assistantText.trim()) {
+        showRequestFailure({ kind: "empty" });
+        return;
       }
-
-      // Attach the newest run id so feedback + stop work on this answer.
-      let attachedRunId: string | undefined;
       try {
-        const runs = await listThreadRuns(threadId);
-        const newest = runs[0]?.run_id;
-        if (newest) {
-          attachedRunId = newest;
-          setMessages((prev) => prev.map((m) => (m.id === assistantMsgId ? { ...m, runId: newest } : m)));
-        }
         setUsage(await fetchTokenUsage(threadId));
-      } catch {
-        /* non-fatal */
-      }
+      } catch {}
+
       try {
-        appendLocalMessages(tid, [
-          { id: assistantMsgId, role: "assistant", content: assistantText, createdAt: assistantCreatedAt, runId: attachedRunId },
-        ]);
-      } catch {
-        /* ignore */
-      }
+        appendLocalMessages(tid, deliveredMessages);
+      } catch {}
 
       // Follow-up suggestions.
       if (suggestionsOn) {
@@ -504,15 +504,12 @@ export default function ChatView() {
           /* suggestions are optional */
         }
       }
-    } catch (err) {
-      if (err instanceof DOMException && err.name === "AbortError") {
-        setMessages((prev) => [
-          ...prev,
-          { id: `sys-${Date.now()}`, role: "assistant", content: "_Stopped — the answer was halted._", createdAt: new Date().toISOString() },
-        ]);
-      } else {
-        console.error(err);
-      }
+    } catch (error) {
+      showRequestFailure(controller.signal.aborted
+        ? { kind: "stopped" }
+        : !responseStarted && error instanceof ApiClientError && error.kind === "http"
+          ? { kind: "http", status: error.status }
+          : { kind: responseStarted ? "stream" : "network" });
     } finally {
       setIsLoading(false);
       abortRef.current = null;
@@ -611,7 +608,7 @@ export default function ChatView() {
         const runs = await listThreadRuns(activeThreadId);
         const live = runs.find((r) => r.status === "running" || r.status === "pending");
         if (live) await cancelRun(activeThreadId, live.run_id);
-        flash("Stopped.");
+        flash(live ? "Cancellation requested — check Runs for status." : "No active run found — check Runs for status.");
       } catch {
         /* stream abort alone already halts the UI */
       }
@@ -810,6 +807,7 @@ export default function ChatView() {
           onBranchOpened={(id) => reloadThreads(id)}
           onExportHistory={handleExportHistory}
           onImportHistory={handleImportHistory}
+          serverOnline={gatewayOk === true}
         />
       )}
 
@@ -829,7 +827,13 @@ export default function ChatView() {
                 type="button"
                 onClick={() => setView("system")}
                 title={gatewayOk === false ? "Server unreachable — open System to diagnose" : "Server status — open System control center"}
-                className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 font-medium hidden sm:inline-flex items-center gap-1 hover:bg-emerald-500/20"
+                className={`text-[10px] px-2 py-0.5 rounded-full font-medium hidden sm:inline-flex items-center gap-1 ${
+                  gatewayOk === false
+                    ? "bg-destructive/10 text-destructive hover:bg-destructive/20"
+                    : gatewayOk
+                      ? "bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20"
+                      : "bg-amber-500/10 text-amber-600 hover:bg-amber-500/20"
+                }`}
               >
                 <span className={`size-1.5 rounded-full ${gatewayOk === false ? "bg-destructive" : gatewayOk ? "bg-emerald-500" : "bg-amber-400"}`} />
                 {gatewayOk === false ? "Offline" : gatewayOk ? "Connected" : "Checking…"}
@@ -842,6 +846,24 @@ export default function ChatView() {
             </div>
           )}
         </header>
+
+        {gatewayOk === false && !offlineDismissed && (
+          <div className="shrink-0 px-4 pt-2">
+            <div className="max-w-4xl mx-auto flex items-center gap-2.5 rounded-xl border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs">
+              <span className="size-2 rounded-full bg-destructive animate-pulse shrink-0" aria-hidden="true" />
+              <span className="flex-1 min-w-0">
+                <strong>Backend not connected.</strong>{" "}
+                <span className="text-muted-foreground">Chats stay in this browser until the Gateway runs. Start it with <code className="font-mono">.\start.ps1</code>, then refresh.</span>
+              </span>
+              <button type="button" onClick={() => setView("system")} className="px-2.5 py-1 rounded-lg bg-destructive text-destructive-foreground text-[11px] font-semibold shrink-0">
+                Diagnose
+              </button>
+              <button type="button" onClick={() => setOfflineDismissed(true)} className="px-2 py-1 rounded-lg text-[11px] text-muted-foreground hover:text-foreground shrink-0" aria-label="Dismiss offline warning">
+                Dismiss
+              </button>
+            </div>
+          </div>
+        )}
 
         {notice && (
           <div className="shrink-0 px-4 pt-2">
@@ -1019,12 +1041,12 @@ export default function ChatView() {
                     <Sparkles className="size-6" />
                   </div>
                   <h2 className="text-lg font-semibold text-foreground tracking-tight">
-                    DeerFlow Lightweight AI Studio
+                    {branding.name}
                   </h2>
                   <p className="text-xs text-muted-foreground leading-relaxed">
                     {activeBot
                       ? `Talking to ${activeBot.display_name || activeBot.name} (${activeBot.role}). Switch specialists anytime from the Bots tab.`
-                      : "Ask anything — research, code, plans. Attach files with the paperclip, polish drafts with the wand."}
+                      : branding.intro}
                   </p>
                   {bots.length > 0 && (
                     <div className="flex flex-wrap justify-center gap-1.5 pt-1">
@@ -1066,11 +1088,28 @@ export default function ChatView() {
                 ))
               )}
 
+              {requestError && requestError.threadId === activeThreadId && (
+                <div className="max-w-4xl mx-auto space-y-2">
+                  <div role="alert">
+                    <ErrorBox
+                      message={requestError.message}
+                      onRetry={!isLoading ? () => sendMessage(input.trim() ? input : requestError.draft) : undefined}
+                    />
+                  </div>
+                  {requestError.partial && (
+                    <div className="rounded-xl border border-destructive/40 p-3 text-xs">
+                      <p className="font-semibold mb-2">Incomplete response — not saved</p>
+                      <pre className="whitespace-pre-wrap break-words font-sans">{requestError.partial}</pre>
+                    </div>
+                  )}
+                </div>
+              )}
+
               {isLoading && (
                 <div className="flex items-center gap-2 text-xs text-muted-foreground py-2 px-4 animate-pulse">
                   <Activity className="size-4 animate-spin text-primary" />
                   <span>
-                    {activeBot ? `${activeBot.display_name || activeBot.name} is generating response` : "DeerFlow agent is generating response"} & verifying tools…
+                    {activeBot ? `${activeBot.display_name || activeBot.name} is generating response` : `${branding.assistantLabel} is generating response`} & verifying tools…
                   </span>
                 </div>
               )}

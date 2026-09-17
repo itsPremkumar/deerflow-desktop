@@ -1,33 +1,28 @@
-"""Workspace AVO Runner: Grounded Workspace Candidate Execution with Auto-Rollback.
-
-Integrates Autonomous AVO's evolutionary loop directly with real workspace code files:
-1. Micro-checkpoints target file before mutation.
-2. Applies modification and executes empirical tests/benchmarks.
-3. Evaluates multi-dimensional vector f(x) with hard binary correctness gate.
-4. Auto-rollbacks workspace on failure/regression; commits and persists on improvement.
-"""
-
 from __future__ import annotations
 
 import json
-import logging
+import math
+import os
 import shlex
 import subprocess
 import sys
+import threading
 import time
 from pathlib import Path
+from typing import Any
+
+from deerflow.sandbox.env_policy import build_sandbox_env
+
 from .knowledge import DomainKnowledgeBase
 from .lineage import AVOLineage, VersionRecord
 from .persistence import AVOPersistenceManager
 from .scoring import EvaluationVector
 from .supervisor import AVOSupervisor
 
-logger = logging.getLogger("deerflow.avo.workspace_runner")
+_WORKSPACE_LOCK = threading.RLock()
 
 
 class WorkspaceAVORunner:
-    """Executes grounded evolutionary variation against real files with safety rollback."""
-
     def __init__(
         self,
         lineage: AVOLineage | None = None,
@@ -36,13 +31,21 @@ class WorkspaceAVORunner:
         persistence_mgr: AVOPersistenceManager | None = None,
         root_path: str | Path | None = None,
     ) -> None:
-        self.root_path = Path(root_path).resolve() if root_path else Path.cwd()
+        self.root_path = Path(root_path).resolve() if root_path else Path.cwd().resolve()
         self.persistence_mgr = persistence_mgr or AVOPersistenceManager(self.root_path)
-
-        # Restore from disk if existing, or use provided/new instances
         self.lineage = lineage or self.persistence_mgr.load_lineage() or AVOLineage()
         self.knowledge_base = knowledge_base or self.persistence_mgr.load_knowledge_base() or DomainKnowledgeBase()
         self.supervisor = supervisor or AVOSupervisor()
+
+    def _target(self, path: str) -> Path:
+        target = Path(path)
+        target = target if target.is_absolute() else self.root_path / target
+        resolved = target.resolve(strict=True)
+        if not resolved.is_relative_to(self.root_path) or not resolved.is_file():
+            raise ValueError("Target must be a file within the workspace root")
+        if target.absolute() != resolved or resolved.stat().st_nlink != 1:
+            raise ValueError("Candidate target must not use links or traversal")
+        return resolved
 
     def run_workspace_variation(
         self,
@@ -55,169 +58,154 @@ class WorkspaceAVORunner:
         parent_id: str | None = None,
         timeout_seconds: float = 30.0,
     ) -> dict[str, Any]:
-        """Execute a grounded variation step on a workspace file with auto-rollback."""
-        target_path = Path(target_file_path)
-        if not target_path.is_absolute():
-            target_path = self.root_path / target_path
+        with _WORKSPACE_LOCK:
+            return self._run_variation(target_file_path, candidate_code, hypothesis, modification, test_command, expected_metrics, parent_id, timeout_seconds)
 
-        if not target_path.exists():
-            return {
-                "success": False,
-                "committed": False,
-                "error": f"Target file does not exist: {target_file_path}",
-                "rolled_back": False,
-            }
-
-        effective_parent = parent_id or self.lineage.head_id
-
-        from deerflow.tools.builtins.code_agentic_core import manage_code_checkpoint
-
-        try:
-            rel_file = str(target_path.relative_to(self.root_path))
-        except ValueError:
-            rel_file = target_file_path
-
-        # 1. Create safety micro-checkpoint of baseline state
-        checkpoint_label = f"avo_pre_{time.time_ns()}"
-        cp_res_raw = manage_code_checkpoint.invoke({
-            "action": "create",
-            "label": checkpoint_label,
-            "target_files": [rel_file],
-            "root_path": str(self.root_path),
-        })
-        try:
-            cp_res = json.loads(cp_res_raw)
-            checkpoint_id = cp_res.get("checkpoint_id", checkpoint_label)
-        except Exception:
-            checkpoint_id = checkpoint_label
-
-        # 2. Write candidate modification to target file
-        try:
-            target_path.write_text(candidate_code, encoding="utf-8")
-        except Exception as e:
-            return {
-                "success": False,
-                "committed": False,
-                "error": f"Failed to write candidate code: {e}",
-                "rolled_back": False,
-            }
-
-        # 3. Execute test/benchmark command
-        cmd = test_command or f'"{sys.executable}" -m pytest'
-        start_time = time.time()
-        try:
-            result = subprocess.run(
-                cmd,
-                shell=True,
-                cwd=str(self.root_path),
-                capture_output=True,
-                text=True,
-                timeout=timeout_seconds,
-            )
-            duration = time.time() - start_time
-            correctness = (result.returncode == 0)
-            stdout = result.stdout
-            stderr = result.stderr
-        except subprocess.TimeoutExpired:
-            duration = timeout_seconds
-            correctness = False
-            stdout = ""
-            stderr = f"Evaluation command timed out after {timeout_seconds}s"
-        except Exception as e:
-            duration = 0.0
-            correctness = False
-            stdout = ""
-            stderr = str(e)
-
-        # 4. Compute performance vector
-        # Shorter execution time is higher performance speedup
-        perf_score = max(0.01, round(1.0 / max(0.01, duration), 4))
-        metrics = {"throughput": perf_score, "duration_s": round(duration, 3)}
-        if expected_metrics:
-            metrics.update(expected_metrics)
-
-        vector = EvaluationVector(
-            metrics=metrics,
-            correctness=correctness,
-            metadata={"stdout_tail": stdout[-300:], "stderr_tail": stderr[-300:]},
-        )
-
-        candidate = VersionRecord(
-            parent_id=effective_parent,
-            hypothesis=hypothesis,
-            modification=modification,
-            correctness=correctness,
-            vector=vector,
-            performance_score=vector.effective_metric("throughput"),
-            quality_score=1.0 if correctness else 0.0,
-            diff_summary=modification,
-            metadata={"target_file": str(target_path), "checkpoint_id": checkpoint_id},
-        )
-
-        # 5. Evaluate matches-or-improves commit policy
-        committed = self.lineage.commit_candidate(candidate)
-
-        # 6. Checkpoint management: rollback if failed/regressed, retain if committed
-        rolled_back = False
-        if not committed:
-            # Auto-rollback file to baseline checkpoint
-            rollback_res_raw = manage_code_checkpoint.invoke({
-                "action": "rollback",
-                "checkpoint_id": checkpoint_id,
-                "root_path": str(self.root_path),
-            })
-            rolled_back = True
-            self.knowledge_base.record_negative_lesson(
-                attempt_hypothesis=hypothesis,
-                failure_reason=candidate.rejection_reason or "Score regression or test failure",
-            )
-        else:
-            self.knowledge_base.record_positive_pattern(
-                hypothesis=hypothesis,
-                modification_summary=modification,
-                measured_gain=f"geomean={vector.geometric_mean():.4f} (duration={duration:.3f}s)",
-            )
-
-        # 7. Observe supervisor for anti-stagnation
-        signature = f"{modification[:30]}_{correctness}"
-        stagnated, directive, diag = self.supervisor.observe_step(
-            improved=committed,
-            signature=signature,
-            backtrack_candidate=effective_parent,
-        )
-
-        # 8. Persist updated lineage and knowledge base to disk
-        self.persistence_mgr.save_lineage(self.lineage)
-        self.persistence_mgr.save_knowledge_base(self.knowledge_base)
-
-        return {
-            "success": committed,
-            "committed": committed,
-            "rolled_back": rolled_back,
-            "version_id": candidate.version_id,
-            "parent_id": effective_parent,
-            "correctness": correctness,
-            "duration_seconds": round(duration, 3),
-            "performance_score": perf_score,
-            "rejection_reason": candidate.rejection_reason,
-            "supervisor_intervention": stagnated,
-            "supervisor_directive": directive.to_dict() if directive else None,
-            "supervisor_status": diag,
-            "stdout_snippet": stdout[-200:] if stdout else None,
-            "stderr_snippet": stderr[-200:] if stderr else None,
+    def _run_variation(self, target_file_path, candidate_code, hypothesis, modification, test_command, expected_metrics, parent_id, timeout_seconds) -> dict[str, Any]:
+        response: dict[str, Any] = {
+            "success": False,
+            "committed": False,
+            "rolled_back": False,
+            "workspace_retained": False,
+            "production_deployed": False,
+            "commit_scope": "workspace_retention",
+            "workspace_state": "unchanged",
+            "rollback_scope": "target_file_only",
+            "execution_scope": "local_process_not_security_sandbox",
+            "concurrency_scope": "single_process",
+            "persisted": False,
         }
+        try:
+            if expected_metrics:
+                raise ValueError("expected_metrics cannot supply or override measured evaluation metrics")
+            if not math.isfinite(timeout_seconds) or not 0 < timeout_seconds <= 300:
+                raise ValueError("timeout_seconds must be finite and between 0 and 300")
+            target = self._target(target_file_path)
+            baseline = target.read_bytes()
+            baseline_text = baseline.decode("utf-8", errors="strict").replace("\r\n", "\n")
+            command = shlex.split(test_command, posix=os.name != "nt") if test_command else [sys.executable, "-m", "pytest"]
+            if os.name == "nt":
+                command = [arg[1:-1] if len(arg) >= 2 and arg[0] == arg[-1] and arg[0] in "\"'" else arg for arg in command]
+            if not command:
+                raise ValueError("Evaluation command is empty")
+            from deerflow.authz.sandbox_authz import authorize_sandbox_execution, safe_app_config
+
+            authorize_sandbox_execution(context={}, app_config=safe_app_config())
+            effective_parent = parent_id or self.lineage.head_id
+            if effective_parent and effective_parent not in self.lineage.versions:
+                raise ValueError("Unknown candidate parent")
+            if parent_id and parent_id != self.lineage.head_id:
+                raise ValueError("Workspace candidate must use the current lineage head")
+            from deerflow.tools.builtins.code_agentic_core import manage_code_checkpoint
+
+            rel_file = str(target.relative_to(self.root_path))
+            checkpoint = json.loads(manage_code_checkpoint.invoke({"action": "create", "label": f"avo_pre_{time.time_ns()}", "target_files": [rel_file], "root_path": str(self.root_path)}))
+            if not isinstance(checkpoint, dict) or checkpoint.get("status") != "created" or not isinstance(checkpoint.get("checkpoint_id"), str) or not checkpoint["checkpoint_id"]:
+                raise ValueError("Successful checkpoint required before candidate write")
+            if checkpoint.get("captured_files") != [rel_file] or checkpoint.get("captured_files_count") != 1:
+                raise ValueError("Checkpoint did not capture the target file")
+            checkpoint_id = checkpoint["checkpoint_id"]
+            response["checkpoint_id"] = checkpoint_id
+        except Exception as exc:
+            response["error"] = str(exc)
+            return response
+
+        def rollback() -> None:
+            response["workspace_state"] = "unknown"
+            try:
+                self._target(target_file_path)
+                result = json.loads(manage_code_checkpoint.invoke({"action": "rollback", "checkpoint_id": checkpoint_id, "root_path": str(self.root_path)}))
+                if not isinstance(result, dict) or result.get("status") != "rolled_back" or result.get("checkpoint_id") != checkpoint_id or rel_file not in result.get("restored_files", []):
+                    raise RuntimeError("Checkpoint rollback was not successful")
+                if self._target(target_file_path).read_text(encoding="utf-8").replace("\r\n", "\n") != baseline_text:
+                    raise RuntimeError("Rollback content does not match baseline")
+                response["rolled_back"] = True
+                response["workspace_state"] = "baseline_restored"
+            except Exception as exc:
+                response["rollback_error"] = str(exc)
+
+        try:
+            if self._target(target_file_path).read_bytes() != baseline:
+                raise RuntimeError("Target changed after checkpoint creation")
+            target.write_text(candidate_code, encoding="utf-8", newline="")
+            response["workspace_state"] = "candidate_written"
+        except Exception as exc:
+            response["error"] = f"Failed to write candidate: {exc}"
+            rollback()
+            return response
+
+        start = time.monotonic()
+        try:
+            result = subprocess.run(command, shell=False, cwd=str(self.root_path), capture_output=True, text=True, timeout=timeout_seconds, stdin=subprocess.DEVNULL, env=build_sandbox_env())
+            correctness = result.returncode == 0
+            stdout, stderr = result.stdout, result.stderr
+        except Exception as exc:
+            correctness, stdout, stderr = False, "", str(exc)
+        duration = time.monotonic() - start
+        perf_score = max(0.01, round(1.0 / max(0.01, duration), 4))
+        try:
+            if self._target(target_file_path).read_bytes() != candidate_code.encode("utf-8"):
+                correctness = False
+                stderr += "\nTarget changed during evaluation"
+            vector = EvaluationVector(metrics={"throughput": perf_score}, correctness=correctness, metadata={"duration_s": duration, "stdout_tail": stdout[-300:], "stderr_tail": stderr[-300:]})
+            candidate = VersionRecord(
+                parent_id=effective_parent,
+                hypothesis=hypothesis,
+                modification=modification,
+                correctness=correctness,
+                vector=vector,
+                performance_score=perf_score,
+                quality_score=1.0 if correctness else 0.0,
+                diff_summary=modification,
+                metadata={"target_file": str(target), "checkpoint_id": checkpoint_id, "commit_scope": "workspace_retention", "production_deployed": False},
+            )
+            retained = self.lineage.commit_candidate(candidate)
+            response.update(
+                committed=retained,
+                workspace_retained=retained,
+                version_id=candidate.version_id,
+                parent_id=effective_parent,
+                correctness=correctness,
+                duration_seconds=round(duration, 3),
+                performance_score=perf_score,
+                rejection_reason=candidate.rejection_reason,
+                stdout_snippet=stdout[-200:] or None,
+                stderr_snippet=stderr[-200:] or None,
+            )
+            if not retained:
+                rollback()
+                self.knowledge_base.record_negative_lesson(attempt_hypothesis=hypothesis, failure_reason=candidate.rejection_reason or "Evaluation rejected")
+            else:
+                response["workspace_state"] = "candidate_retained"
+                self.knowledge_base.record_positive_pattern(hypothesis=hypothesis, modification_summary=modification, measured_gain=f"throughput={perf_score:.4f} (duration={duration:.3f}s)")
+            stagnated, directive, diag = self.supervisor.observe_step(improved=retained, signature=f"{modification[:30]}_{correctness}", backtrack_candidate=effective_parent)
+            response.update(supervisor_intervention=stagnated, supervisor_directive=directive.to_dict() if directive else None, supervisor_status=diag)
+            self.persistence_mgr.save_lineage(self.lineage)
+            self.persistence_mgr.save_knowledge_base(self.knowledge_base)
+            response["persisted"] = True
+            response["success"] = retained
+        except Exception as exc:
+            response["error"] = str(exc)
+            if not response["workspace_retained"] and not response["rolled_back"]:
+                rollback()
+        return response
 
 
 _AVO_RUNNERS: dict[str, WorkspaceAVORunner] = {}
 
 
 def get_avo_runner(project_id: str = "default") -> WorkspaceAVORunner:
-    """Project-scoped singleton accessor for WorkspaceAVORunner."""
-    import os
-    if project_id not in _AVO_RUNNERS:
-        base_dir = os.environ.get("DEER_FLOW_PROJECTS_DIR", ".deerflow_projects")
-        proj_dir = Path(base_dir) / project_id
-        proj_dir.mkdir(parents=True, exist_ok=True)
-        pm = AVOPersistenceManager(proj_dir)
-        _AVO_RUNNERS[project_id] = WorkspaceAVORunner(persistence_mgr=pm, root_path=proj_dir)
-    return _AVO_RUNNERS[project_id]
+    import re
+
+    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]{0,127}", project_id):
+        raise ValueError("Invalid AVO project id")
+    with _WORKSPACE_LOCK:
+        base = Path(os.environ.get("DEER_FLOW_PROJECTS_DIR", ".deerflow_projects")).resolve()
+        project = base / project_id
+        if project.resolve() != project:
+            raise ValueError("AVO project path escapes project root")
+        key = str(project)
+        if key not in _AVO_RUNNERS:
+            project.mkdir(parents=True, exist_ok=True)
+            _AVO_RUNNERS[key] = WorkspaceAVORunner(root_path=project)
+        return _AVO_RUNNERS[key]

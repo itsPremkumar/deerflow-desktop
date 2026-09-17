@@ -5,6 +5,7 @@ import { Send, Square, Wand2, Paperclip, Terminal, ChevronRight } from "lucide-r
 import { AIModel, SlashCommandInfo } from "@/types/chat";
 import { fetchCommands } from "@/lib/api";
 import { SlashCommand } from "@/lib/commands";
+import { branding } from "@/lib/branding";
 
 const DEFAULT_CORE_COMMANDS: SlashCommandInfo[] = [
   { command: "/goal", category: "mission", description: "Define and orchestrate autonomous goals", usage: "/goal <objective>", is_core: true, is_autonomous_trigger: true, requires_approval: false },
@@ -293,7 +294,7 @@ export function Composer({
         </div>
       </div>
       <div className="text-[11px] text-center text-muted-foreground mt-2">
-        DeerFlow AI Agent • Type <kbd className="px-1 py-0.5 rounded bg-muted text-[10px] font-mono">/</kbd> for commands • <kbd className="px-1 py-0.5 rounded bg-muted text-[10px] font-mono">Enter</kbd> to send • <kbd className="px-1 py-0.5 rounded bg-muted text-[10px] font-mono">Shift + Enter</kbd> for new line
+        {branding.name} • Type <kbd className="px-1 py-0.5 rounded bg-muted text-[10px] font-mono">/</kbd> for commands • <kbd className="px-1 py-0.5 rounded bg-muted text-[10px] font-mono">Enter</kbd> to send • <kbd className="px-1 py-0.5 rounded bg-muted text-[10px] font-mono">Shift + Enter</kbd> for new line
       </div>
     </div>
   );

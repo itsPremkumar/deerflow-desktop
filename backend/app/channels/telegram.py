@@ -20,6 +20,7 @@ from app.channels.message_bus import (
     OutboundMessage,
     ResolvedAttachment,
 )
+from deerflow.branding import DISPLAY_NAME
 from deerflow.uploads.manager import is_upload_staging_file, normalize_filename
 
 logger = logging.getLogger(__name__)
@@ -764,7 +765,7 @@ class TelegramChannel(Channel):
             status="connected",
         )
         logger.info("[Telegram] bound chat=%s user=%s to DeerFlow user=%s connection=%s", chat_id, user_id, owner_user_id, connection["id"])
-        await self._run_on_telegram_loop(update.message.reply_text("Telegram connected to DeerFlow."))
+        await self._run_on_telegram_loop(update.message.reply_text(f"Telegram connected to {DISPLAY_NAME}."))
         return True
 
     async def _bind_connection_from_start_token(self, update, state_token: str) -> bool:
@@ -834,7 +835,7 @@ class TelegramChannel(Channel):
                 return
         if not self._check_user(update.effective_user.id):
             return
-        await update.message.reply_text("Welcome to DeerFlow! Send me a message to start a conversation.\nType /help for available commands.")
+        await update.message.reply_text(f"Welcome to {DISPLAY_NAME}! Send me a message to start a conversation.\nType /help for available commands.")
 
     async def _process_incoming_with_reply(
         self,
