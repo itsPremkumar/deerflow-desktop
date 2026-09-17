@@ -41,6 +41,8 @@ const net = require('node:net');
 const os = require('node:os');
 const path = require('node:path');
 
+const { resolveStartUrl, rewriteGatewayDestinations } = require('./lib/desktop-utils');
+
 const APP_NAME = 'DeerFlow';
 // Single source of truth for desktop ports: electron/desktop-config.json
 // (also read by scripts/build-frontend.mjs so the baked /api rewrites match).
@@ -654,8 +656,8 @@ function spawnBackend(gatewayPort) {
 // ---------------------------------------------------------------------------
 
 function spawnFrontendDev(nodeExe, frontendPort, gatewayBaseUrl) {
-  const devScript = path.join(frontendDir, 'scripts', 'dev.mjs');
-  if (!fs.existsSync(path.join(frontendDir, 'node_modules', 'next', 'package.json'))) {
+  const nextBin = path.join(frontendDir, 'node_modules', 'next', 'dist', 'bin', 'next');
+  if (!fs.existsSync(nextBin)) {
     dialog.showErrorBox(
       'DeerFlow — frontend dependencies missing',
       `Next.js was not found in ${frontendDir}\\node_modules.\n\n` +
@@ -669,8 +671,7 @@ function spawnFrontendDev(nodeExe, frontendPort, gatewayBaseUrl) {
     PORT: String(frontendPort),
     DEER_FLOW_INTERNAL_GATEWAY_BASE_URL: gatewayBaseUrl,
   });
-  // dev.mjs forwards everything after `--` to `next dev` (webpack default).
-  const fArgs = [devScript, '--', '--port', String(frontendPort)];
+  const fArgs = [nextBin, 'dev', '--port', String(frontendPort)];
   log(`Starting frontend (dev): ${nodeExe} ${fArgs.join(' ')}`, `cwd=${frontendDir}`);
   const child = spawn(nodeExe, fArgs, { cwd: frontendDir, env, stdio: ['ignore', 'pipe', 'pipe'] });
   children.frontend = child;
@@ -709,25 +710,16 @@ function patchStandaloneGatewayUrl(standaloneDir, gatewayBaseUrl) {
   } catch (error) {
     throw new Error(`Cannot parse Next.js routes manifest at ${manifestPath}: ${error.message}`);
   }
-  const groups = manifest ? manifest.rewrites : null;
-  const lists = groups ? [groups.beforeFiles, groups.afterFiles, groups.fallback] : [];
-  let patched = 0;
-  for (const list of lists) {
-    if (!Array.isArray(list)) continue;
-    for (const rule of list) {
-      if (!rule || typeof rule.destination !== 'string') continue;
-      const updated = rule.destination.replace(/^https?:\/\/(127\.0\.0\.1|localhost):\d+/, gatewayBaseUrl);
-      if (updated !== rule.destination) {
-        rule.destination = updated;
-        patched += 1;
-      }
-    }
-  }
+  const { patched, allMatch } = rewriteGatewayDestinations(manifest, gatewayBaseUrl);
   if (patched === 0) {
-    throw new Error(
-      `Cannot point the bundled frontend at the Gateway: no loopback rewrite destinations found in ${manifestPath}. ` +
-        `Expected /api rewrites to http://127.0.0.1:<port> (built with DEER_FLOW_INTERNAL_GATEWAY_BASE_URL). Rebuild the frontend.`,
-    );
+    if (!allMatch) {
+      throw new Error(
+        `Cannot point the bundled frontend at the Gateway: no loopback /api rewrite destinations found in ${manifestPath}. ` +
+          `Expected /api rewrites to http://127.0.0.1:<port> (built with DEER_FLOW_INTERNAL_GATEWAY_BASE_URL). Rebuild the frontend.`,
+      );
+    }
+    log(`Rewrite destinations already point at Gateway ${gatewayBaseUrl}`);
+    return false;
   }
   try {
     fs.writeFileSync(manifestPath, JSON.stringify(manifest), 'utf8');
@@ -790,22 +782,6 @@ let splashWindow = null;
 let mainWindow = null;
 let appQuitting = false;
 let runtimeStatus = { dev: args.dev, packaged: isPackaged, frontendUrl: null, gatewayUrl: null };
-
-/**
- * First screen of the desktop app: the 2.0 chat composer directly (the same
- * destination as the website's "Get Started with 2.0" button), so the
- * marketing landing page is never shown. Override with
- * DEERFLOW_START_PATH=/some/path when a different start page is needed.
- */
-function resolveStartUrl(frontendUrl) {
-  if (!frontendUrl || !/^https?:\/\//i.test(frontendUrl)) return frontendUrl;
-  const startPath = process.env.DEERFLOW_START_PATH || '/workspace/chats/new';
-  try {
-    return new URL(startPath, frontendUrl).toString();
-  } catch {
-    return frontendUrl;
-  }
-}
 
 function createSplash() {
   splashWindow = new BrowserWindow({

@@ -10,6 +10,7 @@ const gatewayBase = (process.env.DEER_FLOW_INTERNAL_GATEWAY_BASE_URL || "http://
 
 const nextConfig = {
   reactStrictMode: true,
+  output: process.env.NEXT_CONFIG_BUILD_OUTPUT === "standalone" ? "standalone" : undefined,
   // Pin the tracing root to this app: a stray package-lock.json in an ancestor
   // folder (e.g. the Windows home dir) otherwise hijacks workspace inference.
   outputFileTracingRoot: __dirname,

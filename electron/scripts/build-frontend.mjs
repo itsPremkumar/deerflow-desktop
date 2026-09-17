@@ -119,11 +119,14 @@ function assembleStandalone() {
   // The web showcase fixtures (public/demo) are excluded from the desktop
   // bundle (see electron-builder.yml) to keep the installer lean.
   const publicDest = path.join(standaloneDir, "public");
-  fs.cpSync(path.join(frontendDir, "public"), publicDest, {
-    recursive: true,
-    filter: (src) => !src.includes(`${path.sep}demo${path.sep}`) && !src.endsWith(`${path.sep}demo`),
-  });
-  console.log(`Copied public/ -> ${publicDest} (excluding demo/)`);
+  const publicSrc = path.join(frontendDir, "public");
+  if (fs.existsSync(publicSrc)) {
+    fs.cpSync(publicSrc, publicDest, {
+      recursive: true,
+      filter: (src) => !src.includes(`${path.sep}demo${path.sep}`) && !src.endsWith(`${path.sep}demo`),
+    });
+    console.log(`Copied public/ -> ${publicDest} (excluding demo/)`);
+  }
   const staticSrc = path.join(frontendDir, ".next", "static");
   const staticDest = path.join(standaloneDir, ".next", "static");
   const copies = [[staticSrc, staticDest]];
